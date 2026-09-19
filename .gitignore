@@ -5,6 +5,7 @@ dist-ssr
 *.local
 .env*
 .tanstack
+.vercel
 .wrangler
 .output
 .vinxi
