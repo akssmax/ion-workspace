@@ -4,6 +4,7 @@ import { pickThemeConfig } from "./schema"
 import { useThemeStore } from "./store"
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const preset = useThemeStore((s) => s.preset)
   const mode = useThemeStore((s) => s.mode)
   const accent = useThemeStore((s) => s.accent)
   const gray = useThemeStore((s) => s.gray)
@@ -15,7 +16,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   useLayoutEffect(() => {
     applyTheme(pickThemeConfig(useThemeStore.getState()))
-  }, [mode, accent, gray, radius, font, scale, cvd, highContrast])
+  }, [preset, mode, accent, gray, radius, font, scale, cvd, highContrast])
 
   useEffect(() => {
     if (mode !== "system") return

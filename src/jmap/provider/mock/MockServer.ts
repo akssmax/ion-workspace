@@ -254,6 +254,13 @@ export class MockServer {
             calendars: { maxEventsPerEmail: 1 },
             contacts: { mayCreateTopLevelAddressBooks: true },
             files: { maxDepth: 10 },
+            [JMAP_CAPS.MAIL]: { maxMailboxesPerEmail: 20 },
+            [JMAP_CAPS.SUBMISSION]: {},
+            [JMAP_CAPS.CALENDARS]: {},
+            [JMAP_CAPS.CONTACTS]: {},
+            [JMAP_CAPS.FILES]: {},
+            "urn:ietf:params:jmap:vacationresponse": {},
+            "urn:ietf:params:jmap:sieve": {},
           },
         },
       },
@@ -551,7 +558,7 @@ export class MockServer {
       if (value && typeof value === "object") {
         const out: Record<string, unknown> = {}
         for (const [k, v] of Object.entries(value as Record<string, unknown>))
-          out[k] = walk(v)
+          out[k] = k === "onSuccessActivateScript" ? v : walk(v)
         return out
       }
       return value

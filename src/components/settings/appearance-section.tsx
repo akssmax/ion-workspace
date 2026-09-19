@@ -4,9 +4,8 @@ export function AppearanceSection() {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        These settings live on this device and apply across the app, docs, and
-        login. White-label brands can ship a different default config without
-        changing components.
+        Make this workspace feel like yours. Changes apply instantly across the
+        app and are saved on this device.
       </p>
       <ThemeController />
     </div>

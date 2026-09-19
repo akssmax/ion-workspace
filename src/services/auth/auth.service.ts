@@ -25,7 +25,8 @@ export async function fetchAppConfig(): Promise<{
 
 export async function authenticate(
   username: string,
-  password: string
+  password: string,
+  mfaToken?: string
 ): Promise<SessionInfo> {
   // Harden against trivial empty submissions.
   const cleaned = username.trim()
@@ -33,9 +34,9 @@ export async function authenticate(
     throw new Error("Username and password are required.")
   }
   const call = login as unknown as (input: {
-    data: { username: string; password: string }
+    data: { username: string; password: string; mfaToken?: string }
   }) => Promise<SessionInfo>
-  return call({ data: { username: cleaned, password } })
+  return call({ data: { username: cleaned, password, mfaToken } })
 }
 
 export async function signOut(): Promise<void> {

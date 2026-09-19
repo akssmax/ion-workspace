@@ -1,3 +1,5 @@
+import { getThemePreset, type ThemePresetId } from "./presets"
+
 export const THEME_STORAGE_KEY = "workspace-theme"
 
 export type ThemeMode = "light" | "dark" | "system"
@@ -23,13 +25,10 @@ export type FontId = "inter" | "system" | "humanist" | "serif" | "mono"
 export type RadiusId = "none" | "sm" | "md" | "lg" | "xl" | "full"
 export type ScaleId = "sm" | "md" | "lg" | "xl"
 export type CvdId =
-  | "none"
-  | "deuteranopia"
-  | "protanopia"
-  | "tritanopia"
-  | "achromatopsia"
+  "none" | "deuteranopia" | "protanopia" | "tritanopia" | "achromatopsia"
 
 export type ThemeConfig = {
+  preset: ThemePresetId
   mode: ThemeMode
   accent: AccentId
   gray: GrayScale
@@ -42,6 +41,7 @@ export type ThemeConfig = {
 
 /** White-label brands override this object — components read the live store. */
 export const DEFAULT_THEME: ThemeConfig = {
+  preset: "default",
   mode: "system",
   accent: "teal",
   gray: "zinc",
@@ -54,6 +54,7 @@ export const DEFAULT_THEME: ThemeConfig = {
 
 export function pickThemeConfig(value: ThemeConfig): ThemeConfig {
   return {
+    preset: getThemePreset(value.preset)?.id ?? "default",
     mode: value.mode,
     accent: value.accent,
     gray: value.gray,
@@ -97,14 +98,15 @@ export const GRAY_OPTIONS: { id: GrayScale; label: string }[] = [
   { id: "gray", label: "Gray" },
 ]
 
-export const RADIUS_OPTIONS: { id: RadiusId; label: string; value: string }[] = [
-  { id: "none", label: "None", value: "0px" },
-  { id: "sm", label: "Small", value: "0.3rem" },
-  { id: "md", label: "Default", value: "0.45rem" },
-  { id: "lg", label: "Large", value: "0.75rem" },
-  { id: "xl", label: "XL", value: "1rem" },
-  { id: "full", label: "Full", value: "1.5rem" },
-]
+export const RADIUS_OPTIONS: { id: RadiusId; label: string; value: string }[] =
+  [
+    { id: "none", label: "None", value: "0px" },
+    { id: "sm", label: "Small", value: "0.3rem" },
+    { id: "md", label: "Default", value: "0.45rem" },
+    { id: "lg", label: "Large", value: "0.75rem" },
+    { id: "xl", label: "XL", value: "1rem" },
+    { id: "full", label: "Full", value: "1.5rem" },
+  ]
 
 export const FONT_OPTIONS: { id: FontId; label: string; stack: string }[] = [
   {

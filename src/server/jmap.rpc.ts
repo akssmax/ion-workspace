@@ -236,7 +236,16 @@ export const persistAccountId = createServerFn({ method: "POST" })
     (input: unknown) => input as { accountId?: string; username?: string }
   )
   .handler(async ({ data }) => {
-    if (data.accountId) await updateSession({ accountId: data.accountId })
+    if (data.accountId) {
+      const token = await requireAccessToken()
+      const response = await fetch(`${WORKSPACE_CONFIG.stalwartOrigin}/.well-known/jmap`, {
+        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000),
+      })
+      if (!response.ok) throw new ProxyError("Could not verify mail account.", response.status)
+      const session = await response.json() as { accounts?: Record<string, { accountCapabilities?: Record<string, unknown> }> }
+      if (!session.accounts?.[data.accountId]?.accountCapabilities?.["urn:ietf:params:jmap:mail"]) throw new ProxyError("Mail account is unavailable.", 403)
+      await updateSession({ accountId: data.accountId })
+    }
     return { ok: true }
   })
 

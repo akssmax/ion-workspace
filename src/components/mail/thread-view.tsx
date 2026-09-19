@@ -57,23 +57,29 @@ import { formatDateTime } from "@/lib/dates"
 import { useFeatureFlag } from "@/features/flags"
 import { usePreferences } from "@/queries/preferences"
 import { filenameDefaults, formatMailFilename } from "@/lib/mail-filenames"
+import { zipStoredFiles } from "@/lib/zip-store"
 import {
   TrashConfirmDialog,
   trashIconButtonClassName,
 } from "./trash-confirm-dialog"
 import { InlineComposer } from "./composer"
 import { AttachmentViewer } from "./attachment-viewer"
+import { useLanguage } from "@/lib/language"
 
 export function ThreadViewPane({
   threadId,
 }: {
   threadId: string | null
 }) {
+  const { t } = useLanguage()
   const closeCompose = useComposerStore((s) => s.closeCompose)
   const composeOpen = useComposerStore((s) => s.open)
   const composeMode = useComposerStore((s) => s.mode)
   const pinnedReply = useFeatureFlag("mail.pinnedReply")
   const { data: preferences } = usePreferences()
+  const downloadForExport = useDownloadAttachment()
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const { data, isLoading } = useThread(threadId)
   const markRead = useMarkRead()
   const openedThread = useRef<string | null>(null)
@@ -102,7 +108,7 @@ export function ThreadViewPane({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
         <MailPlus className="size-10 text-muted-foreground/40" />
-        <p>Select a conversation to read it.</p>
+        <p>{t("Select a conversation to read it.")}</p>
       </div>
     )
   }
@@ -120,13 +126,37 @@ export function ThreadViewPane({
     )
   }
 
+  async function exportThread() {
+    if (!data) return
+    setExporting(true)
+    setExportError(null)
+    try {
+      const messages = data.emails.filter(email => email.blobId)
+      const files = [] as { name: string; bytes: Uint8Array }[]
+      for (const [index, email] of messages.entries()) {
+        const blob = await downloadForExport.mutateAsync(email.blobId!)
+        const name = formatMailFilename("eml", preferences?.emlFilenameTemplate ?? filenameDefaults.eml, { date: email.receivedAt ? new Date(email.receivedAt) : undefined, from: email.from?.[0]?.name ?? undefined, fromEmail: email.from?.[0]?.email, to: email.to?.[0]?.name ?? undefined, subject: email.subject ?? undefined }, preferences?.filenameSpaces)
+        files.push({ name: `${index + 1}-${name}`, bytes: new Uint8Array(await blob.arrayBuffer()) })
+      }
+      const archive = zipStoredFiles(files)
+      const url = URL.createObjectURL(archive)
+      const link = document.createElement("a")
+      link.href = url
+      link.download = formatMailFilename("zip", preferences?.zipFilenameTemplate ?? filenameDefaults.zip, { count: files.length, subject: data.latestSubject }, preferences?.filenameSpaces)
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (error) { setExportError(error instanceof Error ? error.message : "Could not export this thread.") }
+    finally { setExporting(false) }
+  }
+
   const actionBar = (
     <div className="flex flex-wrap items-center gap-2">
       <ThreadActions threadId={threadId} email={latestEmail(data.emails)} />
       <div className="ml-auto" />
-      <ReplyAction email={latestEmail(data.emails)} mode="reply" />
-      <ReplyAction email={latestEmail(data.emails)} mode="reply-all" />
+      <ReplyAction email={latestEmail(data.emails)} mode={preferences?.replyDefault === "reply-all" ? "reply-all" : "reply"} />
+      <ReplyAction email={latestEmail(data.emails)} mode={preferences?.replyDefault === "reply-all" ? "reply" : "reply-all"} />
       <ReplyAction email={latestEmail(data.emails)} mode="forward" />
+      {data.emails.filter(email => email.blobId).length > 1 ? <Button variant="ghost" size="sm" disabled={exporting} onClick={() => void exportThread()}><Download className="size-4" /> Export ZIP</Button> : null}
     </div>
   )
 
@@ -144,7 +174,7 @@ export function ThreadViewPane({
         }
       >
         {preferences?.messageActionsPosition !== "bottom" ? actionBar : null}
-        <h2 className="mt-2 break-words text-lg leading-snug font-semibold">
+        <h2 dir="auto" className="mt-2 break-words text-lg leading-snug font-semibold">
           {data.latestSubject}
         </h2>
         <p className="mt-1 break-all text-xs text-muted-foreground">
@@ -161,6 +191,7 @@ export function ThreadViewPane({
             Expand all messages
           </Button>
         ) : null}
+        {exportError ? <p role="alert" className="mt-2 text-xs text-destructive">{exportError}</p> : null}
       </div>
 
       <div
@@ -443,7 +474,7 @@ function EmailCard({ email, expanded, onToggle }: {
   }
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-xl border bg-card">
+    <article dir="auto" className="min-w-0 overflow-hidden rounded-xl border bg-card">
       <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
           {initials(senderName(email))}

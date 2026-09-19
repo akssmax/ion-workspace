@@ -25,6 +25,34 @@ export interface ServerProxyTransportOptions {
   publicEventSourceUrl?: string | null
 }
 
+export function toJmapRequest(payload: unknown[], session: JmapSession): { using: string[]; methodCalls: unknown[][] } {
+  const advertised = new Set(Object.keys(session.capabilities ?? {}))
+  const requested = ((payload[0] as unknown[] | undefined)?.[1] as { using?: string[] } | undefined)?.using ?? []
+  const using = requested.filter((capability) => advertised.has(capability))
+  if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("VacationResponse/")) && advertised.has("urn:ietf:params:jmap:vacationresponse")) using.push("urn:ietf:params:jmap:vacationresponse")
+  if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("SieveScript/")) && advertised.has("urn:ietf:params:jmap:sieve")) using.push("urn:ietf:params:jmap:sieve")
+  const methodCalls = payload.slice(1).map((item) => {
+    const [method, rawArgs, id, options] = item as [string, Record<string, unknown>, string, { resultOf?: { callId: string; name: string; path: string } }?]
+    const args = structuredClone(rawArgs)
+    if (options?.resultOf) {
+      const reference = options.resultOf
+      if (Array.isArray(args.ids) && args.ids.some((value) => typeof value === "string" && value.startsWith("#"))) {
+        delete args.ids
+        args["#ids"] = reference
+      }
+      const create = args.create as Record<string, Record<string, unknown>> | undefined
+      if (create) for (const entry of Object.values(create)) {
+        if (typeof entry.emailId === "string" && entry.emailId.startsWith("#")) {
+          delete entry.emailId
+          entry["#emailId"] = reference
+        }
+      }
+    }
+    return [method, args, id]
+  })
+  return { using: [...new Set(using)], methodCalls }
+}
+
 export class ServerProxyTransport implements Transport {
   readonly kind = "real" as const
 
@@ -48,31 +76,8 @@ export class ServerProxyTransport implements Transport {
     const postRequest = proxyJmapRequest as unknown as (input: {
       data: { payload: unknown; url: string }
     }) => Promise<{ methodResponses: unknown[] }>
-    const advertised = new Set(Object.keys(session.capabilities ?? {}))
-    const requested = ((payload[0] as unknown[] | undefined)?.[1] as { using?: string[] } | undefined)?.using ?? []
-    const using = requested.filter((capability) => advertised.has(capability))
-    if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("VacationResponse/")) && advertised.has("urn:ietf:params:jmap:vacationresponse")) using.push("urn:ietf:params:jmap:vacationresponse")
-    if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("SieveScript/")) && advertised.has("urn:ietf:params:jmap:sieve")) using.push("urn:ietf:params:jmap:sieve")
-    const methodCalls = payload.slice(1).map((item) => {
-      const [method, rawArgs, id, options] = item as [string, Record<string, unknown>, string, { resultOf?: { callId: string; name: string; path: string } }?]
-      const args = structuredClone(rawArgs)
-      if (options?.resultOf) {
-        const reference = options.resultOf
-        if (Array.isArray(args.ids) && args.ids.some((value) => typeof value === "string" && value.startsWith("#"))) {
-          delete args.ids
-          args["#ids"] = reference
-        }
-        const create = args.create as Record<string, Record<string, unknown>> | undefined
-        if (create) for (const entry of Object.values(create)) {
-          if (typeof entry.emailId === "string" && entry.emailId.startsWith("#")) {
-            delete entry.emailId
-            entry["#emailId"] = reference
-          }
-        }
-      }
-      return [method, args, id]
-    })
-    const response = await postRequest({ data: { payload: { using, methodCalls }, url: session.apiUrl } })
+    const request = toJmapRequest(payload, session)
+    const response = await postRequest({ data: { payload: request, url: session.apiUrl } })
     return response.methodResponses
   }
 
@@ -112,7 +117,6 @@ export class ServerProxyTransport implements Transport {
       type: result.type,
     }
   }
-
   async download(
     request: DownloadRequest,
     _options?: TransportRequestOptions

@@ -28,6 +28,7 @@ import { parseSearch } from "@/lib/search"
 import type { ListDensity, RowStyle } from "@/lib/inbox-layout"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelChips } from "@/modules/mail/labels"
+import { useLanguage, type Language } from "@/lib/language"
 
 export function EmailList({
   mailboxId,
@@ -46,6 +47,7 @@ export function EmailList({
   rowStyle?: RowStyle
   narrow?: boolean
 }) {
+  const { language, t } = useLanguage()
   const setFocusedThread = useMailStore((s) => s.setFocusedThread)
   const selectedThreadIds = useMailStore((s) => s.selectedThreadIds)
   const toggleThreadSelection = useMailStore((s) => s.toggleThreadSelection)
@@ -93,8 +95,8 @@ export function EmailList({
         <MailPlus className="size-8 text-muted-foreground/40" />
         <p>
           {parsed.query
-            ? "No messages matched your search."
-            : "This mailbox is empty."}
+            ? t("No messages matched your search.")
+            : t("This mailbox is empty.")}
         </p>
       </div>
     )
@@ -142,6 +144,7 @@ export function EmailList({
           density,
           showSnippets,
           narrow,
+          language,
           onSelect: (e: React.MouseEvent) => onRowClick(row, e),
           onToggleSelect: () => toggleThreadSelection(threadId),
         }
@@ -160,7 +163,7 @@ export function EmailList({
           disabled={emails.isFetchingNextPage}
           onClick={() => void emails.fetchNextPage()}
         >
-          {emails.isFetchingNextPage ? "Loading more messages…" : "Load more messages"}
+          {emails.isFetchingNextPage ? t("Loading more messages…") : t("Load more messages")}
         </button>
       ) : null}
     </div>
@@ -176,6 +179,7 @@ interface RowProps {
   density: ListDensity
   showSnippets: boolean
   narrow: boolean
+  language: Language
   onSelect: (e: React.MouseEvent) => void
   onToggleSelect: () => void
 }
@@ -308,6 +312,7 @@ function GmailRow(props: RowProps) {
       />
       <button
         type="button"
+        dir="auto"
         onClick={onSelect}
         className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden text-left"
       >
@@ -333,7 +338,7 @@ function GmailRow(props: RowProps) {
         </span>
         <RowBadges email={email} narrow={props.narrow} />
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {time ? formatRelative(time) : ""}
+          {time ? formatRelative(time, props.language) : ""}
         </span>
       </button>
     </div>
@@ -375,6 +380,7 @@ function OutlookRow(props: RowProps) {
       />
       <button
         type="button"
+        dir="auto"
         onClick={onSelect}
         className="flex min-w-0 flex-1 items-start gap-3 overflow-hidden text-left"
       >
@@ -401,7 +407,7 @@ function OutlookRow(props: RowProps) {
                   : "text-muted-foreground"
               )}
             >
-              {time ? formatRelative(time) : ""}
+              {time ? formatRelative(time, props.language) : ""}
             </span>
           </span>
           <span
@@ -447,6 +453,7 @@ function MinimalRow(props: RowProps) {
         />
         <button
           type="button"
+          dir="auto"
           onClick={onSelect}
           className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
         >
@@ -480,7 +487,7 @@ function MinimalRow(props: RowProps) {
           </span>
           <RowBadges email={email} narrow={props.narrow} />
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {time ? formatRelative(time) : ""}
+            {time ? formatRelative(time, props.language) : ""}
           </span>
         </button>
       </div>
@@ -502,6 +509,7 @@ function MinimalRow(props: RowProps) {
       />
       <button
         type="button"
+        dir="auto"
         onClick={onSelect}
         className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden text-left"
       >
@@ -523,7 +531,7 @@ function MinimalRow(props: RowProps) {
           </span>
           <RowBadges email={email} narrow={props.narrow} />
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-            {time ? formatRelative(time) : ""}
+            {time ? formatRelative(time, props.language) : ""}
           </span>
         </div>
         <div className="flex min-w-0 items-center gap-2 pl-4">

@@ -8,8 +8,10 @@ import { FolderPlus } from "lucide-react"
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
 import { Input } from "@/components/ui/input"
 import { useCreateMailbox } from "@/queries/mail"
+import { useLanguage } from "@/lib/language"
 
 export function NewFolderRow() {
+  const { t } = useLanguage()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -43,7 +45,7 @@ export function NewFolderRow() {
           className="text-muted-foreground"
         >
           <FolderPlus className="size-4" />
-          <span>New folder</span>
+          <span>{t("New folder")}</span>
         </SidebarMenuButton>
       </SidebarMenuItem>
     )
@@ -55,7 +57,7 @@ export function NewFolderRow() {
         <Input
           autoFocus
           value={name}
-          placeholder="Folder name"
+          placeholder={t("Folder name")}
           onChange={(e) => {
             setName(e.target.value)
             setError(null)
@@ -66,7 +68,7 @@ export function NewFolderRow() {
             if (e.key === "Escape") cancel()
           }}
           className="h-6 px-1 text-sm"
-          aria-label="New folder name"
+          aria-label={t("New folder name")}
         />
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
       </div>

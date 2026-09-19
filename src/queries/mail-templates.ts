@@ -31,16 +31,18 @@ export function useSaveMailTemplate() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (data: {
+      id?: string
       name: string
       subject: string
       htmlBody: string
     }) => {
       if (isDemoRuntime) {
-        const id = crypto.randomUUID()
-        demoTemplates = [
-          ...demoTemplates,
-          { ...data, id, createdAt: new Date().toISOString() },
-        ]
+        const id = data.id ?? crypto.randomUUID()
+        if (data.id) {
+          demoTemplates = demoTemplates.map((template) => template.id === id ? { ...template, ...data } : template)
+        } else {
+          demoTemplates = [...demoTemplates, { ...data, id, createdAt: new Date().toISOString() }]
+        }
         return { id }
       }
       return (

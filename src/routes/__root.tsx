@@ -7,6 +7,7 @@ import { useState } from "react"
 import { createWorkspaceQueryClient } from "@/queries/client"
 import { RouteErrorFallback } from "@/components/error-boundary"
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/theme/provider"
+import { LanguageSync } from "@/lib/language"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
@@ -56,6 +57,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body suppressHydrationWarning>
         <ThemeProvider>
           <QueryClientProvider client={queryClient}>
+            <LanguageSync />
             {children}
             {import.meta.env.DEV && (
               <TanStackDevtools

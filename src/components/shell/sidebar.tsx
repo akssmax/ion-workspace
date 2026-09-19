@@ -35,6 +35,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { NavUser } from "./nav-user"
 import { IonLogo } from "@/components/brand/logo"
 import { useWorkspaceStore  } from "@/stores/workspace.store"
@@ -49,6 +50,7 @@ import { useFeatureFlag } from "@/features/flags"
 import { MailboxRow, NewFolderRow } from "@/modules/mail/mailboxes"
 import { useAddressBooks, useContacts } from "@/queries/contacts"
 import { Link } from "@tanstack/react-router"
+import { useLanguage, type TranslationKey } from "@/lib/language"
 
 const APPS: {
   id: WorkspaceApp
@@ -93,6 +95,7 @@ const CALENDAR_VIEWS: { id: CalendarView; label: string }[] = [
 ]
 
 export function SidebarShell() {
+  const { t, direction } = useLanguage()
   const app = useWorkspaceStore((s) => s.app)
   const setApp = useWorkspaceStore((s) => s.setApp)
   const openCompose = useComposerStore((s) => s.openCompose)
@@ -105,6 +108,7 @@ export function SidebarShell() {
 
   return (
     <Sidebar
+      side={direction === "rtl" ? "right" : "left"}
       collapsible="icon"
       className="overflow-hidden *:data-[sidebar=sidebar]:flex-row"
     >
@@ -118,7 +122,7 @@ export function SidebarShell() {
             <SidebarMenuItem>
               <SidebarMenuButton
                 size="lg"
-                tooltip={{ children: "Toggle sidebar", hidden: false }}
+                tooltip={{ children: t("Toggle sidebar"), hidden: false }}
                 onClick={toggleSidebar}
                 className="md:h-8 md:p-0"
               >
@@ -135,24 +139,24 @@ export function SidebarShell() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    tooltip={{ children: "Compose", hidden: false }}
+                    tooltip={{ children: t("Compose"), hidden: false }}
                     onClick={() => openCompose({ open: true, mode: "new" })}
                     className="px-2.5 md:px-2"
                   >
                     <Plus />
-                    <span>Compose</span>
+                    <span>{t("Compose")}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 {APPS.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
-                      tooltip={{ children: item.label, hidden: false }}
+                      tooltip={{ children: t(item.label as TranslationKey), hidden: false }}
                       onClick={() => pickApp(item.id)}
                       isActive={app === item.id}
                       className="px-2.5 md:px-2"
                     >
                       {item.icon}
-                      <span>{item.label}</span>
+                      <span>{t(item.label as TranslationKey)}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -164,14 +168,14 @@ export function SidebarShell() {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton
-                    tooltip={{ children: "Settings", hidden: false }}
+                    tooltip={{ children: t("Settings"), hidden: false }}
                     render={
                       <Link to="/settings" search={{ section: "general" }} />
                     }
                     className="px-2.5 md:px-2"
                   >
                     <Settings />
-                    <span>Settings</span>
+                    <span>{t("Settings")}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -179,7 +183,13 @@ export function SidebarShell() {
           </SidebarGroup>}
         </SidebarContent>
         <SidebarFooter>
-          {isDemoRuntime ? <span className="px-2 py-3 text-[10px] text-muted-foreground">DEMO</span> : <NavUser />}
+          {isDemoRuntime ? (
+            <div className="flex flex-col items-center gap-1 py-2" title="Alex Morgan · Sample account" aria-label="Alex Morgan, sample account">
+              <Avatar>
+                <AvatarFallback>AM</AvatarFallback>
+              </Avatar>
+            </div>
+          ) : <NavUser />}
         </SidebarFooter>
       </Sidebar>
 
@@ -201,6 +211,7 @@ export function SidebarShell() {
 }
 
 function PanelTitle({ app }: { app: WorkspaceApp }) {
+  const { t } = useLanguage()
   const { data: rawMailboxes } = useMailboxes()
   const totalUnread = (rawMailboxes ?? []).reduce(
     (sum, mb) => sum + (mb.unreadEmails ?? 0),
@@ -216,7 +227,7 @@ function PanelTitle({ app }: { app: WorkspaceApp }) {
           : "Contacts"
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span className="truncate text-sm font-medium">{title}</span>
+      <span className="truncate text-sm font-medium">{t(title as TranslationKey)}</span>
       {app === "mail" && totalUnread > 0 ? (
         <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
           {totalUnread}
@@ -227,6 +238,7 @@ function PanelTitle({ app }: { app: WorkspaceApp }) {
 }
 
 function MailboxPanel() {
+  const { t } = useLanguage()
   const setApp = useWorkspaceStore((s) => s.setApp)
   const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
@@ -247,7 +259,7 @@ function MailboxPanel() {
         <SidebarMenu>
           {mailboxes.map((mb) => {
             const label = mb.role
-              ? (FOLDER_LABELS[mb.role] ?? mb.name)
+              ? (FOLDER_LABELS[mb.role] ? t(FOLDER_LABELS[mb.role] as TranslationKey) : mb.name)
               : mb.name
             const icon = mb.role ? (
               (FOLDER_ICONS[mb.role] ?? <Inbox className="size-4" />)
@@ -289,11 +301,12 @@ function MailboxPanel() {
 }
 
 function CalendarPanel() {
+  const { t } = useLanguage()
   const view = useCalendarStore((s) => s.view)
   const setView = useCalendarStore((s) => s.setView)
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Views</SidebarGroupLabel>
+      <SidebarGroupLabel>{t("Views")}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {CALENDAR_VIEWS.map((item) => (
@@ -302,7 +315,7 @@ function CalendarPanel() {
                 onClick={() => setView(item.id)}
                 isActive={view === item.id}
               >
-                <span>{item.label}</span>
+                <span>{t(item.label as TranslationKey)}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
@@ -313,11 +326,12 @@ function CalendarPanel() {
 }
 
 function FilesPanel() {
+  const { t } = useLanguage()
   const path = useFilesStore((s) => s.path)
   const navigateTo = useFilesStore((s) => s.navigateTo)
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Folders</SidebarGroupLabel>
+      <SidebarGroupLabel>{t("Folders")}</SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
           {path.map((node, i) => (
@@ -337,13 +351,14 @@ function FilesPanel() {
 }
 
 function ContactsPanel() {
+  const { t } = useLanguage()
   const setApp = useWorkspaceStore((s) => s.setApp)
   const { data: books } = useAddressBooks()
   const { data: contacts } = useContacts()
   return (
     <SidebarGroup>
       <SidebarGroupLabel>
-        Address books
+        {t("Address books")}
         {(contacts?.length ?? 0) > 0 ? ` · ${contacts?.length}` : ""}
       </SidebarGroupLabel>
       <SidebarGroupContent>

@@ -24,6 +24,8 @@ function LoginPage() {
   const session = useSession()
   const [username, setUsername] = useState("demo")
   const [password, setPassword] = useState("demo")
+  const [mfaToken, setMfaToken] = useState("")
+  const [needsMfa, setNeedsMfa] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [hint, setHint] = useState<string | null>(null)
@@ -51,11 +53,12 @@ function LoginPage() {
     setError(null)
     setBusy(true)
     try {
-      const info = await authenticate(username, password)
+      const info = await authenticate(username, password, mfaToken)
       queryClient.setQueryData(["session"], info)
       void queryClient.invalidateQueries({ queryKey: qk.preferences() })
       await navigate({ to: "/app", replace: true })
     } catch (err) {
+      if (err instanceof Error && err.message.includes("second factor")) setNeedsMfa(true)
       setError(err instanceof Error ? err.message : "Sign in failed.")
     } finally {
       setBusy(false)
@@ -109,6 +112,8 @@ function LoginPage() {
               />
             </div>
           </div>
+
+          {needsMfa ? <div className="space-y-2"><Label htmlFor="mfa-token">Authentication code</Label><Input id="mfa-token" value={mfaToken} onChange={event => setMfaToken(event.target.value)} autoComplete="one-time-code" inputMode="numeric" /></div> : null}
 
           {error ? (
             <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

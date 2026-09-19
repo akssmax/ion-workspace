@@ -36,10 +36,10 @@ async function readPublicSession(): Promise<SessionInfo | null> {
 
 export const login = createServerFn({ method: "POST" })
   .validator(
-    (input: unknown) => input as { username?: string; password?: string }
+    (input: unknown) => input as { username?: string; password?: string; mfaToken?: string }
   )
   .handler(
-    async ({ data }: { data?: { username?: string; password?: string } }) => {
+    async ({ data }: { data?: { username?: string; password?: string; mfaToken?: string } }) => {
       const username = data?.username?.trim()
       const password = data?.password ?? ""
       if (!username || !password) {
@@ -67,7 +67,7 @@ export const login = createServerFn({ method: "POST" })
       // Real mode: exchange the Stalwart authorization code for OAuth tokens.
       let tokens: Awaited<ReturnType<typeof authenticateStalwart>>
       try {
-        tokens = await authenticateStalwart(username, password)
+        tokens = await authenticateStalwart(username, password, data?.mfaToken)
       } catch (error) {
         if (error instanceof Error && /Stalwart|second factor|expired/.test(error.message))
           throw error
@@ -76,12 +76,22 @@ export const login = createServerFn({ method: "POST" })
         )
       }
 
-      const email = username.includes("@") ? username : `${username}@mail.local`
+      const discovery = await fetch(`${WORKSPACE_CONFIG.stalwartOrigin}/.well-known/jmap`, {
+        headers: { Authorization: `Bearer ${tokens.accessToken}` },
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (!discovery.ok) throw new Error(`Stalwart JMAP discovery failed (${discovery.status}).`)
+      const jmap = await discovery.json() as { username?: string; primaryAccounts?: Record<string, string> }
+      const accountId = jmap.primaryAccounts?.["urn:ietf:params:jmap:mail"]
+      if (!accountId) throw new Error("This Stalwart account does not provide JMAP mail access.")
+      const canonicalName = jmap.username || username
+      const email = canonicalName.includes("@") ? canonicalName : username
       const session: SessionData = {
-        userId: `real-${username}`,
-        username,
+        userId: `real-${WORKSPACE_CONFIG.stalwartOrigin}:${accountId}`,
+        username: canonicalName,
         email,
         mode: "real",
+        accountId,
         ...tokens,
       }
       await setSession(session)

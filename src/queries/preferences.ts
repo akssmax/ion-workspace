@@ -21,6 +21,7 @@ export function usePreferences() {
   const scope = `${session?.userId ?? "signed-out"}:${session?.accountId ?? "primary"}`
   return useQuery({
     queryKey: qk.preferences(scope),
+    enabled: !!session || isDemoRuntime,
     queryFn: () =>
       isDemoRuntime ? Promise.resolve(demoPreferences) : getPreferences(),
     staleTime: Infinity,

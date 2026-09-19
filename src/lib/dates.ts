@@ -17,6 +17,10 @@ import {
   startOfMonth,
   endOfDay,
 } from "date-fns"
+import { ar, de, es, fr, hi } from "date-fns/locale"
+import type { Language } from "./language"
+
+const relativeLocales = { ar, de, es, fr, hi }
 
 export function toDate(value: string | number | Date): Date {
   if (typeof value === "number") return new Date(value)
@@ -77,8 +81,8 @@ export function formatDateTime(value: string | number | Date): string {
   return format(date, "MMM d, yyyy p")
 }
 
-export function formatRelative(value: string | number | Date): string {
-  return formatDistanceToNowStrict(toDate(value), { addSuffix: true })
+export function formatRelative(value: string | number | Date, language: Language = "en"): string {
+  return formatDistanceToNowStrict(toDate(value), { addSuffix: true, locale: language === "en" ? undefined : relativeLocales[language] })
 }
 
 export function emailListTime(value: string | number | Date): string {

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import type { CSSProperties } from "react"
-import { ArrowUpRight, Maximize2 } from "lucide-react"
 import { useResolvedDark } from "@/theme/store"
 import { DEMO_SURFACES, isDemoSurface } from "@/lib/demo/preview-messages"
 import type { DemoSurface } from "@/lib/demo/preview-messages"
@@ -61,11 +60,6 @@ export function LivePreview() {
             </button>
           ))}
         </div>
-        <a href={`/demo?surface=${surface}`}>
-          <Maximize2 size={14} aria-hidden="true" />
-          <span>Open full demo</span>
-          <ArrowUpRight size={14} aria-hidden="true" />
-        </a>
       </div>
       <div className="ion-live-stage">
         <div id="live-workspace" className="ion-live-viewport">

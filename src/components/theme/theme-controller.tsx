@@ -21,6 +21,7 @@ import {
   type ThemeMode,
 } from "@/theme/schema"
 import { useThemeStore } from "@/theme/store"
+import { ThemeGallery } from "./theme-gallery"
 
 const SWATCH_BG: Record<string, string> = {
   zinc: "bg-zinc-500",
@@ -62,10 +63,7 @@ export function ThemeController({
 
   if (!mounted) {
     return (
-      <div
-        className="h-64 animate-pulse rounded-2xl bg-muted/40"
-        aria-hidden
-      />
+      <div className="h-64 animate-pulse rounded-2xl bg-muted/40" aria-hidden />
     )
   }
 
@@ -94,47 +92,55 @@ export function ThemeController({
         </div>
       </ThemeField>
 
-      <ThemeField
-        label="Accent"
-        hint={
-          compact
-            ? undefined
-            : "Brand color for buttons, unread dots, and the sidebar mark."
-        }
-      >
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {ACCENT_OPTIONS.map((opt) => (
-            <SwatchButton
-              key={opt.id}
-              label={opt.label}
-              selected={theme.accent === opt.id}
-              swatch={opt.swatch}
-              onSelect={() => theme.setTheme({ accent: opt.id as AccentId })}
-            />
-          ))}
-        </div>
-      </ThemeField>
+      <ThemeGallery />
 
-      <ThemeField
-        label="Base gray"
-        hint={
-          compact
-            ? undefined
-            : "Neutral surfaces — zinc, stone, and the rest of Tailwind’s gray ramps."
-        }
-      >
-        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-          {GRAY_OPTIONS.map((opt) => (
-            <SwatchButton
-              key={opt.id}
-              label={opt.label}
-              selected={theme.gray === opt.id}
-              swatch={opt.id}
-              onSelect={() => theme.setTheme({ gray: opt.id as GrayScale })}
-            />
-          ))}
-        </div>
-      </ThemeField>
+      {theme.preset === "default" ? (
+        <>
+          <ThemeField
+            label="Accent"
+            hint={
+              compact
+                ? undefined
+                : "Brand color for buttons, unread dots, and the sidebar mark."
+            }
+          >
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {ACCENT_OPTIONS.map((opt) => (
+                <SwatchButton
+                  key={opt.id}
+                  label={opt.label}
+                  selected={theme.accent === opt.id}
+                  swatch={opt.swatch}
+                  onSelect={() =>
+                    theme.setTheme({ accent: opt.id as AccentId })
+                  }
+                />
+              ))}
+            </div>
+          </ThemeField>
+
+          <ThemeField
+            label="Base gray"
+            hint={
+              compact
+                ? undefined
+                : "Neutral surfaces — zinc, stone, and the rest of Tailwind’s gray ramps."
+            }
+          >
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {GRAY_OPTIONS.map((opt) => (
+                <SwatchButton
+                  key={opt.id}
+                  label={opt.label}
+                  selected={theme.gray === opt.id}
+                  swatch={opt.id}
+                  onSelect={() => theme.setTheme({ gray: opt.id as GrayScale })}
+                />
+              ))}
+            </div>
+          </ThemeField>
+        </>
+      ) : null}
 
       <ThemeField label="Radius">
         <div className="flex flex-wrap gap-1.5">
@@ -239,9 +245,13 @@ export function ThemeController({
             >
               <span>
                 <span className="block text-sm font-medium">{opt.label}</span>
-                <span className="text-xs text-muted-foreground">{opt.hint}</span>
+                <span className="text-xs text-muted-foreground">
+                  {opt.hint}
+                </span>
               </span>
-              {theme.cvd === opt.id ? <Check className="size-4 shrink-0" /> : null}
+              {theme.cvd === opt.id ? (
+                <Check className="size-4 shrink-0" />
+              ) : null}
             </button>
           ))}
         </div>
@@ -355,7 +365,9 @@ function AppearanceCard({
       onClick={onSelect}
       className={cn(
         "flex flex-col gap-1.5 rounded-xl p-1 text-center transition-colors",
-        selected ? "ring-2 ring-primary" : "ring-1 ring-border hover:bg-muted/40"
+        selected
+          ? "ring-2 ring-primary"
+          : "ring-1 ring-border hover:bg-muted/40"
       )}
     >
       <AppearancePreview mode={mode} accentVar="var(--primary)" />
@@ -374,8 +386,16 @@ function AppearancePreview({
   if (mode === "system") {
     return (
       <div className="flex h-16 overflow-hidden rounded-lg border">
-        <MiniUi className="w-1/2 bg-zinc-50" bar="bg-zinc-200" accent={accentVar} />
-        <MiniUi className="w-1/2 bg-zinc-950" bar="bg-zinc-700" accent={accentVar} />
+        <MiniUi
+          className="w-1/2 bg-zinc-50"
+          bar="bg-zinc-200"
+          accent={accentVar}
+        />
+        <MiniUi
+          className="w-1/2 bg-zinc-950"
+          bar="bg-zinc-700"
+          accent={accentVar}
+        />
       </div>
     )
   }
@@ -408,10 +428,7 @@ function MiniUi({
   return (
     <div className={cn("flex gap-1 p-1.5", className)}>
       <div className="flex w-3.5 shrink-0 flex-col gap-0.5">
-        <span
-          className="size-2 rounded-[2px]"
-          style={{ background: accent }}
-        />
+        <span className="size-2 rounded-[2px]" style={{ background: accent }} />
         <span className={cn("h-1 w-2.5 rounded-full", bar)} />
         <span className={cn("h-1 w-2.5 rounded-full", bar)} />
         <span className={cn("h-1 w-2 rounded-full", bar)} />

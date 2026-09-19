@@ -34,7 +34,7 @@ export interface WorkspaceConfig {
 function boolFromEnv(name: string, def = false): boolean {
   const value = process.env[name]
   if (value === undefined) return def
-  return value === "1" || value.toLowerCase() === "true"
+  return value === "1" || value.toLowerCase() === "true" || value.toLowerCase() === "real"
 }
 
 export function getConfig(): WorkspaceConfig {

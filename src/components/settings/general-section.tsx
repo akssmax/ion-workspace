@@ -15,14 +15,7 @@ import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import type { WorkspaceApp } from "@/stores/workspace.store"
 import { SaveState, SettingRow } from "./settings-page"
-
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "hi", label: "हिन्दी (Hindi)" },
-  { value: "es", label: "Español" },
-  { value: "fr", label: "Français" },
-  { value: "de", label: "Deutsch" },
-]
+import { LANGUAGES, useLanguage } from "@/lib/language"
 
 const TIMEZONES = [
   { value: "auto", label: "Automatic (device)" },
@@ -50,7 +43,7 @@ const DENSITIES = [
 ]
 
 /** SelectValue render prop: map the raw value to its display label. */
-function labelFor(options: { value: string; label: string }[]) {
+function labelFor(options: readonly { value: string; label: string }[]) {
   return (value: string) =>
     options.find((o) => o.value === value)?.label ?? value
 }
@@ -59,13 +52,14 @@ export function GeneralSection() {
   const { data: prefs } = usePreferences()
   const save = useSavePreferences()
   const setApp = useWorkspaceStore((s) => s.setApp)
+  const { t } = useLanguage()
 
   return (
     <div>
       <SettingRow
         id="pref-language"
-        label="Language"
-        hint="Used across the workspace interface."
+        label={t("Language")}
+        hint={t("Used across the workspace interface.")}
       >
         <Select
           value={prefs?.language ?? "en"}
@@ -90,8 +84,8 @@ export function GeneralSection() {
 
       <SettingRow
         id="pref-timezone"
-        label="Timezone"
-        hint="Used for dates and times across mail and calendar."
+        label={t("Timezone")}
+        hint={t("Used for dates and times across mail and calendar.")}
       >
         <Select
           value={prefs?.timezone ?? "auto"}
@@ -100,12 +94,12 @@ export function GeneralSection() {
           }
         >
           <SelectTrigger id="pref-timezone" className="w-52">
-            <SelectValue>{labelFor(TIMEZONES)}</SelectValue>
+            <SelectValue>{(value: string) => value === "auto" ? t("Automatic (device)") : labelFor(TIMEZONES)(value)}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {TIMEZONES.map((tz) => (
               <SelectItem key={tz.value} value={tz.value}>
-                {tz.label}
+                {tz.value === "auto" ? t("Automatic (device)") : tz.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -116,8 +110,8 @@ export function GeneralSection() {
 
       <SettingRow
         id="pref-default-view"
-        label="Default app"
-        hint="The app you land in. Changing it switches you there now."
+        label={t("Default app")}
+        hint={t("The app you land in. Changing it switches you there now.")}
       >
         <Select
           value={prefs?.defaultView ?? "mail"}
@@ -128,12 +122,12 @@ export function GeneralSection() {
           }}
         >
           <SelectTrigger id="pref-default-view" className="w-52">
-            <SelectValue>{labelFor(APPS)}</SelectValue>
+            <SelectValue>{(value: string) => t(labelFor(APPS)(value) as "Mail" | "Calendar" | "Contacts" | "Files")}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {APPS.map((a) => (
               <SelectItem key={a.value} value={a.value}>
-                {a.label}
+                {t(a.label as "Mail" | "Calendar" | "Contacts" | "Files")}
               </SelectItem>
             ))}
           </SelectContent>
@@ -144,8 +138,8 @@ export function GeneralSection() {
 
       <SettingRow
         id="pref-density"
-        label="Display density"
-        hint="Overall spacing of the interface."
+        label={t("Display density")}
+        hint={t("Overall spacing of the interface.")}
       >
         <Select
           value={prefs?.displayDensity ?? "comfortable"}
@@ -156,12 +150,12 @@ export function GeneralSection() {
           }
         >
           <SelectTrigger id="pref-density" className="w-52">
-            <SelectValue>{labelFor(DENSITIES)}</SelectValue>
+            <SelectValue>{(value: string) => t(labelFor(DENSITIES)(value) as "Comfortable" | "Compact")}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {DENSITIES.map((d) => (
               <SelectItem key={d.value} value={d.value}>
-                {d.label}
+                {t(d.label as "Comfortable" | "Compact")}
               </SelectItem>
             ))}
           </SelectContent>

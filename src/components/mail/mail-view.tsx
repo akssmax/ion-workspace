@@ -37,8 +37,12 @@ import { useFeatureFlag } from "@/features/flags"
 import { UpcomingIsland } from "@/modules/calendar/upcoming-island"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import { AdvancedSearch } from "./advanced-search"
+import { useLanguage, type TranslationKey } from "@/lib/language"
+
+const mailboxRoleLabels: Record<string, TranslationKey> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", junk: "Junk", trash: "Trash", starred: "Starred", important: "Important" }
 
 export function MailView() {
+  const { t, direction } = useLanguage()
   const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const searchQuery = useMailStore((s) => s.searchQuery)
   const setSearchQuery = useMailStore((s) => s.setSearchQuery)
@@ -59,6 +63,7 @@ export function MailView() {
   const { data: rawMailboxes } = useMailboxes()
   const mailboxes = sortMailboxes(rawMailboxes ?? [])
   const mailbox = mailboxes.find((m) => m.id === activeMailboxId)
+  const mailboxLabel = (item: typeof mailbox) => item?.role && mailboxRoleLabels[item.role] ? t(mailboxRoleLabels[item.role]) : item?.name
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const compact = isMobile || (paneWidth !== null && paneWidth < 620)
   const showMailboxMenu = sidebarState === "collapsed" || compact
@@ -88,7 +93,7 @@ export function MailView() {
       const bounds = panesRef.current?.getBoundingClientRect()
       if (!bounds) return
       const available = axis === "x" ? bounds.width : bounds.height
-      const point = axis === "x" ? pointer.clientX - bounds.left : pointer.clientY - bounds.top
+      const point = axis === "x" ? direction === "rtl" ? bounds.right - pointer.clientX : pointer.clientX - bounds.left : pointer.clientY - bounds.top
       const minimum = axis === "x" ? 220 : 150
       const remaining = axis === "x" ? 280 : 220
       const size = Math.min(Math.max(point, minimum), Math.max(minimum, available - remaining))
@@ -154,13 +159,13 @@ export function MailView() {
                     variant="ghost"
                     size="sm"
                     className="min-w-0 gap-1.5 px-2"
-                    aria-label={`Choose mailbox, current: ${mailbox?.name ?? "Inbox"}`}
+                    aria-label={`${t("Choose mailbox")}: ${mailboxLabel(mailbox) ?? t("Inbox")}`}
                   />
                 }
               >
                 <MailboxIcon role={mailbox?.role} />
                 <span className="max-w-28 truncate">
-                  {mailbox?.name ?? (searchQuery ? "Search results" : "Inbox")}
+                  {mailboxLabel(mailbox) ?? (searchQuery ? t("Search results") : t("Inbox"))}
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
               </DropdownMenuTrigger>
@@ -171,7 +176,7 @@ export function MailView() {
                     onClick={() => pickMailbox(item.id)}
                   >
                     <MailboxIcon role={item.role} />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                    <span className="min-w-0 flex-1 truncate">{mailboxLabel(item)}</span>
                     {(item.unreadEmails ?? 0) > 0 ? (
                       <span className="text-xs text-muted-foreground tabular-nums">
                         {item.unreadEmails}
@@ -188,31 +193,31 @@ export function MailView() {
             <div className="flex min-w-0 items-center gap-2">
               <MailboxIcon role={mailbox?.role} />
               <h1 className="truncate text-sm font-semibold">
-                {mailbox?.name ?? (searchQuery ? "Search results" : "Inbox")}
+                {mailboxLabel(mailbox) ?? (searchQuery ? t("Search results") : t("Inbox"))}
               </h1>
             </div>
           )}
         </div>
 
         <div className={cn("relative z-10 min-w-0 flex-1", compact ? "order-last ml-0 basis-full" : "ml-2 sm:absolute sm:left-1/2 sm:ml-0 sm:w-[min(34rem,calc(100%-20rem))] sm:-translate-x-1/2")}>
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
-            aria-label="Search mail"
+            aria-label={t("Search mail")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={
               mailbox?.role === "trash"
-                ? "Search trash…"
-                : compact ? "Search mail" : "Search mail (try: from:X, has:attachment)"
+                ? t("Search trash…")
+                : compact ? t("Search mail") : t("Search mail (try: from:X, has:attachment)")
             }
-            className="w-full pr-26 pl-9"
+            className="w-full pe-32 ps-9"
           />
-          <div className="absolute top-1/2 right-2 flex -translate-y-1/2 items-center gap-1">
+          <div className="absolute inset-y-0 end-2 flex items-center gap-1 whitespace-nowrap">
             <AdvancedSearch onSearch={setSearchQuery} />
             <kbd
               aria-label="Press slash to search"
-              className="hidden rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground shadow-xs sm:inline-flex"
+              className="hidden h-6 min-w-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs sm:inline-flex"
             >
               /
             </kbd>
@@ -221,9 +226,9 @@ export function MailView() {
               aria-label="Open command palette (Command K)"
               title="Open command palette"
               onClick={() => setPaletteOpen(true)}
-              className="rounded focus-visible:outline-2 focus-visible:outline-ring"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
             >
-              <kbd className="inline-flex rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground shadow-xs">
+              <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
                 ⌘ K
               </kbd>
             </button>
@@ -277,7 +282,7 @@ export function MailView() {
             onKeyDown={(event) => {
               const amount = verticalSplit
                 ? event.key === "ArrowDown" ? 0.04 : event.key === "ArrowUp" ? -0.04 : 0
-                : event.key === "ArrowRight" ? 0.04 : event.key === "ArrowLeft" ? -0.04 : 0
+                : event.key === "ArrowRight" ? (direction === "rtl" ? -0.04 : 0.04) : event.key === "ArrowLeft" ? (direction === "rtl" ? 0.04 : -0.04) : 0
               if (!amount) return
               event.preventDefault()
               const bounds = panesRef.current?.getBoundingClientRect()
@@ -310,8 +315,8 @@ export function MailView() {
                   size="sm"
                   onClick={() => setFocusedThread(null)}
                 >
-                  <ArrowLeft className="size-4" />
-                  Back
+                  <ArrowLeft className="size-4 rtl:rotate-180" />
+                  {t("Back")}
                 </Button>
               </div>
             ) : null}

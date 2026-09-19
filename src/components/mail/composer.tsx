@@ -45,6 +45,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -559,16 +560,10 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
       {identities.data && identities.data.length > 1 ? (
         <div className="flex items-center gap-2 border-b px-5 py-2 text-sm">
           <Label htmlFor="compose-from" className="text-muted-foreground">From</Label>
-          <select
-            id="compose-from"
-            className="min-w-0 flex-1 rounded border bg-background px-2 py-1"
-            value={identity?.id ?? ""}
-            onChange={(event) => updateCompose({ identityId: event.target.value })}
-          >
-            {identities.data.map((item) => (
-              <option key={item.id} value={item.id}>{item.name} &lt;{item.email}&gt;</option>
-            ))}
-          </select>
+          <Select value={identity?.id ?? identities.data[0]?.id} onValueChange={value => { if (typeof value === "string") updateCompose({ identityId: value }) }}>
+            <SelectTrigger id="compose-from" className="min-w-0 flex-1"><SelectValue>{identity ? `${identity.name} <${identity.email}>` : "Choose identity"}</SelectValue></SelectTrigger>
+            <SelectContent>{identities.data.map(item => <SelectItem key={item.id} value={item.id}>{item.name} &lt;{item.email}&gt;</SelectItem>)}</SelectContent>
+          </Select>
         </div>
       ) : null}
       {inline && composer.to.length > 0 && !showRecipients ? (

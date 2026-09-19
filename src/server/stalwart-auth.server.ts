@@ -18,17 +18,17 @@ async function exchangeToken(params: URLSearchParams): Promise<TokenResponse> {
   return data
 }
 
-export async function authenticateStalwart(username: string, password: string) {
+export async function authenticateStalwart(username: string, password: string, mfaToken?: string) {
   const codeVerifier = verifier()
   const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url")
   const response = await fetch(WORKSPACE_CONFIG.authPath, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: "authCode", accountName: username, accountSecret: password, clientId: WORKSPACE_CONFIG.oauthClientId, codeChallenge, codeChallengeMethod: "S256" }),
+    body: JSON.stringify({ type: "authCode", accountName: username, accountSecret: password, mfaToken: mfaToken || null, clientId: WORKSPACE_CONFIG.oauthClientId, codeChallenge, codeChallengeMethod: "S256" }),
     signal: AbortSignal.timeout(15_000),
   })
   const result = await response.json().catch(() => ({})) as { type?: string; clientCode?: string; detail?: string }
-  if (result.type === "mfaRequired") throw new Error("This account requires a second factor. Complete Stalwart sign-in before connecting it here.")
+  if (result.type === "mfaRequired") throw new Error("A second factor is required. Enter your authentication code and try again.")
   if (!response.ok || result.type !== "authenticated" || !result.clientCode) {
     throw new Error(result.detail ?? `Stalwart sign-in failed (${response.status}).`)
   }

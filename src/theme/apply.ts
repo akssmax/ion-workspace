@@ -8,6 +8,7 @@ import {
   pickThemeConfig,
 } from "./schema"
 import type { AccentId, CvdId, ThemeConfig, ThemeMode } from "./schema"
+import { getThemePreset, THEME_PRESETS } from "./presets"
 
 const DEUTAN_UNSAFE: AccentId[] = ["red", "lime", "emerald", "rose"]
 const TRITAN_UNSAFE: AccentId[] = ["blue", "sky", "yellow", "amber", "indigo"]
@@ -66,6 +67,7 @@ export function applyTheme(
   root.style.colorScheme = dark ? "dark" : "light"
   root.style.fontSize = `${scale}px`
   root.dataset.themeAccent = accent
+  root.dataset.themePreset = config.preset
   root.dataset.themeGray = gray
   root.dataset.themeCvd = config.cvd
   root.dataset.themeScale = config.scale
@@ -174,6 +176,22 @@ export function applyTheme(
   setVar(root, "--chart-3", grayToken(gray, 600))
   setVar(root, "--chart-4", grayToken(gray, 700))
   setVar(root, "--chart-5", grayToken(gray, 800))
+
+  // Reset tokens owned by presets before applying the next palette.
+  setVar(
+    root,
+    "--destructive",
+    dark ? "oklch(0.704 0.191 22.216)" : "oklch(0.577 0.245 27.325)"
+  )
+  setVar(root, "--destructive-foreground", "#ffffff")
+  const preset = getThemePreset(config.preset)
+  if (preset && !contrast && config.cvd === "none") {
+    for (const [name, value] of Object.entries(
+      preset[dark ? "dark" : "light"]
+    )) {
+      setVar(root, `--${name}`, value)
+    }
+  }
 }
 
 function applyStatus(root: HTMLElement, cvd: CvdId, dark: boolean) {
@@ -228,7 +246,7 @@ export function parseStoredTheme(raw: string | null): ThemeConfig {
 /** Inline head script so the first paint matches stored theme (no FOUC). */
 export function themeBootstrapScript(storageKey: string): string {
   const defaults = JSON.stringify(DEFAULT_THEME)
-  return `(function(){try{var k=${JSON.stringify(storageKey)};var d=${defaults};var t=Object.assign({},d);var demo=/^\\/demo\\/?$/.test(location.pathname);var raw=demo?null:localStorage.getItem(k);if(demo){t.mode="light";t.accent="zinc";}if(raw){var p=JSON.parse(raw);if(p&&p.state)t=Object.assign({},d,p.state);}var dark=t.mode==='dark'||(t.mode!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light';var scales={sm:14,md:16,lg:18,xl:20};r.style.fontSize=(scales[t.scale]||16)+'px';var radii={none:'0px',sm:'0.3rem',md:'0.45rem',lg:'0.75rem',xl:'1rem',full:'1.5rem'};r.style.setProperty('--radius',radii[t.radius]||'0.45rem');var fonts={inter:"'Inter Variable', ui-sans-serif, sans-serif",system:'ui-sans-serif, system-ui, sans-serif',humanist:'Verdana, Geneva, sans-serif',serif:"ui-serif, Georgia, 'Times New Roman', serif",mono:'ui-monospace, SFMono-Regular, Menlo, monospace'};var font=fonts[t.font]||fonts.inter;r.style.setProperty('--font-sans',font);r.style.setProperty('--font-heading',font);var accent=t.accent;if((t.cvd==='deuteranopia'||t.cvd==='protanopia')&&['red','lime','emerald','rose'].indexOf(accent)>=0)accent='blue';if(t.cvd==='tritanopia'&&['blue','sky','yellow','amber','indigo'].indexOf(accent)>=0)accent='rose';var swatch=accent==='zinc'?'zinc':accent;var gray=t.gray||'zinc';r.style.setProperty('--background',dark?'var(--color-'+gray+'-950)':'oklch(1 0 0)');r.style.setProperty('--foreground',dark?'var(--color-'+gray+'-100)':'var(--color-'+gray+'-950)');r.style.setProperty('--primary',dark?(swatch==='zinc'?'var(--color-zinc-200)':'var(--color-'+swatch+'-400)'):(swatch==='zinc'?'var(--color-zinc-900)':'var(--color-'+swatch+'-600)'));if(t.cvd==='achromatopsia')r.style.filter='grayscale(1) contrast(1.12)';}catch(e){}})();`
+  return `(function(){try{var k=${JSON.stringify(storageKey)};var d=${defaults};var t=Object.assign({},d);var demo=/^\\/demo\\/?$/.test(location.pathname);var raw=demo?null:localStorage.getItem(k);if(demo){t.mode="light";t.accent="zinc";}if(raw){var p=JSON.parse(raw);if(p&&p.state)t=Object.assign({},d,p.state);}var dark=t.mode==='dark'||(t.mode!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light';var scales={sm:14,md:16,lg:18,xl:20};r.style.fontSize=(scales[t.scale]||16)+'px';var radii={none:'0px',sm:'0.3rem',md:'0.45rem',lg:'0.75rem',xl:'1rem',full:'1.5rem'};r.style.setProperty('--radius',radii[t.radius]||'0.45rem');var fonts={inter:"'Inter Variable', ui-sans-serif, sans-serif",system:'ui-sans-serif, system-ui, sans-serif',humanist:'Verdana, Geneva, sans-serif',serif:"ui-serif, Georgia, 'Times New Roman', serif",mono:'ui-monospace, SFMono-Regular, Menlo, monospace'};var font=fonts[t.font]||fonts.inter;r.style.setProperty('--font-sans',font);r.style.setProperty('--font-heading',font);var accent=t.accent;if((t.cvd==='deuteranopia'||t.cvd==='protanopia')&&['red','lime','emerald','rose'].indexOf(accent)>=0)accent='blue';if(t.cvd==='tritanopia'&&['blue','sky','yellow','amber','indigo'].indexOf(accent)>=0)accent='rose';var swatch=accent==='zinc'?'zinc':accent;var gray=t.gray||'zinc';r.style.setProperty('--background',dark?'var(--color-'+gray+'-950)':'oklch(1 0 0)');r.style.setProperty('--foreground',dark?'var(--color-'+gray+'-100)':'var(--color-'+gray+'-950)');r.style.setProperty('--primary',dark?(swatch==='zinc'?'var(--color-zinc-200)':'var(--color-'+swatch+'-400)'):(swatch==='zinc'?'var(--color-zinc-900)':'var(--color-'+swatch+'-600)'));if(t.cvd==='achromatopsia')r.style.filter='grayscale(1) contrast(1.12)';var presets=${JSON.stringify(THEME_PRESETS)};var preset=presets.find(function(p){return p.id===t.preset;});r.dataset.themePreset=preset?preset.id:'default';if(preset&&!t.highContrast&&t.cvd==='none'){var colors=preset[dark?'dark':'light'];Object.keys(colors).forEach(function(key){r.style.setProperty('--'+key,colors[key]);});}}catch(e){}})();`
 }
 
 export const THEME_BOOTSTRAP_SCRIPT = themeBootstrapScript(THEME_STORAGE_KEY)

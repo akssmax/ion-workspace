@@ -52,7 +52,7 @@ function DatePicker({
           selected={selected}
           defaultMonth={selected}
           onSelect={selectDate}
-          captionLayout="dropdown"
+          captionLayout="label"
           autoFocus
         />
         <div className="flex items-center justify-between border-t p-2">

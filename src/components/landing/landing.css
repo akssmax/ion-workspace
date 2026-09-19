@@ -869,13 +869,6 @@
 .ion-live-toolbar button {
   text-transform: capitalize;
 }
-.ion-live-toolbar > a {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  white-space: nowrap;
-}
 .ion-live-viewport {
   position: relative;
   height: 660px;
@@ -948,10 +941,6 @@
   }
   .ion-live-toolbar .ion-tabs {
     width: 100%;
-  }
-  .ion-live-toolbar > a {
-    padding: 7px;
-    margin-left: auto;
   }
   .ion-live-viewport {
     height: 560px;

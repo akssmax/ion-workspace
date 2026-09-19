@@ -23,6 +23,9 @@ export interface SessionData {
   prefs?: unknown
 }
 
+if (process.env.NODE_ENV === "production" && !process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET is required in production.")
+}
 const SECRET =
   process.env.SESSION_SECRET ?? "workspace-tool-dev-secret-key-0123456789abc"
 

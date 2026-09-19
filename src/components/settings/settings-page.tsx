@@ -12,6 +12,7 @@ import { useNavigate, useSearch } from "@tanstack/react-router"
 import "@/features/catalog"
 import { Button } from "@/components/ui/button"
 import { cn } from "cn"
+import { useLanguage, type TranslationKey } from "@/lib/language"
 import { GeneralSection } from "./general-section"
 import { AppearanceSection } from "./appearance-section"
 import { InboxSection } from "./inbox-section"
@@ -43,10 +44,10 @@ export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number]
 
 const SECTIONS: {
   id: SettingsSectionId
-  title: string
-  description: string
+  title: TranslationKey
+  description: TranslationKey
   icon: React.ReactNode
-  group: string
+  group: TranslationKey
 }[] = [
   {
     id: "general",
@@ -102,9 +103,13 @@ const SECTIONS: {
   },
 ]
 
+const GROUP_ORDER = ["Appearance", "Mail", "Privacy & Security", "Workspace"]
+const ORDERED_SECTIONS = [...SECTIONS].sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group))
+
 export function SettingsPage() {
   const { section } = useSearch({ from: "/settings" })
   const navigate = useNavigate()
+  const { t } = useLanguage()
   const active = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]
 
   function pick(id: SettingsSectionId) {
@@ -117,22 +122,22 @@ export function SettingsPage() {
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Back to workspace"
+          aria-label={t("Back to workspace")}
           onClick={() => void navigate({ to: "/app" })}
         >
-          <ArrowLeft className="size-4" />
+          <ArrowLeft className="size-4 rtl:rotate-180" />
         </Button>
-        <h1 className="text-sm font-semibold">Settings</h1>
+        <h1 className="text-sm font-semibold">{t("Settings")}</h1>
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <nav
-          aria-label="Settings sections"
+          aria-label={t("Settings")}
           className="flex w-full shrink-0 gap-1 overflow-x-auto border-b p-2 sm:block sm:w-60 sm:space-y-0.5 sm:overflow-y-auto sm:border-r sm:border-b-0 sm:p-3"
         >
-          {SECTIONS.map((s, index) => (
+          {ORDERED_SECTIONS.map((s, index) => (
             <div key={s.id} className="shrink-0">
-            {(index === 0 || SECTIONS[index - 1].group !== s.group) ? <p className="hidden px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:block">{s.group}</p> : null}
+            {(index === 0 || ORDERED_SECTIONS[index - 1].group !== s.group) ? <p className="hidden px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:block">{t(s.group)}</p> : null}
             <button
               type="button"
               onClick={() => pick(s.id)}
@@ -145,7 +150,7 @@ export function SettingsPage() {
               )}
             >
               {s.icon}
-              {s.title}
+                  {t(s.title)}
             </button>
             </div>
           ))}
@@ -154,9 +159,9 @@ export function SettingsPage() {
         <main className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold">{active.title}</h2>
+              <h2 className="text-lg font-semibold">{t(active.title)}</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                {active.description}
+                {t(active.description)}
               </p>
             </div>
             {active.id === "general" ? <GeneralSection /> : null}
