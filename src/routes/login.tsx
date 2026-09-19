@@ -49,7 +49,7 @@ function LoginPage() {
 
   if (session.data) {
     return (
-      <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6">
+      <div className="dark relative flex min-h-svh items-center justify-center overflow-hidden bg-[#151515] p-6 text-[#f5f5f5]">
         <AuthBackground />
         <div className="relative z-10">
           <RedirectToApp />
@@ -83,11 +83,11 @@ function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 py-12">
+    <main className="dark relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-[#151515] px-4 py-12 text-[#f5f5f5]">
       <AuthBackground />
       <div className="relative z-10 w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-[oklch(0.18_0.04_125)] text-[oklch(0.88_0.22_125)]">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-white/20 bg-[#242424] text-white">
             <IonLogo wordmark={false} size={22} />
           </div>
           <h1 className="text-xl font-semibold tracking-tight">
@@ -100,7 +100,7 @@ function LoginPage() {
 
         <form
           onSubmit={onSubmit}
-          className="space-y-4 rounded-2xl border bg-card/90 p-6 shadow-sm backdrop-blur-sm"
+          className="space-y-4 rounded-2xl border border-white/15 bg-[#1b1b1b]/95 p-6 shadow-2xl shadow-black/40 backdrop-blur-sm"
         >
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
@@ -152,7 +152,11 @@ function LoginPage() {
             </div>
           ) : null}
 
-          <Button type="submit" className="w-full" disabled={busy}>
+          <Button
+            type="submit"
+            className="w-full bg-white text-[#151515] hover:bg-neutral-200"
+            disabled={busy}
+          >
             {busy ? "Signing in…" : "Sign in"}
           </Button>
 

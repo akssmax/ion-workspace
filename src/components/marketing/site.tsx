@@ -112,7 +112,7 @@ export function Site({ children }: { children: ReactNode }) {
       <header className="ion-header">
         <div className="ion-header-inner">
           <a href="/" aria-label="Ion home" className="ion-brand">
-            <IonLogo size={29} />
+            <IonLogo size={29} animateOnHover />
           </a>
           <nav aria-label="Main navigation">
             <a href="/product">Product</a>
@@ -131,7 +131,7 @@ export function Site({ children }: { children: ReactNode }) {
         <LandingRow>
           <Cell md={6} className="ion-pad">
             <a href="/" aria-label="Ion home" className="ion-footer-logo">
-              <IonLogo size={48} />
+              <IonLogo size={48} animateOnHover />
             </a>
             <p className="ion-footer-statement">
               A place for work.

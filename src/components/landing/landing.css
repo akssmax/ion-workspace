@@ -59,6 +59,8 @@
 .ion-brand {
   font-size: 26px;
   margin-right: auto;
+  display: inline-flex;
+  align-items: center;
 }
 .ion-header nav,
 .ion-header-actions {
@@ -471,6 +473,8 @@
 }
 .ion-footer-logo {
   font-size: 46px;
+  display: inline-flex;
+  align-items: center;
 }
 .ion-footer-statement {
   font-size: 29px;
