@@ -1,0 +1,137 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
+import { AlertCircle, KeyRound, User } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { authenticate, fetchAppConfig } from "@/services/auth/auth.service"
+import { useSession } from "@/hooks/use-session"
+import { qk } from "@/queries/keys"
+import { AuthBackground } from "@/components/effects/AuthBackground"
+import { IonLogo } from "@/components/brand/logo"
+
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+  head: () => ({
+    meta: [{ title: "Sign in · Ion" }],
+  }),
+})
+
+function LoginPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const session = useSession()
+  const [username, setUsername] = useState("demo")
+  const [password, setPassword] = useState("demo")
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [hint, setHint] = useState<string | null>(null)
+
+  // Emails a hint with the configured demo credentials (mock mode only).
+  void fetchAppConfig().then((config) => {
+    if (config.jmapMode === "mock") {
+      setHint(`Mock mode — use ${config.mockUsername} / ${config.mockPassword}`)
+    }
+  })
+
+  if (session.data) {
+    return (
+      <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6">
+        <AuthBackground />
+        <div className="relative z-10">
+          <RedirectToApp />
+        </div>
+      </div>
+    )
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    setBusy(true)
+    try {
+      const info = await authenticate(username, password)
+      queryClient.setQueryData(["session"], info)
+      void queryClient.invalidateQueries({ queryKey: qk.preferences() })
+      await navigate({ to: "/app", replace: true })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <main className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden px-4 py-12">
+      <AuthBackground />
+      <div className="relative z-10 w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-[oklch(0.18_0.04_125)] text-[oklch(0.88_0.22_125)]">
+            <IonLogo wordmark={false} size={22} />
+          </div>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to Ion</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Mail, calendar, contacts &amp; files.
+          </p>
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="space-y-4 rounded-2xl border bg-card/90 p-6 shadow-sm backdrop-blur-sm"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <div className="relative">
+              <User className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="username"
+                className="pl-9"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                placeholder="you@example.com"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <div className="relative">
+              <KeyRound className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                id="password"
+                className="pl-9"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+          </div>
+
+          {error ? (
+            <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          ) : null}
+
+          <Button type="submit" className="w-full" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
+
+          {hint ? (
+            <p className="text-center text-xs text-muted-foreground">{hint}</p>
+          ) : null}
+        </form>
+      </div>
+    </main>
+  )
+}
+
+function RedirectToApp() {
+  const navigate = useNavigate()
+  void navigate({ to: "/app", replace: true })
+  return <p className="text-sm text-muted-foreground">Redirecting…</p>
+}

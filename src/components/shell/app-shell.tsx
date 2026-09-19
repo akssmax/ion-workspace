@@ -1,0 +1,44 @@
+/**
+ * Shell layout: sidebar + active app view + command palette + shortcuts.
+ */
+
+import type { CSSProperties } from "react"
+import "@/features/catalog"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { SidebarShell } from "./sidebar"
+import { CommandPalette } from "./command-palette"
+import { KeyboardShortcuts } from "./keyboard-shortcuts"
+import { useJmapPush } from "@/queries/push"
+import { useWorkspaceStore } from "@/stores/workspace.store"
+import { MailView } from "../mail/mail-view"
+import { CalendarView } from "../calendar/calendar-view"
+import { ContactsView } from "../contacts/contacts-view"
+import { FilesView } from "../files/files-view"
+import { ComposeDialog } from "../mail/composer"
+import { SendStatusPill } from "../mail/send-status"
+
+export function AppShell() {
+  const app = useWorkspaceStore((s) => s.app)
+  useJmapPush()
+
+  return (
+    <SidebarProvider
+      defaultOpen
+      style={{ "--sidebar-width": "300px" } as CSSProperties}
+    >
+      <SidebarShell />
+      <SidebarInset className="h-svh overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {app === "mail" ? <MailView /> : null}
+          {app === "calendar" ? <CalendarView /> : null}
+          {app === "contacts" ? <ContactsView /> : null}
+          {app === "files" ? <FilesView /> : null}
+        </div>
+      </SidebarInset>
+      <CommandPalette />
+      <ComposeDialog />
+      <SendStatusPill />
+      <KeyboardShortcuts />
+    </SidebarProvider>
+  )
+}
