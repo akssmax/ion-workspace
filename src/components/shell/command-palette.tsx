@@ -1,3 +1,4 @@
+import { isDemoRuntime } from "@/lib/demo/runtime"
 /**
  * Command palette (Cmd/Ctrl+K): fast navigation and actions.
  */
@@ -132,7 +133,7 @@ export function CommandPalette() {
               <FileText className="size-4" />
               Open Files
             </CommandItem>
-            <CommandItem
+            {!isDemoRuntime && <><CommandItem
               value="open settings preferences"
               onSelect={() => {
                 setOpen(false)
@@ -157,7 +158,7 @@ export function CommandPalette() {
             >
               <Palette className="size-4" />
               Appearance
-            </CommandItem>
+            </CommandItem></>}
           </CommandGroup>
           <CommandGroup heading="Calendar">
             <CommandItem

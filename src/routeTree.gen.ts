@@ -11,8 +11,12 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DesignSystemRouteRouteImport } from './routes/design-system/route'
+import { Route as EnterpriseRouteImport } from './routes/enterprise'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ProductRouteImport } from './routes/product'
+import { Route as RequestAccessRouteImport } from './routes/request-access'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DesignSystemIndexRouteImport } from './routes/design-system/index'
 import { Route as DesignSystemAccentsRouteImport } from './routes/design-system/accents'
@@ -37,14 +41,34 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DesignSystemRouteRoute = DesignSystemRouteRouteImport.update({
   id: '/design-system',
   path: '/design-system',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EnterpriseRoute = EnterpriseRouteImport.update({
+  id: '/enterprise',
+  path: '/enterprise',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductRoute = ProductRouteImport.update({
+  id: '/product',
+  path: '/product',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RequestAccessRoute = RequestAccessRouteImport.update({
+  id: '/request-access',
+  path: '/request-access',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -118,7 +142,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRouteRouteWithChildren
   '/app': typeof AppRoute
+  '/demo': typeof DemoRoute
+  '/enterprise': typeof EnterpriseRoute
   '/login': typeof LoginRoute
+  '/product': typeof ProductRoute
+  '/request-access': typeof RequestAccessRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -136,7 +164,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/demo': typeof DemoRoute
+  '/enterprise': typeof EnterpriseRoute
   '/login': typeof LoginRoute
+  '/product': typeof ProductRoute
+  '/request-access': typeof RequestAccessRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -156,7 +188,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRouteRouteWithChildren
   '/app': typeof AppRoute
+  '/demo': typeof DemoRoute
+  '/enterprise': typeof EnterpriseRoute
   '/login': typeof LoginRoute
+  '/product': typeof ProductRoute
+  '/request-access': typeof RequestAccessRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -177,7 +213,11 @@ export interface FileRouteTypes {
     | '/'
     | '/design-system'
     | '/app'
+    | '/demo'
+    | '/enterprise'
     | '/login'
+    | '/product'
+    | '/request-access'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -195,7 +235,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/app'
+    | '/demo'
+    | '/enterprise'
     | '/login'
+    | '/product'
+    | '/request-access'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -214,7 +258,11 @@ export interface FileRouteTypes {
     | '/'
     | '/design-system'
     | '/app'
+    | '/demo'
+    | '/enterprise'
     | '/login'
+    | '/product'
+    | '/request-access'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -234,7 +282,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignSystemRouteRoute: typeof DesignSystemRouteRouteWithChildren
   AppRoute: typeof AppRoute
+  DemoRoute: typeof DemoRoute
+  EnterpriseRoute: typeof EnterpriseRoute
   LoginRoute: typeof LoginRoute
+  ProductRoute: typeof ProductRoute
+  RequestAccessRoute: typeof RequestAccessRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -254,6 +306,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/design-system': {
       id: '/design-system'
       path: '/design-system'
@@ -261,11 +320,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DesignSystemRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/enterprise': {
+      id: '/enterprise'
+      path: '/enterprise'
+      fullPath: '/enterprise'
+      preLoaderRoute: typeof EnterpriseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product': {
+      id: '/product'
+      path: '/product'
+      fullPath: '/product'
+      preLoaderRoute: typeof ProductRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/request-access': {
+      id: '/request-access'
+      path: '/request-access'
+      fullPath: '/request-access'
+      preLoaderRoute: typeof RequestAccessRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -399,7 +479,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignSystemRouteRoute: DesignSystemRouteRouteWithChildren,
   AppRoute: AppRoute,
+  DemoRoute: DemoRoute,
+  EnterpriseRoute: EnterpriseRoute,
   LoginRoute: LoginRoute,
+  ProductRoute: ProductRoute,
+  RequestAccessRoute: RequestAccessRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport

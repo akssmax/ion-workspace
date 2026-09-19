@@ -1,3 +1,4 @@
+import { isDemoRuntime } from "@/lib/demo/runtime"
 /**
  * Sync engine: keeps the Dexie cache warm and (later) forwards JMAP Push
  * notifications from the transport into React Query invalidation.
@@ -7,7 +8,8 @@
  */
 
 import { db } from "../../db/db"
-import type { JmapId } from "../../jmap/types/mail"
+import type { CachedEmail } from "../../db/db"
+import type { EmailProperties, Thread } from "../../jmap/types/mail"
 import * as mailService from "../../services/mail/mail.service"
 import * as calendarService from "../../services/calendar/calendar.service"
 import * as contactsService from "../../services/contacts/contacts.service"
@@ -19,10 +21,54 @@ class SyncEngine {
   private listeners = new Set<PushListener>()
   private syncing = new Set<string>()
 
+  async storeMailPage(accountId: string, emails: EmailProperties[]): Promise<void> {
+    if (isDemoRuntime) return
+    await db.mailCache.bulkPut(emails.map((email) => ({
+      ...email,
+      accountId,
+      cacheKey: `${accountId}:${email.id}`,
+      mailboxIdsList: Object.keys(email.mailboxIds),
+    })))
+  }
+
+  async offlineMailPage(accountId: string, mailboxId: string, position: number, limit: number) {
+    if (isDemoRuntime) throw new Error("Demo data is unavailable. Reset the demo to try again.")
+    const accountEmails = await db.mailCache.where("accountId").equals(accountId).toArray()
+    const matches = accountEmails
+      .filter((email) => mailboxId === "all" || email.mailboxIds[mailboxId])
+      .sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? ""))
+    const emails = matches.slice(position, position + limit)
+    return {
+      mailboxes: [],
+      queryState: "offline",
+      position,
+      ids: emails.map((email) => email.id),
+      total: matches.length,
+      emails,
+      notFound: [],
+      state: "offline",
+    }
+  }
+
+  async storeThread(accountId: string, thread: Thread, emails: EmailProperties[]) {
+    if (isDemoRuntime) return
+    await db.threadCache.put({ ...thread, accountId, cacheKey: `${accountId}:${thread.id}` })
+    await this.storeMailPage(accountId, emails)
+  }
+
+  async offlineThread(accountId: string, threadId: string) {
+    if (isDemoRuntime) return null
+    const thread = await db.threadCache.get(`${accountId}:${threadId}`)
+    if (!thread) return null
+    const emails = await Promise.all(thread.emailIds.map((id) => db.mailCache.get(`${accountId}:${id}`)))
+    return { thread, emails: emails.filter((email): email is NonNullable<typeof email> => !!email) }
+  }
+
   /**
    * Cache the mailbox list (returns directly, UI can show cached instantly).
    */
   async ensureMailboxes(): Promise<void> {
+    if (isDemoRuntime) return
     try {
       const mailboxes = await mailService.getMailboxes()
       await db.mailboxes.bulkPut(mailboxes)
@@ -38,6 +84,7 @@ class SyncEngine {
   async syncMailbox(
     mailboxId: string
   ): Promise<Awaited<ReturnType<typeof mailService.getEmails>>> {
+    if (isDemoRuntime) return mailService.getEmails(mailboxId, { limit: 120 })
     const key = `mailbox:${mailboxId}`
     if (this.syncing.has(key)) {
       throw new Error("already syncing")
@@ -47,13 +94,11 @@ class SyncEngine {
       const result = await mailService.getEmails(mailboxId, { limit: 120 })
       const emails = result.emails.map((e) => ({
         ...e,
-        mailboxIdsList: Object.keys(e.mailboxIds ?? {}),
+        mailboxIdsList: Object.keys(e.mailboxIds),
       }))
       if (emails.length) {
         await db.emails.bulkPut(emails)
-        const threadIds = [...new Set(emails.map((e) => e.threadId))].filter(
-          Boolean
-        ) as JmapId[]
+        const threadIds = [...new Set(emails.map((e) => e.threadId))].filter(Boolean)
         if (threadIds.length) {
           const threads = await mailService.getThreads(threadIds)
           await db.threads.bulkPut(threads)
@@ -76,6 +121,7 @@ class SyncEngine {
     mailboxId: string,
     limit = 120
   ): Promise<CachedEmailLike[]> {
+    if (isDemoRuntime) return []
     const ids = await db.emails
       .where("mailboxIdsList")
       .equals(mailboxId)
@@ -84,6 +130,7 @@ class SyncEngine {
   }
 
   async cacheThread(threadId: string): Promise<void> {
+    if (isDemoRuntime) return
     try {
       const { thread, emails } = await mailService.getThread(threadId)
       await db.threads.put(thread)
@@ -94,6 +141,7 @@ class SyncEngine {
   }
 
   async syncEvents(): Promise<void> {
+    if (isDemoRuntime) return
     try {
       const events = await calendarService.getEventsInRange(
         new Date(0).toISOString(),
@@ -106,6 +154,7 @@ class SyncEngine {
   }
 
   async syncContacts(): Promise<void> {
+    if (isDemoRuntime) return
     try {
       const contacts = await contactsService.getAllContacts()
       await db.contacts.bulkPut(contacts)
@@ -115,6 +164,7 @@ class SyncEngine {
   }
 
   async syncFiles(): Promise<void> {
+    if (isDemoRuntime) return
     try {
       const files = await filesService.listFiles(null)
       await db.files.bulkPut(files)
@@ -133,6 +183,6 @@ class SyncEngine {
   }
 }
 
-type CachedEmailLike = import("../../db/db").CachedEmail
+type CachedEmailLike = CachedEmail
 
 export const syncEngine = new SyncEngine()

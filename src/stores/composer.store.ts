@@ -19,6 +19,7 @@ export interface ComposeState {
   open: boolean
   mode: ComposeMode
   draftEmailId: string | null
+  identityId: string | null
   inReplyTo: string[] | null
   references: string[] | null
   to: Recipient[]
@@ -43,6 +44,7 @@ const empty: Pick<
   ComposeState,
   | "mode"
   | "draftEmailId"
+  | "identityId"
   | "inReplyTo"
   | "references"
   | "to"
@@ -54,6 +56,7 @@ const empty: Pick<
 > = {
   mode: "new",
   draftEmailId: null,
+  identityId: null,
   inReplyTo: null,
   references: null,
   to: [],

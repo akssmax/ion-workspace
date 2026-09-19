@@ -15,6 +15,8 @@ export interface SessionData {
   mode: "mock" | "real"
   /** Stalwart session JWT (real mode only). Never sent to the client. */
   accessToken?: string
+  refreshToken?: string
+  accessTokenExpiresAt?: number
   /** Primary JMAP account id (resolved lazily). */
   accountId?: string
   /** UI preferences. */

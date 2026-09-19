@@ -6,11 +6,8 @@ import {
   SCALE_OPTIONS,
   THEME_STORAGE_KEY,
   pickThemeConfig,
-  type AccentId,
-  type CvdId,
-  type ThemeConfig,
-  type ThemeMode,
 } from "./schema"
+import type { AccentId, CvdId, ThemeConfig, ThemeMode } from "./schema"
 
 const DEUTAN_UNSAFE: AccentId[] = ["red", "lime", "emerald", "rose"]
 const TRITAN_UNSAFE: AccentId[] = ["blue", "sky", "yellow", "amber", "indigo"]
@@ -92,7 +89,11 @@ export function applyTheme(
     setVar(root, "--secondary-foreground", grayToken(gray, 50))
     setVar(root, "--accent", grayToken(gray, 800))
     setVar(root, "--accent-foreground", grayToken(gray, 50))
-    setVar(root, "--border", contrast ? "oklch(1 0 0 / 18%)" : "oklch(1 0 0 / 10%)")
+    setVar(
+      root,
+      "--border",
+      contrast ? "oklch(1 0 0 / 18%)" : "oklch(1 0 0 / 10%)"
+    )
     setVar(root, "--input", "oklch(1 0 0 / 15%)")
     setVar(root, "--ring", grayToken(gray, 400))
     setVar(root, "--sidebar", grayToken(gray, 900))
@@ -101,7 +102,11 @@ export function applyTheme(
     setVar(root, "--sidebar-accent-foreground", grayToken(gray, 50))
     setVar(root, "--sidebar-border", "oklch(1 0 0 / 10%)")
     setVar(root, "--sidebar-ring", grayToken(gray, 400))
-    setVar(root, "--primary", accentToken(swatch, swatch === "zinc" ? 200 : 400))
+    setVar(
+      root,
+      "--primary",
+      accentToken(swatch, swatch === "zinc" ? 200 : 400)
+    )
     setVar(
       root,
       "--primary-foreground",
@@ -114,7 +119,11 @@ export function applyTheme(
     )
     setVar(root, "--sidebar-primary-foreground", accentToken(swatch, 950))
   } else {
-    setVar(root, "--background", contrast ? grayToken(gray, 50) : "oklch(1 0 0)")
+    setVar(
+      root,
+      "--background",
+      contrast ? grayToken(gray, 50) : "oklch(1 0 0)"
+    )
     setVar(root, "--foreground", grayToken(gray, 950))
     setVar(root, "--card", "oklch(1 0 0)")
     setVar(root, "--card-foreground", grayToken(gray, 950))
@@ -135,7 +144,11 @@ export function applyTheme(
     setVar(root, "--sidebar-accent-foreground", grayToken(gray, 900))
     setVar(root, "--sidebar-border", grayToken(gray, 200))
     setVar(root, "--sidebar-ring", grayToken(gray, 400))
-    setVar(root, "--primary", accentToken(swatch, swatch === "zinc" ? 900 : 600))
+    setVar(
+      root,
+      "--primary",
+      accentToken(swatch, swatch === "zinc" ? 900 : 600)
+    )
     setVar(
       root,
       "--primary-foreground",
@@ -215,7 +228,7 @@ export function parseStoredTheme(raw: string | null): ThemeConfig {
 /** Inline head script so the first paint matches stored theme (no FOUC). */
 export function themeBootstrapScript(storageKey: string): string {
   const defaults = JSON.stringify(DEFAULT_THEME)
-  return `(function(){try{var k=${JSON.stringify(storageKey)};var d=${defaults};var t=Object.assign({},d);var raw=localStorage.getItem(k);if(raw){var p=JSON.parse(raw);if(p&&p.state)t=Object.assign({},d,p.state);}var dark=t.mode==='dark'||(t.mode!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light';var scales={sm:14,md:16,lg:18,xl:20};r.style.fontSize=(scales[t.scale]||16)+'px';var radii={none:'0px',sm:'0.3rem',md:'0.45rem',lg:'0.75rem',xl:'1rem',full:'1.5rem'};r.style.setProperty('--radius',radii[t.radius]||'0.45rem');var fonts={inter:"'Inter Variable', ui-sans-serif, sans-serif",system:'ui-sans-serif, system-ui, sans-serif',humanist:'Verdana, Geneva, sans-serif',serif:"ui-serif, Georgia, 'Times New Roman', serif",mono:'ui-monospace, SFMono-Regular, Menlo, monospace'};var font=fonts[t.font]||fonts.inter;r.style.setProperty('--font-sans',font);r.style.setProperty('--font-heading',font);var accent=t.accent;if((t.cvd==='deuteranopia'||t.cvd==='protanopia')&&['red','lime','emerald','rose'].indexOf(accent)>=0)accent='blue';if(t.cvd==='tritanopia'&&['blue','sky','yellow','amber','indigo'].indexOf(accent)>=0)accent='rose';var swatch=accent==='zinc'?'zinc':accent;var gray=t.gray||'zinc';r.style.setProperty('--background',dark?'var(--color-'+gray+'-950)':'oklch(1 0 0)');r.style.setProperty('--foreground',dark?'var(--color-'+gray+'-100)':'var(--color-'+gray+'-950)');r.style.setProperty('--primary',dark?(swatch==='zinc'?'var(--color-zinc-200)':'var(--color-'+swatch+'-400)'):(swatch==='zinc'?'var(--color-zinc-900)':'var(--color-'+swatch+'-600)'));if(t.cvd==='achromatopsia')r.style.filter='grayscale(1) contrast(1.12)';}catch(e){}})();`
+  return `(function(){try{var k=${JSON.stringify(storageKey)};var d=${defaults};var t=Object.assign({},d);var demo=/^\\/demo\\/?$/.test(location.pathname);var raw=demo?null:localStorage.getItem(k);if(demo){t.mode="light";t.accent="zinc";}if(raw){var p=JSON.parse(raw);if(p&&p.state)t=Object.assign({},d,p.state);}var dark=t.mode==='dark'||(t.mode!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.classList.toggle('dark',dark);r.style.colorScheme=dark?'dark':'light';var scales={sm:14,md:16,lg:18,xl:20};r.style.fontSize=(scales[t.scale]||16)+'px';var radii={none:'0px',sm:'0.3rem',md:'0.45rem',lg:'0.75rem',xl:'1rem',full:'1.5rem'};r.style.setProperty('--radius',radii[t.radius]||'0.45rem');var fonts={inter:"'Inter Variable', ui-sans-serif, sans-serif",system:'ui-sans-serif, system-ui, sans-serif',humanist:'Verdana, Geneva, sans-serif',serif:"ui-serif, Georgia, 'Times New Roman', serif",mono:'ui-monospace, SFMono-Regular, Menlo, monospace'};var font=fonts[t.font]||fonts.inter;r.style.setProperty('--font-sans',font);r.style.setProperty('--font-heading',font);var accent=t.accent;if((t.cvd==='deuteranopia'||t.cvd==='protanopia')&&['red','lime','emerald','rose'].indexOf(accent)>=0)accent='blue';if(t.cvd==='tritanopia'&&['blue','sky','yellow','amber','indigo'].indexOf(accent)>=0)accent='rose';var swatch=accent==='zinc'?'zinc':accent;var gray=t.gray||'zinc';r.style.setProperty('--background',dark?'var(--color-'+gray+'-950)':'oklch(1 0 0)');r.style.setProperty('--foreground',dark?'var(--color-'+gray+'-100)':'var(--color-'+gray+'-950)');r.style.setProperty('--primary',dark?(swatch==='zinc'?'var(--color-zinc-200)':'var(--color-'+swatch+'-400)'):(swatch==='zinc'?'var(--color-zinc-900)':'var(--color-'+swatch+'-600)'));if(t.cvd==='achromatopsia')r.style.filter='grayscale(1) contrast(1.12)';}catch(e){}})();`
 }
 
 export const THEME_BOOTSTRAP_SCRIPT = themeBootstrapScript(THEME_STORAGE_KEY)

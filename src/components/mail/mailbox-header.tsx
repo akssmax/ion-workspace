@@ -16,6 +16,8 @@ import {
   Star,
   StarOff,
   Trash2,
+  RotateCcw,
+  ShieldAlert,
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -42,6 +44,10 @@ import {
   useMarkRead,
   useMarkStarred,
   useTrashEmails,
+  useRestoreEmails,
+  usePermanentlyDeleteEmails,
+  useReportJunk,
+  useMarkNotJunk,
 } from "@/queries/mail"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelMenu } from "@/modules/mail/labels"
@@ -63,6 +69,10 @@ export function MailboxHeader() {
 
   const archive = useArchiveEmails()
   const trash = useTrashEmails()
+  const restore = useRestoreEmails()
+  const permanentlyDelete = usePermanentlyDeleteEmails()
+  const reportJunk = useReportJunk()
+  const markNotJunk = useMarkNotJunk()
   const starred = useMarkStarred()
   const read = useMarkRead()
   const [trashConfirmOpen, setTrashConfirmOpen] = useState(false)
@@ -70,8 +80,9 @@ export function MailboxHeader() {
   const hasSelection = selectedThreadIds.length > 0
   const allVisibleSelected =
     visibleThreadIds.length > 0 &&
-    selectedThreadIds.length >= visibleThreadIds.length
+    visibleThreadIds.every((id) => selectedThreadIds.includes(id))
   const isTrash = mailbox?.role === "trash"
+  const isJunk = mailbox?.role === "junk"
   const labelsEnabled = useFeatureFlag("mail.labels")
 
   return (
@@ -83,6 +94,13 @@ export function MailboxHeader() {
       )}
     >
       <div className="flex min-w-0 flex-1 items-center overflow-hidden">
+        {isTrash ? <Button
+          variant="ghost"
+          size="icon-sm"
+          disabled={!hasSelection}
+          onClick={() => void restore.mutateAsync([...selectedThreadIds])}
+          aria-label="Restore to inbox"
+        ><RotateCcw className="size-4" /></Button> : null}
         <Tooltip>
           <TooltipTrigger
             render={
@@ -176,7 +194,7 @@ export function MailboxHeader() {
                 size="icon-sm"
                 disabled={!hasSelection}
                 onClick={() => setTrashConfirmOpen(true)}
-                aria-label="Move to trash"
+                aria-label={isTrash ? "Delete permanently" : "Move to trash"}
                 className={trashIconButtonClassName}
               >
                 <Trash2 className="size-4" />
@@ -185,7 +203,7 @@ export function MailboxHeader() {
           >
             <span />
           </TooltipTrigger>
-          <TooltipContent>Move to trash</TooltipContent>
+          <TooltipContent>{isTrash ? "Delete permanently" : "Move to trash"}</TooltipContent>
         </Tooltip>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -234,6 +252,20 @@ export function MailboxHeader() {
               <StarOff className="size-3.5" />
               Remove star
             </DropdownMenuItem>
+            {isJunk ? (
+              <DropdownMenuItem onClick={() => void markNotJunk.mutateAsync([...selectedThreadIds])}>
+                <ShieldAlert className="size-3.5" /> Not spam
+              </DropdownMenuItem>
+            ) : !isTrash ? (
+              <>
+                <DropdownMenuItem onClick={() => void reportJunk.mutateAsync({ ids: [...selectedThreadIds] })}>
+                  <ShieldAlert className="size-3.5" /> Report spam
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void reportJunk.mutateAsync({ ids: [...selectedThreadIds], phishing: true })}>
+                  <ShieldAlert className="size-3.5" /> Report phishing
+                </DropdownMenuItem>
+              </>
+            ) : null}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -281,7 +313,8 @@ export function MailboxHeader() {
         open={trashConfirmOpen}
         onOpenChange={setTrashConfirmOpen}
         count={selectedThreadIds.length}
-        onConfirm={() => void trash.mutateAsync([...selectedThreadIds])}
+        permanent={isTrash}
+        onConfirm={() => void (isTrash ? permanentlyDelete : trash).mutateAsync([...selectedThreadIds])}
       />
     </header>
   )

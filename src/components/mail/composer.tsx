@@ -18,12 +18,23 @@ import {
   List,
   ListOrdered,
   Link2,
-  Save,
   MessageSquareReply,
   ReplyAll,
   Forward,
   ChevronDown,
   X,
+  Maximize2,
+  Minimize2,
+  Heading1,
+  Heading2,
+  Strikethrough,
+  Quote,
+  Code2,
+  Undo2,
+  Redo2,
+  RemoveFormatting,
+  Minus,
+  FileText,
 } from "lucide-react"
 import {
   Dialog,
@@ -58,6 +69,8 @@ import {
 import { useAutocompleteContacts } from "@/queries/contacts"
 import type { EmailProperties } from "@/jmap/types/mail"
 import { emailTextBody, emailHtmlBody } from "@/lib/html"
+import { useMailTemplates, useSaveMailTemplate, useDeleteMailTemplate } from "@/queries/mail-templates"
+import { usePreferences } from "@/queries/preferences"
 
 function isInlineMode(mode: ComposeMode): boolean {
   return mode === "reply" || mode === "reply-all" || mode === "forward"
@@ -68,16 +81,45 @@ export function ComposeDialog() {
   const open = useComposerStore((s) => s.open)
   const mode = useComposerStore((s) => s.mode)
   const closeCompose = useComposerStore((s) => s.closeCompose)
+  const [expanded, setExpanded] = useState(false)
 
   if (!open || isInlineMode(mode)) return null
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && closeCompose()}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent
+        showCloseButton={false}
+        className={cn(
+          "flex max-h-[min(90vh,900px)] w-[min(760px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-none",
+          expanded && "h-[calc(100vh-2rem)] w-[calc(100vw-2rem)]"
+        )}
+      >
+        <DialogHeader className="flex-row items-center border-b bg-muted/40 px-5 py-3">
           <DialogTitle>
             {mode === "draft" ? "Edit draft" : "New message"}
           </DialogTitle>
+          <div className="ml-auto flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={expanded ? "Restore size" : "Expand compose"}
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <Minimize2 className="size-4" />
+              ) : (
+                <Maximize2 className="size-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Close compose"
+              onClick={closeCompose}
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
         </DialogHeader>
         <ComposerForm variant="dialog" />
       </DialogContent>
@@ -89,7 +131,7 @@ export function ComposeDialog() {
  * Inline reply / reply-all / forward panel — rendered at the bottom of the
  * reading pane so the original thread stays in context.
  */
-export function InlineComposer() {
+export function InlineComposer({ pinned }: { pinned: boolean }) {
   const open = useComposerStore((s) => s.open)
   const mode = useComposerStore((s) => s.mode)
   const closeCompose = useComposerStore((s) => s.closeCompose)
@@ -97,16 +139,13 @@ export function InlineComposer() {
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!open || !isInlineMode(mode)) return
-    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-  }, [open, mode])
+    if (!open || pinned || !isInlineMode(mode)) return
+    panelRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+  }, [open, pinned, mode])
 
   if (!open || !isInlineMode(mode)) return null
 
-  const modeMeta: Record<
-    string,
-    { label: string; icon: React.ReactNode }
-  > = {
+  const modeMeta: Record<string, { label: string; icon: React.ReactNode }> = {
     reply: {
       label: "Reply",
       icon: <MessageSquareReply className="size-4" />,
@@ -122,7 +161,10 @@ export function InlineComposer() {
   return (
     <div
       ref={panelRef}
-      className="mx-6 mb-6 overflow-hidden rounded-xl border bg-card shadow-sm"
+      className={cn(
+        "mx-4 mb-4 rounded-xl border bg-card shadow-sm sm:mx-6",
+        pinned && "max-h-[55%] min-h-0 shrink-0 overflow-y-auto"
+      )}
     >
       <div className="flex items-center gap-1 border-b px-3 py-2">
         <DropdownMenu>
@@ -164,9 +206,7 @@ export function InlineComposer() {
           <X className="size-4" />
         </Button>
       </div>
-      <div className="p-3">
-        <ComposerForm variant="inline" />
-      </div>
+      <ComposerForm variant="inline" />
     </div>
   )
 }
@@ -177,8 +217,12 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
   const inline = variant === "inline"
 
   const identities = useIdentities()
-  const identity = identities.data?.[0]
+  const { data: preferences } = usePreferences()
+  const identity = identities.data?.find((item) => item.id === composer.identityId) ?? identities.data?.find((item) => item.id === preferences?.defaultIdentityId) ?? identities.data?.[0]
   const uploadAttachment = useUploadAttachment()
+  const { available: templatesAvailable, templates } = useMailTemplates()
+  const saveTemplate = useSaveMailTemplate()
+  const deleteTemplate = useDeleteMailTemplate()
 
   const focusedThreadId = useMailStore((s) => s.focusedThreadId)
   const thread = useThread(
@@ -201,10 +245,12 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
       if (!replied.current) {
         const last = thread.data.emails[thread.data.emails.length - 1]
         replied.current = true
+        const own = new Set((identities.data ?? []).map((item) => item.email.toLowerCase()))
+        const sentByMe = last.from?.some((address) => own.has(address.email.toLowerCase()))
         const to =
           mode === "reply-all"
-            ? dedupe([...(last.from ?? []), ...(composer.to ?? [])])
-            : (last.from ?? [])
+            ? dedupe([...(sentByMe ? [] : last.replyTo?.length ? last.replyTo : last.from ?? []), ...(last.to ?? []), ...(last.cc ?? [])]).filter((address) => !own.has(address.email.toLowerCase()))
+            : (sentByMe ? last.to : last.replyTo?.length ? last.replyTo : last.from) ?? []
         updateCompose({
           to: to.map((a) => ({ name: a.name, email: a.email })),
           subject: subjectFor(mode, last.subject),
@@ -216,14 +262,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
         })
       }
     }
-  }, [
-    open,
-    mode,
-    thread.data,
-    composer.to.length,
-    updateCompose,
-    inline,
-  ])
+  }, [open, mode, thread.data, composer.to.length, updateCompose, inline, identities.data])
 
   const [editTick, setEditTick] = useState(0)
 
@@ -233,23 +272,34 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
         link: { openOnClick: false },
       }),
       Placeholder.configure({
-        placeholder: inline
-          ? "Write a reply…"
-          : "Write your message…",
+        placeholder: inline ? "Write a reply…" : "Write your message…",
       }),
       CharacterCount,
     ],
     content: inline ? "" : (composer.quotedText ?? ""),
-    onUpdate: () => setEditTick((t) => t + 1),
+    onTransaction: () => setEditTick((t) => t + 1),
     editorProps: {
       attributes: {
         class: cn(
-          "prose max-w-none px-3 py-2.5 text-sm outline-none whitespace-pre-wrap [&_p]:m-0 [&_p+_p]:mt-2",
+          "prose max-w-none px-3 py-2.5 text-sm whitespace-pre-wrap outline-none [&_p]:m-0 [&_p+_p]:mt-2",
           inline ? "min-h-[140px]" : "min-h-[220px] px-4 py-3"
         ),
       },
     },
   })
+
+  const signatureInserted = useRef(false)
+  useEffect(() => {
+    if (!open) { signatureInserted.current = false; return }
+    if (!editor || mode === "draft" || signatureInserted.current || !preferences) return
+    signatureInserted.current = true
+    const signature = preferences.signatures?.[identity?.id ?? ""]?.text ?? preferences.signatureText
+    if (!signature?.trim()) return
+    const original = editor.getHTML()
+    const safe = signature.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll("\n", "<br>")
+    const signatureHtml = `<p>-- <br>${safe}</p>`
+    editor.commands.setContent(preferences.signaturePlacement === "below" ? `${original}${signatureHtml}` : `<p></p>${signatureHtml}${original}`, { emitUpdate: true })
+  }, [open, editor, mode, preferences, identity?.id])
 
   useEffect(() => {
     if (inline) return
@@ -280,6 +330,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
       subject: d.subject ?? "",
       inReplyTo: d.inReplyTo ?? null,
       references: d.references ?? null,
+      identityId: identities.data?.find((item) => item.email.toLowerCase() === d.from?.[0]?.email.toLowerCase())?.id ?? null,
     })
     const html = emailHtmlBody(d)
     if (html) editor.commands.setContent(html, { emitUpdate: false })
@@ -288,8 +339,9 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
   const send = useSendEmail()
   const saveDraft = useSaveDraft()
   const [busy, setBusy] = useState(false)
-  const [saveBusy, setSaveBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showCc, setShowCc] = useState(false)
+  const [showRecipients, setShowRecipients] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [saveState, setSaveState] = useState<
@@ -316,6 +368,8 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
           ? [{ name: identity.name, email: identity.email ?? identity.name }]
           : undefined,
         subject: state.subject,
+        inReplyTo: state.inReplyTo,
+        references: state.references,
         htmlBody: editor?.getHTML() ?? "",
         textBody: editor?.getText() ?? "",
         attachments: state.attachments.length ? state.attachments : undefined,
@@ -354,6 +408,10 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
 
   async function sendEmail() {
     if (!identity || composer.to.length === 0) return
+    if (![...composer.to, ...composer.cc, ...composer.bcc].every((recipient) => isValidEmail(recipient.email))) {
+      setError("Check the recipient addresses before sending.")
+      return
+    }
     setBusy(true)
     setError(null)
     composer.setSendState("sending")
@@ -388,75 +446,183 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
     }
   }
 
-  async function storeDraft() {
-    setSaveBusy(true)
-    setError(null)
-    try {
-      const html = editor?.getHTML() ?? ""
-      const text = editor?.getText() ?? ""
-      const id = await saveDraft.mutateAsync({
-        draftEmailId: composer.draftEmailId,
-        to: composer.to,
-        cc: composer.cc,
-        bcc: composer.bcc,
-        from: identity
-          ? [{ name: identity.name, email: identity.email ?? identity.name }]
-          : undefined,
-        subject: composer.subject,
-        htmlBody: html,
-        textBody: text,
-        attachments: composer.attachments.length
-          ? composer.attachments
-          : undefined,
-      })
-      if (id) updateCompose({ draftEmailId: id })
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save the draft.")
-    } finally {
-      setSaveBusy(false)
-    }
-  }
+  const ccVisible = showCc || composer.cc.length > 0 || composer.bcc.length > 0
 
-  const showCc = (composer.cc?.length ?? 0) > 0 || (composer.bcc?.length ?? 0) > 0
+  const formattingTools = [
+    {
+      label: "Heading 1",
+      icon: <Heading1 className="size-4" />,
+      active: editor?.isActive("heading", { level: 1 }),
+      run: () => editor?.chain().focus().toggleHeading({ level: 1 }).run(),
+    },
+    {
+      label: "Heading 2",
+      icon: <Heading2 className="size-4" />,
+      active: editor?.isActive("heading", { level: 2 }),
+      run: () => editor?.chain().focus().toggleHeading({ level: 2 }).run(),
+    },
+    {
+      label: "Bold",
+      icon: <Bold className="size-4" />,
+      active: editor?.isActive("bold"),
+      run: () => editor?.chain().focus().toggleBold().run(),
+    },
+    {
+      label: "Italic",
+      icon: <Italic className="size-4" />,
+      active: editor?.isActive("italic"),
+      run: () => editor?.chain().focus().toggleItalic().run(),
+    },
+    {
+      label: "Underline",
+      icon: <UnderlineIcon className="size-4" />,
+      active: editor?.isActive("underline"),
+      run: () => editor?.chain().focus().toggleUnderline().run(),
+    },
+    {
+      label: "Strikethrough",
+      icon: <Strikethrough className="size-4" />,
+      active: editor?.isActive("strike"),
+      run: () => editor?.chain().focus().toggleStrike().run(),
+    },
+    {
+      label: "Bulleted list",
+      icon: <List className="size-4" />,
+      active: editor?.isActive("bulletList"),
+      run: () => editor?.chain().focus().toggleBulletList().run(),
+    },
+    {
+      label: "Numbered list",
+      icon: <ListOrdered className="size-4" />,
+      active: editor?.isActive("orderedList"),
+      run: () => editor?.chain().focus().toggleOrderedList().run(),
+    },
+    {
+      label: "Quote",
+      icon: <Quote className="size-4" />,
+      active: editor?.isActive("blockquote"),
+      run: () => editor?.chain().focus().toggleBlockquote().run(),
+    },
+    {
+      label: "Inline code",
+      icon: <Code2 className="size-4" />,
+      active: editor?.isActive("code"),
+      run: () => editor?.chain().focus().toggleCode().run(),
+    },
+    {
+      label: "Horizontal rule",
+      icon: <Minus className="size-4" />,
+      active: false,
+      run: () => editor?.chain().focus().setHorizontalRule().run(),
+    },
+    {
+      label: "Link",
+      icon: <Link2 className="size-4" />,
+      active: editor?.isActive("link"),
+      run: () => {
+        if (!editor) return
+        if (editor.isActive("link")) {
+          editor.chain().focus().unsetLink().run()
+          return
+        }
+        const url = window.prompt("Link URL")
+        if (url) editor.chain().focus().setLink({ href: url }).run()
+      },
+    },
+    {
+      label: "Clear formatting",
+      icon: <RemoveFormatting className="size-4" />,
+      active: false,
+      run: () => editor?.chain().focus().unsetAllMarks().clearNodes().run(),
+    },
+    {
+      label: "Undo",
+      icon: <Undo2 className="size-4" />,
+      active: false,
+      run: () => editor?.chain().focus().undo().run(),
+    },
+    {
+      label: "Redo",
+      icon: <Redo2 className="size-4" />,
+      active: false,
+      run: () => editor?.chain().focus().redo().run(),
+    },
+  ]
 
   return (
-    <div className="space-y-3">
-      <RecipientField
-        label="To"
-        value={composer.to}
-        onChange={(to) => updateCompose({ to })}
-        placeholder="recipients…"
-      />
-      {showCc ? (
+    <div
+      className={cn(
+        "flex min-h-0 flex-col",
+        inline ? "" : "flex-1 overflow-y-auto"
+      )}
+    >
+      {identities.data && identities.data.length > 1 ? (
+        <div className="flex items-center gap-2 border-b px-5 py-2 text-sm">
+          <Label htmlFor="compose-from" className="text-muted-foreground">From</Label>
+          <select
+            id="compose-from"
+            className="min-w-0 flex-1 rounded border bg-background px-2 py-1"
+            value={identity?.id ?? ""}
+            onChange={(event) => updateCompose({ identityId: event.target.value })}
+          >
+            {identities.data.map((item) => (
+              <option key={item.id} value={item.id}>{item.name} &lt;{item.email}&gt;</option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+      {inline && composer.to.length > 0 && !showRecipients ? (
+        <button
+          type="button"
+          className="flex min-h-12 items-center gap-2 border-b px-5 text-left text-sm hover:bg-muted/30"
+          onClick={() => setShowRecipients(true)}
+        >
+          <span className="text-muted-foreground">To</span>
+          <span className="truncate">
+            {composer.to.map((r) => r.name || r.email).join(", ")}
+          </span>
+          <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
+        </button>
+      ) : (
+        <div className="border-b px-4 py-2">
+          <RecipientField
+            label="To"
+            value={composer.to}
+            onChange={(to) => updateCompose({ to })}
+            placeholder="Recipients"
+          />
+        </div>
+      )}
+      {ccVisible ? (
         <>
-          <RecipientField
-            label="Cc"
-            value={composer.cc ?? []}
-            onChange={(cc) => updateCompose({ cc })}
-          />
-          <RecipientField
-            label="Bcc"
-            value={composer.bcc ?? []}
-            onChange={(bcc) => updateCompose({ bcc })}
-          />
+          <div className="border-b px-4 py-2">
+            <RecipientField
+              label="Cc"
+              value={composer.cc ?? []}
+              onChange={(cc) => updateCompose({ cc })}
+            />
+          </div>
+          <div className="border-b px-4 py-2">
+            <RecipientField
+              label="Bcc"
+              value={composer.bcc ?? []}
+              onChange={(bcc) => updateCompose({ bcc })}
+            />
+          </div>
         </>
       ) : null}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-7 px-2 text-xs text-muted-foreground"
-        onClick={() => {
-          updateCompose({
-            cc: showCc ? undefined : [],
-            bcc: showCc ? undefined : composer.bcc?.length ? composer.bcc : [],
-          })
-        }}
-      >
-        {showCc ? "Hide Cc/Bcc" : "Add Cc/Bcc"}
-      </Button>
+      {(!inline || showRecipients || composer.to.length === 0) && !ccVisible ? (
+        <button
+          type="button"
+          className="self-end px-5 py-1 text-xs text-muted-foreground hover:text-foreground"
+          onClick={() => setShowCc(true)}
+        >
+          Cc / Bcc
+        </button>
+      ) : null}
 
       {!inline || mode === "forward" ? (
-        <div className="pt-0.5">
+        <div className="border-b px-4 py-2">
           <Label htmlFor="compose-subject" className="sr-only">
             Subject
           </Label>
@@ -465,73 +631,43 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             placeholder="Subject"
             value={composer.subject}
             onChange={(e) => updateCompose({ subject: e.target.value })}
+            className="border-0 bg-transparent shadow-none focus-visible:ring-0"
           />
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border">
+      <div
+        className={cn(
+          "min-h-40 flex-1",
+          inline ? "min-h-48" : "min-h-[260px] overflow-y-auto"
+        )}
+      >
         {editor ? <EditorContent editor={editor} /> : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => editor?.chain().focus().toggleBold().run()}
+      <div className="mx-4 flex min-w-0 items-center gap-2 rounded-lg bg-muted/50 p-1">
+        <div
+          role="toolbar"
+          aria-label="Message formatting"
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5"
         >
-          <Bold className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-        >
-          <Italic className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => editor?.chain().focus().toggleUnderline().run()}
-        >
-          <UnderlineIcon className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-        >
-          <List className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => editor?.chain().focus().toggleOrderedList().run()}
-        >
-          <ListOrdered className="size-3.5" />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="size-8 p-0"
-          onClick={() => {
-            const url = window.prompt("Link URL")
-            if (url) editor?.chain().focus().setLink({ href: url }).run()
-          }}
-        >
-          <Link2 className="size-3.5" />
-        </Button>
-        <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+          {formattingTools.map((tool) => (
+            <Button
+              key={tool.label}
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="size-8"
+              aria-label={tool.label}
+              title={tool.label}
+              aria-pressed={!!tool.active}
+              onClick={tool.run}
+            >
+              {tool.icon}
+            </Button>
+          ))}
+        </div>
+        <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           {saveState === "saving" ? (
             <span>Saving draft…</span>
           ) : saveState === "saved" ? (
@@ -542,9 +678,20 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
           <span>{wordCount} words</span>
         </span>
       </div>
+      {identity?.htmlSignature || identity?.textSignature ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="self-start"
+          onClick={() => editor?.chain().focus().insertContent(identity.htmlSignature || identity.textSignature || "").run()}
+        >
+          Insert signature
+        </Button>
+      ) : null}
 
       {composer.attachments.length ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 px-5 py-2">
           {composer.attachments.map((att) => (
             <span
               key={att.blobId}
@@ -564,10 +711,19 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p className="px-5 text-sm text-destructive">{error}</p> : null}
 
-      <div className="flex flex-wrap items-center gap-2 pt-0.5">
-        <Button onClick={() => void sendEmail()} disabled={!canSend || busy}>
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 px-4 py-3",
+          inline && "sticky bottom-0 border-t bg-card"
+        )}
+      >
+        <Button
+          className="rounded-full px-5"
+          onClick={() => void sendEmail()}
+          disabled={!canSend || busy}
+        >
           {busy ? (
             "Sending…"
           ) : (
@@ -577,22 +733,6 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             </>
           )}
         </Button>
-        {!inline ? (
-          <Button
-            variant="outline"
-            onClick={() => void storeDraft()}
-            disabled={saveBusy}
-          >
-            {saveBusy ? (
-              "Saving…"
-            ) : (
-              <>
-                <Save className="size-4" />
-                Save draft
-              </>
-            )}
-          </Button>
-        ) : null}
         <input
           ref={fileRef}
           type="file"
@@ -620,20 +760,57 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
         />
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
+          aria-label="Attach files"
+          title="Attach files"
           onClick={() => fileRef.current?.click()}
           disabled={busy}
         >
           <Paperclip className="size-4" />
-          Attach
         </Button>
+        {templatesAvailable ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button variant="ghost" size="sm" type="button" />}>
+              <FileText className="size-4" /> Templates
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {templates.map((template) => (
+                <DropdownMenuItem key={template.id} onClick={() => {
+                  if ((!editor?.isEmpty || composer.subject) && !window.confirm("Replace the current subject and message with this template?")) return
+                  updateCompose({ subject: template.subject })
+                  editor?.commands.setContent(template.htmlBody)
+                }}>
+                  {template.name}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuItem onClick={async () => {
+                const name = window.prompt("Template name")?.trim()
+                if (!name) return
+                try {
+                  await saveTemplate.mutateAsync({ name, subject: composer.subject, htmlBody: editor?.getHTML() ?? "" })
+                } catch (cause) {
+                  setError(cause instanceof Error ? cause.message : "Could not save template.")
+                }
+              }}>
+                Save message as template
+              </DropdownMenuItem>
+              {templates.length ? <DropdownMenuItem onClick={async () => {
+                const selected = window.prompt("Name of template to delete")?.trim()
+                const match = templates.find((template) => template.name === selected)
+                if (match) await deleteTemplate.mutateAsync(match.id)
+              }}>Delete a template…</DropdownMenuItem> : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
+          aria-label="Discard message"
+          title="Discard message"
           onClick={closeCompose}
           className="ml-auto"
         >
-          Discard
+          <Trash2 className="size-4" />
         </Button>
       </div>
     </div>
@@ -657,6 +834,7 @@ function RecipientField({
 }) {
   const [text, setText] = useState("")
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [invalid, setInvalid] = useState(false)
   const suggestions = useAutocompleteContacts(text)
 
   const remove = (email: string) =>
@@ -664,9 +842,17 @@ function RecipientField({
 
   const commit = (input: string) => {
     const parsed = parseRecipients(input)
+    const tokens = input.split(/[,;]/).map((token) => token.trim()).filter(Boolean)
+    if (tokens.length && parsed.length !== tokens.length) {
+      setInvalid(true)
+      return
+    }
     if (parsed.length) {
-      onChange([...value, ...parsed])
+      onChange([...value, ...parsed].filter((recipient, index, list) =>
+        list.findIndex((item) => item.email.toLowerCase() === recipient.email.toLowerCase()) === index
+      ))
       setText("")
+      setInvalid(false)
     }
   }
 
@@ -702,12 +888,18 @@ function RecipientField({
             value={text}
             onChange={(e) => {
               setText(e.target.value)
+              setInvalid(false)
               setShowSuggestions(true)
             }}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 120)}
+            onBlur={() => {
+              setShowSuggestions(false)
+              if (text.trim()) commit(text)
+            }}
             onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Tab" || e.key === ",") {
+              if (e.key === "Enter" || e.key === ",") {
                 e.preventDefault()
+                commit(text)
+              } else if (e.key === "Tab" && text.trim()) {
                 commit(text)
               } else if (e.key === "Backspace" && !text && value.length) {
                 onChange(value.slice(0, -1))
@@ -748,6 +940,7 @@ function RecipientField({
           ) : null}
         </div>
       </div>
+      {invalid ? <p role="alert" className="mt-1 text-xs text-destructive">Enter a valid email address.</p> : null}
     </div>
   )
 }
@@ -758,8 +951,8 @@ function parseRecipients(input: string): Recipient[] {
   for (const raw of tokens) {
     const token = raw.trim()
     if (!token) continue
-    const email = token.match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/)?.[0]
-    if (email) {
+    const email = token.match(/(?:^|<)([^\s<>]+@[^\s<>]+)(?:>|$)/)?.[1]
+    if (email && isValidEmail(email)) {
       const name = token
         .replace(email, "")
         .replace(/[<>()]/g, "")
@@ -768,6 +961,10 @@ function parseRecipients(input: string): Recipient[] {
     }
   }
   return out
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(value)
 }
 
 function subjectFor(mode: string, subject?: string | null): string {

@@ -3,7 +3,7 @@
  * the JMAP client directly.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
   EmailFilterOperator,
   JmapId,
@@ -15,10 +15,24 @@ import { parseSearch } from "../lib/search"
 import { formatRelative } from "../lib/dates"
 import { qk } from "./keys"
 import { ACCOUNT_KEY } from "./client"
+import { getPrimaryAccountId } from "../services/jmap.service"
+import { syncEngine } from "../jmap/sync/sync.engine"
+import { useSession } from "../hooks/use-session"
+
+function useMailScopeKey(): string {
+  const { data } = useSession()
+  return data?.accountId ?? data?.userId ?? "signed-out"
+}
+
+function canReadOffline(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code
+  return (typeof navigator !== "undefined" && !navigator.onLine) || code === "transport" || code === "106"
+}
 
 export function useMailboxes() {
+  const accountScope = useMailScopeKey()
   return useQuery({
-    queryKey: qk.mailboxes(),
+    queryKey: [...qk.mailboxes(), accountScope],
     queryFn: () => mailService.getMailboxes(),
     select: sortMailboxes,
     staleTime: 60_000,
@@ -66,9 +80,21 @@ export function useDeleteMailbox() {
 }
 
 export function useIdentities() {
+  const accountScope = useMailScopeKey()
   return useQuery({
-    queryKey: qk.identities(),
+    queryKey: [...qk.identities(), accountScope],
     queryFn: () => mailService.getIdentities(),
+  })
+}
+
+export function useUpdateIdentity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const client = await (await import("../services/jmap.service")).getJmapClient()
+      await client.mail.updateIdentity(id, { name })
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.identities() }),
   })
 }
 
@@ -83,16 +109,27 @@ export interface EmailListScope {
  * parsed search filter applied on top.
  */
 export function useEmails(scope: EmailListScope) {
+  const accountScope = useMailScopeKey()
+  const { data: session } = useSession()
   const mailboxId = scope.mailboxId ?? "all"
   const query = scope.query ?? ""
-  return useQuery({
-    queryKey: qk.emails(mailboxId, query),
-    queryFn: () => fetchEmailsForScope(scope, mailboxId),
+  const pageSize = scope.limit ?? 60
+  return useInfiniteQuery({
+    queryKey: [...qk.emails(mailboxId, query), accountScope],
+    queryFn: ({ pageParam }) => fetchEmailsForScope(scope, mailboxId, pageParam, session?.accountId),
+    initialPageParam: 0,
+    getNextPageParam: (last) =>
+      last.ids.length > 0 &&
+      (last.total == null
+        ? last.ids.length >= pageSize
+        : last.position + last.ids.length < last.total)
+        ? last.position + last.ids.length
+        : undefined,
     enabled: scope.mailboxId !== undefined || scope.query !== undefined,
   })
 }
 
-async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string) {
+async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string, position: number, cachedAccountId?: string) {
   const parsed = scope.query ? parseSearch(scope.query) : null
   let filter: EmailFilterOperator | undefined = parsed?.filter ?? undefined
 
@@ -107,17 +144,31 @@ async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string) {
       const clause: EmailFilterOperator =
         ids.length === 1
           ? { inMailbox: ids[0] }
-          : { anyOf: ids.map((id) => ({ inMailbox: id })) }
-      filter = filter ? { allOf: [clause, filter] } : clause
+          : { operator: "OR", conditions: ids.map((id) => ({ inMailbox: id })) }
+      filter = filter ? { operator: "AND", conditions: [clause, filter] } : clause
     }
   } else if (mailboxId !== "all") {
     // Keep the mailbox context when searching inside a folder.
     filter = filter
-      ? { allOf: [{ inMailbox: mailboxId }, filter] }
+      ? { operator: "AND", conditions: [{ inMailbox: mailboxId }, filter] }
       : { inMailbox: mailboxId }
   }
 
-  return mailService.getEmails(mailboxId, { filter, limit: scope.limit ?? 60 })
+  let accountId = cachedAccountId
+  try {
+    accountId ??= (await getPrimaryAccountId()) ?? undefined
+    const result = await mailService.getEmails(mailboxId, {
+      filter,
+      limit: scope.limit ?? 60,
+      position,
+      calculateTotal: true,
+    })
+    if (accountId) void syncEngine.storeMailPage(accountId, result.emails).catch(() => {})
+    return result
+  } catch (error) {
+    if (!accountId || scope.query || !canReadOffline(error)) throw error
+    return syncEngine.offlineMailPage(accountId, mailboxId, position, scope.limit ?? 60)
+  }
 }
 
 /** Match a search token to a mailbox by role ("inbox") or name ("Receipts"). */
@@ -141,9 +192,24 @@ export interface ThreadView {
 }
 
 export function useThread(threadId: string | null, enabled = true) {
+  const accountScope = useMailScopeKey()
+  const { data: session } = useSession()
   return useQuery({
-    queryKey: qk.thread(threadId ?? "none"),
-    queryFn: () => mailService.getThread(threadId as JmapId),
+    queryKey: [...qk.thread(threadId ?? "none"), accountScope],
+    queryFn: async () => {
+      let accountId = session?.accountId
+      try {
+        accountId ??= (await getPrimaryAccountId()) ?? undefined
+        const data = await mailService.getThread(threadId as JmapId)
+        if (accountId) void syncEngine.storeThread(accountId, data.thread, data.emails).catch(() => {})
+        return data
+      } catch (error) {
+        if (!accountId || !canReadOffline(error)) throw error
+        const cached = await syncEngine.offlineThread(accountId, threadId as JmapId)
+        if (!cached) throw error
+        return cached
+      }
+    },
     enabled: !!threadId && enabled,
     select: (data): ThreadView => {
       const last = data.emails[data.emails.length - 1]
@@ -181,8 +247,9 @@ function invalidateMailViews(queryClient: ReturnType<typeof useQueryClient>) {
 
 /** A single email with body values (draft reopen, previews). */
 export function useEmail(id: JmapId | null) {
+  const accountScope = useMailScopeKey()
   return useQuery({
-    queryKey: [ACCOUNT_KEY, "email", id],
+    queryKey: [ACCOUNT_KEY, "email", id, accountScope],
     queryFn: () => mailService.getEmailById(id!),
     enabled: !!id,
   })
@@ -193,8 +260,9 @@ export function useEmail(id: JmapId | null) {
  * Used by label/move menus to compute per-label state across a selection.
  */
 export function useThreadEmails(threadIds: JmapId[], enabled = true) {
+  const accountScope = useMailScopeKey()
   return useQuery({
-    queryKey: [ACCOUNT_KEY, "thread-emails", ...[...threadIds].sort()],
+    queryKey: [ACCOUNT_KEY, "thread-emails", accountScope, ...[...threadIds].sort()],
     queryFn: async () => {
       const threads = await mailService.getThreads(threadIds)
       const ids = [...new Set(threads.flatMap((t) => t.emailIds))]
@@ -248,17 +316,19 @@ export function useArchiveEmails() {
   })
 }
 
-/** Move threads/emails to another mailbox (replaces membership). */
+/** Move threads/emails without dropping unrelated labels. */
 export function useMoveEmails() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({
       ids,
       toMailboxId,
+      fromMailboxId,
     }: {
       ids: JmapId[]
       toMailboxId: JmapId
-    }) => mailService.moveEmails(ids, toMailboxId),
+      fromMailboxId?: JmapId
+    }) => mailService.moveEmails(ids, toMailboxId, fromMailboxId),
     onSuccess: () => invalidateMailViews(qc),
   })
 }
@@ -271,10 +341,35 @@ export function useTrashEmails() {
   })
 }
 
+export function useReportJunk() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ ids, phishing }: { ids: JmapId[]; phishing?: boolean }) =>
+      mailService.reportJunk(ids, phishing),
+    onSuccess: () => invalidateMailViews(qc),
+  })
+}
+
+export function useMarkNotJunk() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: JmapId[]) => mailService.markNotJunk(ids),
+    onSuccess: () => invalidateMailViews(qc),
+  })
+}
+
 export function useRestoreEmails() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (ids: JmapId[]) => mailService.restoreEmails(ids),
+    onSuccess: () => invalidateMailViews(qc),
+  })
+}
+
+export function usePermanentlyDeleteEmails() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: JmapId[]) => mailService.permanentlyDeleteEmails(ids),
     onSuccess: () => invalidateMailViews(qc),
   })
 }

@@ -1,3 +1,4 @@
+import { isDemoRuntime } from "@/lib/demo/runtime"
 /**
  * App sidebar in the shadcn sidebar-09 layout ("collapsible nested
  * sidebars"): a slim icon rail (workspace, compose, app switcher, user
@@ -158,7 +159,7 @@ export function SidebarShell() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-          <SidebarGroup className="mt-auto">
+          {!isDemoRuntime && <SidebarGroup className="mt-auto">
             <SidebarGroupContent className="px-1.5 md:px-0">
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -175,10 +176,10 @@ export function SidebarShell() {
                 </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
-          </SidebarGroup>
+          </SidebarGroup>}
         </SidebarContent>
         <SidebarFooter>
-          <NavUser />
+          {isDemoRuntime ? <span className="px-2 py-3 text-[10px] text-muted-foreground">DEMO</span> : <NavUser />}
         </SidebarFooter>
       </Sidebar>
 

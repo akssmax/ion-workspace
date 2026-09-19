@@ -52,7 +52,11 @@ export function MoveMenu({
           <DropdownMenuItem
             key={mb.id}
             onClick={() =>
-              void move.mutateAsync({ ids: threadIds, toMailboxId: mb.id })
+              void move.mutateAsync({
+                ids: threadIds,
+                toMailboxId: mb.id,
+                fromMailboxId: activeMailboxId ?? undefined,
+              })
             }
           >
             {mb.role ? (ROLE_LABELS[mb.role] ?? mb.name) : mb.name}

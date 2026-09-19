@@ -79,6 +79,7 @@ export interface SendEmailInput {
 }
 
 const DEFAULT_EMAIL_PROPERTIES = [
+  "blobId",
   "threadId",
   "mailboxIds",
   "keywords",
@@ -463,6 +464,8 @@ export class MailApi {
         ...(input.cc ? { cc: input.cc } : {}),
         ...(input.bcc ? { bcc: input.bcc } : {}),
         ...(input.from ? { from: input.from } : {}),
+        ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
+        ...(input.references?.length ? { references: input.references } : {}),
       }
       if (input.textBody != null) {
         create.textBody = [{ type: "text/plain", partId: "1", blobId: null }]
@@ -528,6 +531,8 @@ export class MailApi {
       ...(input.cc?.length ? { cc: input.cc } : {}),
       ...(input.bcc?.length ? { bcc: input.bcc } : {}),
       ...(input.subject != null ? { subject: input.subject } : {}),
+      ...(input.inReplyTo?.length ? { inReplyTo: input.inReplyTo } : {}),
+      ...(input.references?.length ? { references: input.references } : {}),
     }
 
     if (input.htmlBody != null) {
@@ -607,11 +612,16 @@ export class MailApi {
   ): Promise<void> {
     this.checkAccount()
     const acc = this.acct(accountId)
-    await this.client.call<EmailSetResponse>(
+    const result = await this.client.call<EmailSetResponse>(
       "Email/set",
       { accountId: acc, update: updates },
       "eupd"
     )
+    const error = Object.entries(result.notUpdated ?? {})[0]
+    if (error)
+      throw new Error(
+        `Could not update email ${error[0]}: ${error[1].description ?? error[1].type}`
+      )
   }
 
   async setKeywords(
@@ -625,7 +635,7 @@ export class MailApi {
     for (const id of ids) {
       const patch: Record<string, unknown> = {}
       for (const [kw, value] of Object.entries(keywordsToSet)) {
-        patch[`keywords/${kw}`] = value
+        patch[`keywords/${kw}`] = value ? true : null
       }
       update[id] = patch
     }
@@ -646,23 +656,53 @@ export class MailApi {
     if (ids.length === 0) return
     const update: Record<string, Record<string, unknown>> = {}
     for (const id of ids) {
-      update[id] = { [`mailboxIds/${labelId}`]: applied }
+      update[id] = { [`mailboxIds/${labelId}`]: applied ? true : null }
     }
     await this.updateEmails(update, accountId)
   }
 
-  /**
-   * Move emails between mailboxes (archive, trash, restore, folder moves).
-   */
+  /** Move the primary location while retaining unrelated label memberships. */
   async moveEmails(
     ids: JmapId[],
     toMailboxId: string,
-    accountId?: string
+    accountId?: string,
+    fromMailboxId?: string
   ): Promise<void> {
     this.checkAccount()
     if (ids.length === 0) return
+    const [mailboxes, emails] = await Promise.all([
+      this.getMailboxes(accountId),
+      this.getEmailByIds(ids, { properties: ["id", "mailboxIds"] }, accountId),
+    ])
+    const target = mailboxes.find((mailbox) => mailbox.id === toMailboxId)
+    if (!target) throw new Error("Destination mailbox no longer exists.")
+    const primaryRoles = new Set([
+      "inbox",
+      "archive",
+      "sent",
+      "drafts",
+      "trash",
+      "junk",
+    ])
     const update: Record<string, Record<string, unknown>> = {}
-    for (const id of ids) update[id] = { mailboxIds: { [toMailboxId]: true } }
+    for (const email of emails) {
+      const patch: Record<string, unknown> = {
+        [`mailboxIds/${toMailboxId}`]: true,
+      }
+      for (const mailbox of mailboxes) {
+        if (mailbox.id === toMailboxId || !email.mailboxIds?.[mailbox.id])
+          continue
+        if (
+          primaryRoles.has(mailbox.role ?? "") ||
+          mailbox.id === fromMailboxId
+        ) {
+          patch[`mailboxIds/${mailbox.id}`] = null
+        }
+      }
+      update[email.id] = patch
+    }
+    if (emails.length !== new Set(ids).size)
+      throw new Error("Some messages no longer exist.")
     await this.updateEmails(update, accountId)
   }
 
@@ -684,12 +724,46 @@ export class MailApi {
 
   async archive(ids: JmapId[], accountId?: string): Promise<void> {
     const mailbox = await this.findRoleMailbox("archive", accountId)
-    if (mailbox) await this.moveEmails(ids, mailbox.id, accountId)
+    if (!mailbox) throw new Error("Archive mailbox is unavailable.")
+    await this.moveEmails(ids, mailbox.id, accountId)
   }
 
   async trash(ids: JmapId[], accountId?: string): Promise<void> {
     const mailbox = await this.findRoleMailbox("trash", accountId)
-    if (mailbox) await this.moveEmails(ids, mailbox.id, accountId)
+    if (!mailbox) throw new Error("Trash mailbox is unavailable.")
+    await this.moveEmails(ids, mailbox.id, accountId)
+  }
+
+  async reportJunk(
+    ids: JmapId[],
+    phishing = false,
+    accountId?: string
+  ): Promise<void> {
+    const junk = await this.findRoleMailbox("junk", accountId)
+    if (!junk) throw new Error("Spam mailbox is unavailable.")
+    await this.moveEmails(ids, junk.id, accountId)
+    await this.setKeywords(ids, { $junk: true, $phishing: phishing }, accountId)
+  }
+
+  async markNotJunk(ids: JmapId[], accountId?: string): Promise<void> {
+    const inbox = await this.findRoleMailbox("inbox", accountId)
+    if (!inbox) throw new Error("Inbox mailbox is unavailable.")
+    await this.moveEmails(ids, inbox.id, accountId)
+    await this.setKeywords(ids, { $junk: false, $phishing: false }, accountId)
+  }
+
+  async destroyEmails(ids: JmapId[], accountId?: string): Promise<void> {
+    if (!ids.length) return
+    const result = await this.client.call<EmailSetResponse>(
+      "Email/set",
+      { accountId: this.acct(accountId), destroy: ids },
+      "edestroy"
+    )
+    const error = Object.entries(result.notDestroyed ?? {})[0]
+    if (error)
+      throw new Error(
+        `Could not delete email ${error[0]}: ${error[1].description ?? error[1].type}`
+      )
   }
 
   /**
@@ -702,6 +776,14 @@ export class MailApi {
       "id0"
     )
     return res.list
+  }
+
+  async updateIdentity(id: string, patch: Partial<Pick<Identity, "name" | "replyTo" | "bcc" | "textSignature" | "htmlSignature">>, accountId?: string): Promise<void> {
+    const result = await this.client.call<{ notUpdated?: Record<string, { description?: string; type: string }> }>(
+      "Identity/set", { accountId: this.acct(accountId), update: { [id]: patch } }, "id1"
+    )
+    const failure = result.notUpdated?.[id]
+    if (failure) throw new Error(failure.description ?? failure.type)
   }
 
   /**

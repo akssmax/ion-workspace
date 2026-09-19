@@ -95,6 +95,7 @@ const isIdempotentMethod = (method: string): boolean =>
 export const coreUsing = [
   JMAP_CAPS.CORE,
   JMAP_CAPS.MAIL,
+  JMAP_CAPS.SUBMISSION,
   JMAP_CAPS.CALENDARS,
   JMAP_CAPS.CONTACTS,
   JMAP_CAPS.FILES,

@@ -11,6 +11,7 @@ import {
   Building2,
   StickyNote,
   Save,
+  ArrowLeft,
 } from "lucide-react"
 import { cn } from "cn"
 import {
@@ -26,8 +27,10 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { Contact } from "@/jmap/types/contacts"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function ContactsView() {
+  const isMobile = useIsMobile()
   const { data: contacts, isLoading } = useContacts()
   const session = useSession()
   const createContact = useCreateContact()
@@ -74,8 +77,8 @@ export function ContactsView() {
 
   return (
     <div className="flex h-full min-w-0">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <div className={cn("flex min-w-0 flex-1 flex-col", isMobile && selected && "hidden")}>
+        <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
           <OpenSidebarTrigger />
           <h1 className="text-sm font-semibold">Contacts</h1>
           <span className="text-xs text-muted-foreground">
@@ -154,7 +157,12 @@ export function ContactsView() {
       </div>
 
       {selected ? (
-        <aside className="w-96 shrink-0 border-l bg-card">
+        <aside className="min-w-0 w-full shrink-0 overflow-y-auto border-l bg-card md:w-96">
+          {isMobile ? (
+            <Button variant="ghost" size="sm" className="m-3" onClick={() => { setSelectedId(null); setEditing(false) }}>
+              <ArrowLeft className="size-4" /> Back to contacts
+            </Button>
+          ) : null}
           {editing ? (
             <EditContactForm
               contact={selected}
@@ -196,7 +204,7 @@ function CreateContactForm({
 
   return (
     <form
-      className="grid grid-cols-2 gap-3 border-b p-4"
+      className="grid grid-cols-1 gap-3 border-b p-4 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault()
         onCreate({ fn, email, phone, organization })
@@ -236,7 +244,7 @@ function CreateContactForm({
           onChange={(e) => setPhone(e.target.value)}
         />
       </div>
-      <div className="col-span-2 flex items-center gap-2">
+      <div className="flex items-center gap-2 sm:col-span-2">
         <Button type="submit" disabled={!fn.trim()}>
           <UserPlus className="size-4" />
           Add contact

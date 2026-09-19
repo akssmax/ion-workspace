@@ -87,6 +87,8 @@ export class MockServer {
   private mailboxes: Mailbox[] = []
   private emails = new Map<string, StoredEmail>()
   private identities: { id: string; name: string; email: string }[] = []
+  private vacation = { id: "singleton", isEnabled: false, fromDate: null as string | null, toDate: null as string | null, subject: null as string | null, textBody: null as string | null }
+  private sieveScripts: { id: string; name: string; blobId: string; isActive: boolean }[] = []
   private calendars: {
     id: string
     name: string
@@ -257,9 +259,12 @@ export class MockServer {
       },
       primaryAccounts: {
         [JMAP_CAPS.MAIL]: accountId,
+        [JMAP_CAPS.SUBMISSION]: accountId,
         [JMAP_CAPS.CALENDARS]: accountId,
         [JMAP_CAPS.CONTACTS]: accountId,
         [JMAP_CAPS.FILES]: accountId,
+        "urn:ietf:params:jmap:vacationresponse": accountId,
+        "urn:ietf:params:jmap:sieve": accountId,
       },
       capabilities: {
         [JMAP_CAPS.CORE]: {
@@ -284,12 +289,15 @@ export class MockServer {
           ],
           mayCreateTopLevelMailbox: true,
         },
+        [JMAP_CAPS.SUBMISSION]: {},
         [JMAP_CAPS.CALENDARS]: {
           maxEventsPerEmail: 1,
           mayCreateTopLevelCalendars: true,
         },
         [JMAP_CAPS.CONTACTS]: { mayCreateTopLevelAddressBooks: true },
         [JMAP_CAPS.FILES]: { maxDepth: 10, allowedContentTypes: ["*"] },
+        "urn:ietf:params:jmap:vacationresponse": {},
+        "urn:ietf:params:jmap:sieve": {},
       },
     }
   }
@@ -390,6 +398,25 @@ export class MockServer {
           return H(["EmailSubmission/set", this.submissionSet(args), callId])
         case "Identity/get":
           return H(["Identity/get", this.identityGet(args), callId])
+        case "Identity/set":
+          return H(["Identity/set", this.identitySet(args), callId])
+        case "VacationResponse/get":
+          return H(["VacationResponse/get", { accountId: String(args.accountId), state: this.state("VacationResponse"), list: [this.vacation], notFound: [] }, callId])
+        case "VacationResponse/set":
+          this.vacation = { ...this.vacation, ...((args.update as Record<string, typeof this.vacation> | undefined)?.singleton ?? {}) }
+          return H(["VacationResponse/set", { accountId: String(args.accountId), oldState: this.state("VacationResponse"), newState: this.state("VacationResponse"), updated: { singleton: null } }, callId])
+        case "SieveScript/get":
+          return H(["SieveScript/get", { accountId: String(args.accountId), state: this.state("SieveScript"), list: this.sieveScripts, notFound: [] }, callId])
+        case "SieveScript/validate":
+          return H(["SieveScript/validate", { accountId: String(args.accountId), error: null }, callId])
+        case "SieveScript/set": {
+          const created: Record<string, { id: string }> = {}, updated: Record<string, null> = {}
+          const create = args.create as Record<string, { name: string; blobId: string }> | undefined
+          const update = args.update as Record<string, { blobId: string }> | undefined
+          if (create) for (const [key, item] of Object.entries(create)) { const id = `sieve-${this.nextIdCounter++}`; this.sieveScripts.push({ id, ...item, isActive: true }); created[key] = { id } }
+          if (update) for (const [id, item] of Object.entries(update)) { const script = this.sieveScripts.find(entry => entry.id === id); if (script) { script.blobId = item.blobId; script.isActive = true; updated[id] = null } }
+          return H(["SieveScript/set", { accountId: String(args.accountId), oldState: this.state("SieveScript"), newState: this.state("SieveScript"), created, updated }, callId])
+        }
         case "Email/changes":
           return H(["Email/changes", this.changes("Email", args), callId])
         case "Mailbox/changes":
@@ -725,25 +752,26 @@ export class MockServer {
     email: StoredEmail,
     filter: EmailFilterOperator
   ): boolean {
-    if ("allOf" in filter && Array.isArray(filter.allOf))
-      return filter.allOf!.every((f) => this.matchesFilter(email, f))
-    if ("anyOf" in filter && Array.isArray(filter.anyOf))
-      return filter.anyOf!.some((f) => this.matchesFilter(email, f))
-    if ("not" in filter && filter.not)
-      return !this.matchesFilter(email, filter.not as EmailFilterOperator)
+    if ("operator" in filter) {
+      if (filter.operator === "AND")
+        return filter.conditions.every((f) => this.matchesFilter(email, f))
+      if (filter.operator === "OR")
+        return filter.conditions.some((f) => this.matchesFilter(email, f))
+      return filter.conditions.every((f) => !this.matchesFilter(email, f))
+    }
 
-    const f = filter as EmailFilterOperator
+    const f = filter
     if (f.inMailbox && !email.mailboxIds[f.inMailbox]) return false
     if (
       f.inMailboxOtherThan &&
-      f.inMailboxOtherThan.some((id) => email.mailboxIds[id])
+      !Object.keys(email.mailboxIds).some((id) => !f.inMailboxOtherThan!.includes(id))
     )
       return false
     if (f.hasKeyword && !email.keywords?.[f.hasKeyword]) return false
     if (f.notKeyword && email.keywords?.[f.notKeyword]) return false
     if (f.hasAttachment && !email.hasAttachment) return false
-    if (f.after && email.sentAt && email.sentAt < f.after) return false
-    if (f.before && email.sentAt && email.sentAt > f.before) return false
+    if (f.after && email.receivedAt && email.receivedAt < f.after) return false
+    if (f.before && email.receivedAt && email.receivedAt >= f.before) return false
     if (
       f.subject &&
       !(email.subject ?? "").toLowerCase().includes(f.subject.toLowerCase())
@@ -801,12 +829,12 @@ export class MockServer {
           }
         } else if (prop === "bodyValues" || prop === "headers") {
           if (prop === "headers" && email.headers) {
-            out.headers = email.headers
+            out.headers = structuredClone(email.headers)
           }
         } else {
           const value = (email as unknown as Record<string, unknown>)[prop]
           Object.defineProperty(out, prop, {
-            value,
+            value: value === undefined ? undefined : structuredClone(value),
             enumerable: true,
             configurable: true,
           })
@@ -843,13 +871,19 @@ export class MockServer {
     )) {
       try {
         const id = this.newId("e")
+        const parent = patch.inReplyTo?.map((reference) =>
+          [...this.emails.values()].find((message) =>
+            message.id === reference || message.messageId === reference
+          )
+        ).find(Boolean)
         const mailboxIds = normalizeMailboxIds(
           patch.mailboxIds ?? {},
           this.mailboxes
         )
         const email: StoredEmail = {
           id,
-          threadId: (patch.threadId as string) ?? this.newId("thr"),
+          threadId: (patch.threadId as string) ?? parent?.threadId ?? this.newId("thr"),
+          messageId: `<${id}@mock.local>`,
           mailboxIds,
           keywords:
             (patch.keywords as Record<string, boolean> | undefined) ?? {},
@@ -858,6 +892,8 @@ export class MockServer {
           cc: patch.cc ?? [],
           bcc: patch.bcc ?? [],
           subject: patch.subject,
+          inReplyTo: patch.inReplyTo,
+          references: patch.references,
           sentAt: patch.sentAt ?? new Date().toISOString(),
           receivedAt: new Date().toISOString(),
           size: 0,
@@ -919,6 +955,8 @@ export class MockServer {
           continue
         }
         if ("subject" in patch) email.subject = patch.subject as string | null
+        if ("inReplyTo" in patch) email.inReplyTo = patch.inReplyTo as string[]
+        if ("references" in patch) email.references = patch.references as string[]
         if ("to" in patch) email.to = patch.to as EmailProperties["to"]
         if ("cc" in patch) email.cc = patch.cc as EmailProperties["cc"]
         if ("bcc" in patch) email.bcc = patch.bcc as EmailProperties["bcc"]
@@ -1070,6 +1108,19 @@ export class MockServer {
       list: this.identities,
       notFound: [],
     }
+  }
+
+  private identitySet(args: Record<string, unknown>) {
+    const update = (args.update ?? {}) as Record<string, { name?: string; textSignature?: string }>
+    const updated: Record<string, null> = {}
+    const notUpdated: Record<string, { type: string }> = {}
+    for (const [id, patch] of Object.entries(update)) {
+      const identity = this.identities.find((item) => item.id === id)
+      if (!identity) { notUpdated[id] = { type: "notFound" }; continue }
+      if (patch.name !== undefined) identity.name = patch.name
+      updated[id] = null
+    }
+    return { accountId: String(args.accountId), oldState: this.state("Identity"), newState: this.state("Identity"), updated, notUpdated }
   }
 
   // -- changes --------------------------------------------------------------

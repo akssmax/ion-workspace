@@ -31,8 +31,9 @@ export async function resolvePrimaryAccountId(
   const primary = session.primaryAccounts?.[capability]
   if (primary) return primary
   const accounts = Object.values(session.accounts ?? {})
-  const personal = accounts.find((a) => a.isPersonal)
-  return personal?.id ?? accounts[0]?.id ?? null
+  const matching = accounts.filter((account) => capability in (account.accountCapabilities ?? {}))
+  const personal = matching.find((a) => a.isPersonal)
+  return personal?.id ?? matching[0]?.id ?? null
 }
 
 export type { JmapSession }

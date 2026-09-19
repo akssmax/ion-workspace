@@ -23,17 +23,17 @@ export class RealJmapProvider implements JmapProvider {
 
   async createClient(): Promise<JmapClient> {
     const client = new JmapClient(this.transport)
-    const accountId = await this.resolveAccountId(client)
-    if (accountId) {
-      client.mail.bindAccount(accountId)
-      client.calendar.bindAccount(accountId)
-      client.contacts.bindAccount(accountId)
-      client.files.bindAccount(accountId)
-    }
+    const [mail, calendar, contacts, files] = await Promise.all([
+      JMAP_CAPS.MAIL, JMAP_CAPS.CALENDARS, JMAP_CAPS.CONTACTS, JMAP_CAPS.FILES,
+    ].map((capability) => resolvePrimaryAccountId(client, capability)))
+    if (mail) client.mail.bindAccount(mail)
+    if (calendar) client.calendar.bindAccount(calendar)
+    if (contacts) client.contacts.bindAccount(contacts)
+    if (files) client.files.bindAccount(files)
     return client
   }
 
-  async resolveAccountId(client: JmapClient): Promise<string | null> {
-    return resolvePrimaryAccountId(client, JMAP_CAPS.MAIL)
+  async resolveAccountId(client: JmapClient, capability = JMAP_CAPS.MAIL): Promise<string | null> {
+    return resolvePrimaryAccountId(client, capability)
   }
 }

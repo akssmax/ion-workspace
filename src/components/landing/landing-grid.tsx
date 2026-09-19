@@ -1,12 +1,15 @@
 import type { ReactNode } from "react"
 import { cn } from "cn"
-import { AuthBackground } from "@/components/effects/AuthBackground"
+import { LandingMotion, Reveal } from "./landing-motion"
+import { LandingBackground } from "./landing-background"
 
 export function LandingShell({ children }: { children: ReactNode }) {
   return (
-    <div className="landing min-h-svh bg-background text-foreground">
-      {children}
-    </div>
+    <LandingMotion>
+      <div className="landing min-h-svh bg-background text-foreground">
+        {children}
+      </div>
+    </LandingMotion>
   )
 }
 
@@ -29,8 +32,11 @@ export function LandingRow({
 }) {
   return (
     <section id={id} className={cn("relative", tone, className)}>
-      {atmosphere ? <AuthBackground /> : null}
-      <div
+      {atmosphere && (
+        <LandingBackground inverted={tone?.includes("ion-inverse")} />
+      )}
+      <Reveal
+        disabled={top || atmosphere}
         className={cn(
           "relative z-10 mx-auto grid max-w-6xl grid-cols-4 border-s border-border md:grid-cols-12",
           top && "border-t",
@@ -39,7 +45,7 @@ export function LandingRow({
         )}
       >
         {children}
-      </div>
+      </Reveal>
     </section>
   )
 }

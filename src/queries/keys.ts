@@ -6,7 +6,7 @@ import { ACCOUNT_KEY } from "./client"
 
 export const qk = {
   account: () => [ACCOUNT_KEY] as const,
-  preferences: () => ["preferences"] as const,
+  preferences: (accountScope?: string) => accountScope ? ["preferences", accountScope] as const : ["preferences"] as const,
 
   mailboxes: () => [ACCOUNT_KEY, "mailboxes"] as const,
   identities: () => [ACCOUNT_KEY, "identities"] as const,

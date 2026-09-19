@@ -4,13 +4,14 @@
 
 import { LogOut } from "lucide-react"
 import { useRouter } from "@tanstack/react-router"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useSession } from "@/hooks/use-session"
 import { signOut } from "@/services/auth/auth.service"
 import { qk } from "@/queries/keys"
+import { getMailConnectionStatus } from "@/server/mail-connection.rpc"
 
 function initials(name: string): string {
   return name
@@ -26,12 +27,14 @@ export function AccountSection() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const session = useSession()
+  const connection = useQuery({ queryKey: ["mail-connection", session.data?.userId], queryFn: getMailConnectionStatus, enabled: !!session.data, retry: false })
 
   const email = session.data?.email ?? ""
   const name = session.data?.username ?? (email || "Signed out")
 
   async function handleSignOut() {
     await signOut()
+    queryClient.clear()
     queryClient.setQueryData(["session"], null)
     queryClient.setQueryData(qk.preferences(), {})
     router.invalidate()
@@ -50,6 +53,18 @@ export function AccountSection() {
           <p className="truncate text-sm font-semibold">{name}</p>
           <p className="truncate text-xs text-muted-foreground">{email}</p>
         </div>
+      </section>
+
+      <Separator />
+
+      <section className="space-y-2 rounded-xl border p-4">
+        <h3 className="text-sm font-semibold">Mail server connection</h3>
+        <p className="text-sm">{connection.data?.mode === "mock" ? "Demo mail server" : connection.data?.connected ? "Connected to Stalwart" : "Stalwart connection unavailable"}</p>
+        {connection.data?.accountId ? <p className="break-all text-xs text-muted-foreground">Mail account: {connection.data.accountId}</p> : null}
+        {connection.data?.error ? <p role="alert" className="text-xs text-destructive">{connection.data.error}</p> : null}
+        {connection.data?.capabilities.length ? <p className="break-all text-xs text-muted-foreground">Capabilities: {connection.data.capabilities.join(", ")}</p> : null}
+        {connection.data?.permissions.length ? <p className="text-xs text-muted-foreground">Self-service permissions: {connection.data.permissions.filter(permission => /identity|vacation|sieve/.test(permission)).join(", ") || "None granted"}</p> : null}
+        <Button variant="outline" size="sm" onClick={() => void connection.refetch()}>Check connection</Button>
       </section>
 
       <Separator />

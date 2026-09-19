@@ -25,6 +25,15 @@ export const LABELS_FEATURE = defineFeature({
   apps: ["mail"],
 })
 
+export const PINNED_REPLY_FEATURE = defineFeature({
+  id: "mail.pinnedReply",
+  title: "Pinned reply panel",
+  description:
+    "Keep the reply editor visible below a separately scrollable conversation. Turn off to place replies after the message.",
+  defaultEnabled: true,
+  apps: ["mail"],
+})
+
 export const UPCOMING_ISLAND_FEATURE = defineFeature({
   id: "calendar.upcomingIsland",
   title: "Upcoming events island",

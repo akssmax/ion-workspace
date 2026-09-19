@@ -46,9 +46,34 @@ export class ServerProxyTransport implements Transport {
       return [["Core/session", session, "c0"]]
     }
     const postRequest = proxyJmapRequest as unknown as (input: {
-      data: { payload: unknown[]; url: string }
-    }) => Promise<unknown[]>
-    return postRequest({ data: { payload, url: session.apiUrl } })
+      data: { payload: unknown; url: string }
+    }) => Promise<{ methodResponses: unknown[] }>
+    const advertised = new Set(Object.keys(session.capabilities ?? {}))
+    const requested = ((payload[0] as unknown[] | undefined)?.[1] as { using?: string[] } | undefined)?.using ?? []
+    const using = requested.filter((capability) => advertised.has(capability))
+    if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("VacationResponse/")) && advertised.has("urn:ietf:params:jmap:vacationresponse")) using.push("urn:ietf:params:jmap:vacationresponse")
+    if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("SieveScript/")) && advertised.has("urn:ietf:params:jmap:sieve")) using.push("urn:ietf:params:jmap:sieve")
+    const methodCalls = payload.slice(1).map((item) => {
+      const [method, rawArgs, id, options] = item as [string, Record<string, unknown>, string, { resultOf?: { callId: string; name: string; path: string } }?]
+      const args = structuredClone(rawArgs)
+      if (options?.resultOf) {
+        const reference = options.resultOf
+        if (Array.isArray(args.ids) && args.ids.some((value) => typeof value === "string" && value.startsWith("#"))) {
+          delete args.ids
+          args["#ids"] = reference
+        }
+        const create = args.create as Record<string, Record<string, unknown>> | undefined
+        if (create) for (const entry of Object.values(create)) {
+          if (typeof entry.emailId === "string" && entry.emailId.startsWith("#")) {
+            delete entry.emailId
+            entry["#emailId"] = reference
+          }
+        }
+      }
+      return [method, args, id]
+    })
+    const response = await postRequest({ data: { payload: { using, methodCalls }, url: session.apiUrl } })
+    return response.methodResponses
   }
 
   async upload(
@@ -148,12 +173,7 @@ export class ServerProxyTransport implements Transport {
       this.sessionPromise = proxySession().then((doc) => {
         const session = (doc as Record<string, unknown> | null) ?? {}
         const typed = session as unknown as JmapSession
-        // discover the mail account id and store it for future binds
         typed.primaryAccounts ??= {}
-        if (!typed.primaryAccounts[JMAP_CAPS.MAIL]) {
-          const first = Object.keys(typed.accounts ?? {})[0]
-          if (first) typed.primaryAccounts[JMAP_CAPS.MAIL] = first
-        }
         this.sessionCache = typed
         return typed
       })

@@ -4,7 +4,8 @@
  */
 
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
+import { workspaceStorage } from "@/lib/demo/runtime"
 
 export type WorkspaceApp = "mail" | "calendar" | "contacts" | "files"
 
@@ -23,6 +24,6 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setApp: (app) => set({ app }),
       setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
     }),
-    { name: "workspace-shell" }
+    { name: "workspace-shell", storage: createJSONStorage(workspaceStorage) }
   )
 )

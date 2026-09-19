@@ -8,11 +8,12 @@ export const JMAP_CAPS = {
   MAIL: "urn:ietf:params:jmap:mail",
   CALENDARS: "urn:ietf:params:jmap:calendars",
   CONTACTS: "urn:ietf:params:jmap:contacts",
-  FILES: "urn:ietf:params:jmap:files",
-  SUBMISSION: "urn:ietf:params:jmap:mail",
+  FILES: "urn:ietf:params:jmap:filenode",
+  SUBMISSION: "urn:ietf:params:jmap:submission",
 } as const
 
 export interface JmapAccountCapabilities {
+  [capability: string]: unknown
   mail?: {
     maxMailboxesPerEmail?: number
     maxSizeAttachmentsPerEmail?: number

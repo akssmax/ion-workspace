@@ -17,6 +17,8 @@ export interface WorkspaceConfig {
   jmapPath: string
   /** Where to POST username/password to obtain a session JWT. */
   authPath: string
+  oauthTokenPath: string
+  oauthClientId: string
   /** Session cookie name. */
   sessionCookieName: string
   /** Session lifetime in seconds. */
@@ -42,7 +44,9 @@ export function getConfig(): WorkspaceConfig {
     jmapMode: boolFromEnv("JMAP_MODE", false) ? "real" : "mock",
     stalwartOrigin,
     jmapPath: `${stalwartOrigin}/jmap`,
-    authPath: `${stalwartOrigin}/api/authenticate`,
+    authPath: `${stalwartOrigin}/api/auth`,
+    oauthTokenPath: `${stalwartOrigin}/auth/token`,
+    oauthClientId: process.env.STALWART_OAUTH_CLIENT_ID ?? "workspace-tool",
     sessionCookieName: "wt_session",
     sessionTtlSeconds: Number(
       process.env.SESSION_TTL_SECONDS ?? 60 * 60 * 24 * 14

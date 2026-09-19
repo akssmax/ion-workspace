@@ -6,16 +6,16 @@ export type PreviewSurface = "mail" | "calendar" | "contacts" | "files"
 const THREADS = [
   {
     from: "Maya Chen",
-    subject: "Design review — Ion mark",
-    snippet: "The orbit should read at 16px. Sending two cuts.",
+    subject: "A fresh look at the next chapter",
+    snippet: "A few ideas for our next project. What do you think?",
     time: "2m",
     unread: true,
     active: true,
   },
   {
-    from: "Stalwart",
-    subject: "JMAP session renewed",
-    snippet: "Push is live on this account. State 12.",
+    from: "The Studio",
+    subject: "Your weekly reading list",
+    snippet: "Something worth making time for this week.",
     time: "18m",
     unread: true,
     active: false,
@@ -31,7 +31,7 @@ const THREADS = [
   {
     from: "Files",
     subject: "brand/logo.svg uploaded",
-    snippet: "32×32 mark, lime on ink. Ready to ship.",
+    snippet: "The latest assets are ready for your review.",
     time: "3h",
     unread: false,
     active: false,
@@ -144,7 +144,9 @@ function MailPreview() {
               <span
                 className={cn(
                   "truncate text-[13px]",
-                  thread.unread ? "font-medium text-foreground" : "text-muted-foreground"
+                  thread.unread
+                    ? "font-medium text-foreground"
+                    : "text-muted-foreground"
                 )}
               >
                 {thread.from}
@@ -172,17 +174,17 @@ function MailPreview() {
           Maya Chen · maya@studio
         </p>
         <h3 className="mt-1 text-[15px] font-medium">
-          Design review — Ion mark
+          A fresh look at the next chapter
         </h3>
         <div className="mt-4 space-y-3 text-[13px] leading-relaxed text-muted-foreground">
           <p>
-            The orbit should still read as a mark at 16px. I tightened the
-            nucleus and opened the arc so it doesn’t collapse into a power
-            icon.
+            I’ve put together a few directions for the next chapter. The notes
+            bring our ideas together, with a little room to explore something
+            new.
           </p>
           <p>
-            Two cuts attached — one for the nav, one for the footer theme
-            switch. Let’s ship this on the landing.
+            Take a look when you have a moment. We can walk through the details
+            at Thursday’s design review. Looking forward to it!
           </p>
         </div>
       </div>
@@ -208,12 +210,12 @@ function CalendarPreview() {
               {d}
             </div>
           ))}
-          {Array.from({ length: 28 }, (_, i) => (
+          {Array.from({ length: 35 }, (_, i) => (
             <div
               key={i}
               className="min-h-12 bg-card p-1.5 text-[11px] text-muted-foreground"
             >
-              {i + 1}
+              {i > 0 && i <= 30 ? i : ""}
               {i === 17 ? (
                 <span className="mt-1 block truncate rounded bg-primary/15 px-1 text-[10px] text-primary">
                   Design review

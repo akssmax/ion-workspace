@@ -18,6 +18,7 @@ import {
   type SessionData,
 } from "./session.server"
 import { WORKSPACE_CONFIG } from "./config.server"
+import { authenticateStalwart } from "./stalwart-auth.server"
 
 export interface SessionInfo {
   userId: string
@@ -63,24 +64,12 @@ export const login = createServerFn({ method: "POST" })
         return sdToPublic(session)
       }
 
-      // Real mode: exchange credentials with Stalwart for a session JWT.
-      let token: string
+      // Real mode: exchange the Stalwart authorization code for OAuth tokens.
+      let tokens: Awaited<ReturnType<typeof authenticateStalwart>>
       try {
-        const response = await fetch(WORKSPACE_CONFIG.authPath, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username, password }),
-        })
-        if (!response.ok) {
-          throw new Error(
-            `Stalwart authentication failed (${response.status}).`
-          )
-        }
-        const body = (await response.json()) as { token?: string }
-        token = body.token ?? ""
-        if (!token) throw new Error("Stalwart did not return a session token.")
+        tokens = await authenticateStalwart(username, password)
       } catch (error) {
-        if (error instanceof Error && /Stalwart/.test(error.message))
+        if (error instanceof Error && /Stalwart|second factor|expired/.test(error.message))
           throw error
         throw new Error(
           "Could not reach the mail server. Please try again later."
@@ -93,7 +82,7 @@ export const login = createServerFn({ method: "POST" })
         username,
         email,
         mode: "real",
-        accessToken: token,
+        ...tokens,
       }
       await setSession(session)
       return sdToPublic(session)

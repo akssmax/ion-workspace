@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "cn"
-import { useInboxLayout, useSaveInboxLayout } from "@/queries/preferences"
+import { useInboxLayout, useSaveInboxLayout, usePreferences, useSavePreferences } from "@/queries/preferences"
 import type {
   ListDensity,
   ReadingPanePosition,
@@ -102,6 +102,8 @@ const ROW_STYLE_OPTIONS: {
 export function InboxSection() {
   const layout = useInboxLayout()
   const save = useSaveInboxLayout()
+  const { data: preferences } = usePreferences()
+  const savePreferences = useSavePreferences()
 
   return (
     <div className="space-y-5">
@@ -207,6 +209,16 @@ export function InboxSection() {
       </section>
 
       <SaveState isSaving={save.isPending} isError={save.isError} />
+      <Separator />
+      <section className="space-y-2">
+        <Label htmlFor="message-actions-position">Message actions</Label>
+        <p className="text-xs text-muted-foreground">Place archive, spam and reply actions above or below the email.</p>
+        <select id="message-actions-position" className="w-full rounded-lg border bg-background p-2 text-sm" value={preferences?.messageActionsPosition ?? "top"} onChange={(event) => void savePreferences.mutateAsync({ messageActionsPosition: event.target.value as "top" | "bottom" })}>
+          <option value="top">Above messages</option>
+          <option value="bottom">Below messages</option>
+        </select>
+      </section>
+      <SaveState isSaving={savePreferences.isPending} isError={savePreferences.isError} />
     </div>
   )
 }

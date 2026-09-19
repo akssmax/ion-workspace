@@ -4,7 +4,8 @@
  */
 
 import { create } from "zustand"
-import { persist } from "zustand/middleware"
+import { persist, createJSONStorage } from "zustand/middleware"
+import { workspaceStorage } from "@/lib/demo/runtime"
 
 export type MailPaneView = "list+reading" | "list" | "reading"
 
@@ -80,8 +81,7 @@ export const useMailStore = create<MailState>()(
           }
         }),
       selectThreads: (ids) => set({ selectedThreadIds: ids }),
-      clearSelection: () =>
-        set({ selectedThreadIds: [], focusedThreadId: null }),
+      clearSelection: () => set({ selectedThreadIds: [] }),
       setVisibleThreadIds: (ids) =>
         set((s) =>
           // Avoid render loops: only update when the list actually changed.
@@ -95,6 +95,7 @@ export const useMailStore = create<MailState>()(
     }),
     {
       name: "workspace-mail",
+      storage: createJSONStorage(workspaceStorage),
       partialize: (s) => ({
         activeMailboxId: s.activeMailboxId,
         paneView: s.paneView,

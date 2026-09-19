@@ -1,5 +1,6 @@
 import { Renderer, Program, Mesh, Color, Triangle } from "ogl"
 import { useEffect, useRef, useMemo, useCallback } from "react"
+import { createAnimationLoop } from "./animation-loop"
 import "./FaultyTerminal.css"
 
 const vertexShader = `
@@ -100,7 +101,7 @@ float digit(vec2 p){
     float intensity = pattern(s * 0.1, q, r) * 1.3 - 0.03;
 
     if(uUseMouse > 0.5){
-        vec2 mouseWorld = uMouse * uScale;
+        vec2 mouseWorld = uMouse * vec2(iResolution.z, 1.0) * uScale;
         float distToMouse = distance(s, mouseWorld);
         float mouseInfluence = exp(-distToMouse * 8.0) * uMouseStrength * 10.0;
         intensity += mouseInfluence;
@@ -188,7 +189,8 @@ void main() {
       uv = barrel(uv);
     }
 
-    vec2 p = uv * uScale;
+    // Use the same aspect-correct coordinate space for cells and pointer.
+    vec2 p = uv * vec2(iResolution.z, 1.0) * uScale;
     vec3 col = getColor(p);
 
     if(uChromaticAberration != 0.0){
@@ -249,6 +251,8 @@ export interface FaultyTerminalProps extends React.HTMLAttributes<HTMLDivElement
   mouseReact?: boolean
   mouseStrength?: number
   dpr?: number
+  maxFps?: number
+  maxPixels?: number
   pageLoadAnimation?: boolean
   brightness?: number
   lightMode?: boolean
@@ -271,6 +275,8 @@ export default function FaultyTerminal({
   mouseReact = true,
   mouseStrength = 0.2,
   dpr,
+  maxFps = 30,
+  maxPixels = 900_000,
   pageLoadAnimation = true,
   brightness = 1,
   lightMode = false,
@@ -281,10 +287,10 @@ export default function FaultyTerminal({
   const containerRef = useRef<HTMLDivElement | null>(null)
   const programRef = useRef<Program | null>(null)
   const rendererRef = useRef<Renderer | null>(null)
-  const mouseRef = useRef({ x: 0.5, y: 0.5 })
-  const smoothMouseRef = useRef({ x: 0.5, y: 0.5 })
+  const pointerRef = useRef<{ x: number; y: number } | null>(null)
+  const mouseRef = useRef({ x: -10, y: -10 })
+  const smoothMouseRef = useRef({ x: -10, y: -10 })
   const frozenTimeRef = useRef(0)
-  const rafRef = useRef(0)
   const loadAnimationStartRef = useRef(0)
   const timeOffsetRef = useRef(Math.random() * 100)
 
@@ -298,29 +304,43 @@ export default function FaultyTerminal({
     () =>
       dpr ??
       (typeof window !== "undefined"
-        ? Math.min(window.devicePixelRatio || 1, 2)
+        ? Math.min(window.devicePixelRatio || 1, 1)
         : 1),
     [dpr]
   )
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    const ctn = containerRef.current
-    if (!ctn) return
-    const rect = ctn.getBoundingClientRect()
-    if (rect.width === 0 || rect.height === 0) return
-    const x = (e.clientX - rect.left) / rect.width
-    const y = 1 - (e.clientY - rect.top) / rect.height
-    mouseRef.current = { x, y }
+  const handleMouseMove = useCallback((e: PointerEvent) => {
+    // Coalesce pointer events; do layout reads only at the capped render rate.
+    pointerRef.current =
+      e.pointerType === "touch" ? null : { x: e.clientX, y: e.clientY }
   }, [])
 
   useEffect(() => {
     if (containerRef.current == null) return
     const ctn: HTMLDivElement = containerRef.current
 
-    const renderer = new Renderer({ dpr: resolvedDpr })
+    // Decorative content must not take down the page on devices without WebGL.
+    let renderer: Renderer
+    try {
+      renderer = new Renderer({
+        dpr: resolvedDpr,
+        alpha: false,
+        antialias: false,
+        depth: false,
+        stencil: false,
+        powerPreference: "low-power",
+      })
+      renderer.gl.clearColor(
+        lightMode ? 1 : 0,
+        lightMode ? 1 : 0,
+        lightMode ? 1 : 0,
+        1
+      )
+    } catch {
+      return
+    }
     rendererRef.current = renderer
     const gl = renderer.gl
-    gl.clearColor(lightMode ? 1 : 0, lightMode ? 1 : 0, lightMode ? 1 : 0, 1)
 
     const geometry = new Triangle(gl)
 
@@ -365,27 +385,34 @@ export default function FaultyTerminal({
 
     const mesh = new Mesh(gl, { geometry, program })
 
+    let inView = false
+    let contextLost = false
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
+
     function resize() {
-      renderer.setSize(ctn.offsetWidth, ctn.offsetHeight)
+      const width = Math.max(1, ctn.offsetWidth)
+      const height = Math.max(1, ctn.offsetHeight)
+      // Cap actual framebuffer area, including on large and high-DPI displays.
+      renderer.dpr = Math.min(
+        resolvedDpr,
+        Math.sqrt(maxPixels / (width * height))
+      )
+      renderer.setSize(width, height)
       program.uniforms.iResolution.value = new Color(
         gl.canvas.width,
         gl.canvas.height,
-        gl.canvas.width / gl.canvas.height
+        width / height
       )
+      // Keep cell size in CSS pixels, independent of viewport shape or DPR cap.
+      program.uniforms.uScale.value = (scale * height) / 600
     }
 
-    const resizeObserver = new ResizeObserver(() => resize())
-    resizeObserver.observe(ctn)
-    resize()
-
     const update = (t: number) => {
-      rafRef.current = requestAnimationFrame(update)
-
       if (pageLoadAnimation && loadAnimationStartRef.current === 0) {
         loadAnimationStartRef.current = t
       }
 
-      if (!pause) {
+      if (!pause && !reducedMotion.matches) {
         const elapsed = (t * 0.001 + timeOffsetRef.current) * timeScale
         program.uniforms.iTime.value = elapsed
         frozenTimeRef.current = elapsed
@@ -401,7 +428,29 @@ export default function FaultyTerminal({
       }
 
       if (mouseReact) {
-        const dampingFactor = 0.08
+        const pointer = pointerRef.current
+        const rect = pointer ? ctn.getBoundingClientRect() : null
+        if (
+          pointer &&
+          rect &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          pointer.x >= rect.left &&
+          pointer.x <= rect.right &&
+          pointer.y >= rect.top &&
+          pointer.y <= rect.bottom
+        ) {
+          mouseRef.current = {
+            x: (pointer.x - rect.left) / rect.width,
+            y: 1 - (pointer.y - rect.top) / rect.height,
+          }
+          if (smoothMouseRef.current.x < 0)
+            smoothMouseRef.current = { ...mouseRef.current }
+        } else {
+          mouseRef.current = { x: -10, y: -10 }
+          smoothMouseRef.current = { x: -10, y: -10 }
+        }
+        const dampingFactor = 0.25
         const smoothMouse = smoothMouseRef.current
         const mouse = mouseRef.current
         smoothMouse.x += (mouse.x - smoothMouse.x) * dampingFactor
@@ -414,30 +463,72 @@ export default function FaultyTerminal({
 
       renderer.render({ scene: mesh })
     }
-    rafRef.current = requestAnimationFrame(update)
+    const loop = createAnimationLoop(update, maxFps)
+    function syncPlayback() {
+      loop.stop()
+      if (!inView || document.hidden || contextLost) return
+      if (pause || reducedMotion.matches) {
+        program.uniforms.uPageLoadProgress.value = 1
+        renderer.render({ scene: mesh })
+      } else {
+        loop.start()
+      }
+    }
+    const resizeObserver = new ResizeObserver(() => {
+      resize()
+      syncPlayback()
+    })
+    resizeObserver.observe(ctn)
+    resize()
     ctn.appendChild(gl.canvas)
+    const intersectionObserver = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting
+      syncPlayback()
+    })
+    intersectionObserver.observe(ctn)
+    const onContextLost = () => {
+      contextLost = true
+      loop.stop()
+      // Keep the CSS fallback visible if the GPU context is reclaimed.
+      gl.canvas.style.visibility = "hidden"
+    }
+    gl.canvas.addEventListener("webglcontextlost", onContextLost)
+    document.addEventListener("visibilitychange", syncPlayback)
+    reducedMotion.addEventListener("change", syncPlayback)
 
-    // Listen on window (in addition to the container) so the background still
-    // reacts when overlaying content intercepts pointer events.
+    const clearPointer = () => {
+      pointerRef.current = null
+    }
+    // Listen through the text/buttons without intercepting clicks or scrolling.
     if (mouseReact) {
-      ctn.addEventListener("mousemove", handleMouseMove)
-      window.addEventListener("mousemove", handleMouseMove)
+      window.addEventListener("pointermove", handleMouseMove, { passive: true })
+      window.addEventListener("blur", clearPointer)
+      document.addEventListener("pointerleave", clearPointer)
     }
 
     return () => {
-      cancelAnimationFrame(rafRef.current)
+      loop.stop()
+      intersectionObserver.disconnect()
       resizeObserver.disconnect()
+      document.removeEventListener("visibilitychange", syncPlayback)
+      reducedMotion.removeEventListener("change", syncPlayback)
+      gl.canvas.removeEventListener("webglcontextlost", onContextLost)
       if (mouseReact) {
-        ctn.removeEventListener("mousemove", handleMouseMove)
-        window.removeEventListener("mousemove", handleMouseMove)
+        window.removeEventListener("pointermove", handleMouseMove)
+        window.removeEventListener("blur", clearPointer)
+        document.removeEventListener("pointerleave", clearPointer)
       }
       if (gl.canvas.parentElement === ctn) ctn.removeChild(gl.canvas)
+      geometry.remove()
+      program.remove()
       gl.getExtension("WEBGL_lose_context")?.loseContext()
       loadAnimationStartRef.current = 0
       timeOffsetRef.current = Math.random() * 100
     }
   }, [
     resolvedDpr,
+    maxFps,
+    maxPixels,
     pause,
     timeScale,
     scale,

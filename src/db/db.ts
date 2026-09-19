@@ -1,3 +1,4 @@
+import { isDemoRuntime } from "@/lib/demo/runtime"
 /**
  * Dexie (IndexedDB) schema for the read-through cache.
  *
@@ -5,7 +6,8 @@
  * secondary paints, and diffing for push notifications.
  */
 
-import Dexie, { type EntityTable } from "dexie"
+import Dexie from "dexie"
+import type { EntityTable } from "dexie"
 import type {
   EmailProperties,
   Mailbox,
@@ -23,6 +25,16 @@ export interface CachedEmail extends EmailProperties {
   mailboxIdsList?: string[]
 }
 
+export interface AccountCachedEmail extends CachedEmail {
+  cacheKey: string
+  accountId: string
+}
+
+export interface AccountCachedThread extends Thread {
+  cacheKey: string
+  accountId: string
+}
+
 export interface SyncMeta {
   key: string
   state: string
@@ -38,9 +50,11 @@ class WorkspaceDb extends Dexie {
   contacts!: EntityTable<Contact, "id">
   files!: EntityTable<FileNode, "id">
   syncMeta!: EntityTable<SyncMeta, "key">
+  mailCache!: EntityTable<AccountCachedEmail, "cacheKey">
+  threadCache!: EntityTable<AccountCachedThread, "cacheKey">
 
   constructor() {
-    super("WorkspaceTool")
+    super("WorkspaceTool", { autoOpen: !isDemoRuntime })
     this.version(1).stores({
       mailboxes: "id, &role, name",
       emails: "id, threadId, receivedAt, *mailboxIdsList",
@@ -51,12 +65,17 @@ class WorkspaceDb extends Dexie {
       files: "id, parentId",
       syncMeta: "key",
     })
+    this.version(2).stores({
+      mailCache: "cacheKey, accountId, threadId, receivedAt",
+      threadCache: "cacheKey, accountId",
+    })
   }
 }
 
 export const db = new WorkspaceDb()
 
 export async function clearWorkspaceCache(): Promise<void> {
+  if (isDemoRuntime) return
   await Promise.all([
     db.mailboxes.clear(),
     db.emails.clear(),
@@ -66,6 +85,8 @@ export async function clearWorkspaceCache(): Promise<void> {
     db.contacts.clear(),
     db.files.clear(),
     db.syncMeta.clear(),
+    db.mailCache.clear(),
+    db.threadCache.clear(),
   ])
 }
 

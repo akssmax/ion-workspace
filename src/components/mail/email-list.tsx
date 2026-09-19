@@ -8,7 +8,7 @@
  * - `outlook` — multi-line rows with the same checkbox + avatar, unread accent
  *   bar and bold unread sender.
  *
- * Bulk selection: the checkbox sits beside the avatar (never replaces it).
+ * Bulk selection: every row style has a visible checkbox.
  * Ctrl/Cmd-click toggles; Shift-click selects the visible range from the
  * last-selected row. Clicking the rest of the row opens the conversation.
  */
@@ -36,6 +36,7 @@ export function EmailList({
   density = "comfortable",
   showSnippets = true,
   rowStyle = "minimal",
+  narrow = false,
 }: {
   mailboxId: string | null
   query: string
@@ -43,6 +44,7 @@ export function EmailList({
   density?: ListDensity
   showSnippets?: boolean
   rowStyle?: RowStyle
+  narrow?: boolean
 }) {
   const setFocusedThread = useMailStore((s) => s.setFocusedThread)
   const selectedThreadIds = useMailStore((s) => s.selectedThreadIds)
@@ -60,12 +62,12 @@ export function EmailList({
   }
   const emails = useEmails(scope)
 
-  // Switching mailbox or editing the query drops stale selection & focus.
+  // Switching mailbox or editing the query drops stale selection.
   useEffect(() => {
     clearSelection()
   }, [mailboxId, query, clearSelection])
 
-  const rows = emails.data?.emails ?? []
+  const rows = emails.data?.pages.flatMap((page) => page.emails) ?? []
 
   // Publish visible thread ids so the toolbar's select-all can act on them.
   const setVisibleThreadIds = useMailStore((s) => s.setVisibleThreadIds)
@@ -101,8 +103,7 @@ export function EmailList({
   function onRowClick(row: EmailProperties, e: React.MouseEvent) {
     const threadId = row.threadId
     if (e.shiftKey) {
-      const anchor =
-        selectedThreadIds.at(-1) ?? featuredThreadId ?? threadId
+      const anchor = selectedThreadIds.at(-1) ?? featuredThreadId ?? threadId
       selectRange(anchor, threadId)
       return
     }
@@ -118,10 +119,19 @@ export function EmailList({
     setFocusedThread(threadId)
   }
 
-  const selectionActive = selectedThreadIds.length > 0
-
   return (
-    <div className="h-full overflow-y-auto">
+    <div
+      className="h-full min-w-0 overflow-x-hidden overflow-y-auto"
+      onScroll={(event) => {
+        const el = event.currentTarget
+        if (el.scrollHeight - el.scrollTop - el.clientHeight < 240 && emails.hasNextPage && !emails.isFetchingNextPage) {
+          void emails.fetchNextPage()
+        }
+      }}
+    >
+      {emails.data?.pages[0]?.state === "offline" ? (
+        <p role="status" className="border-b bg-muted px-3 py-1.5 text-xs text-muted-foreground">Offline · showing cached messages</p>
+      ) : null}
       {rows.map((row) => {
         const threadId = row.threadId
         const selected = selectedThreadIds.includes(threadId)
@@ -131,7 +141,7 @@ export function EmailList({
           selected,
           density,
           showSnippets,
-          selectionActive,
+          narrow,
           onSelect: (e: React.MouseEvent) => onRowClick(row, e),
           onToggleSelect: () => toggleThreadSelection(threadId),
         }
@@ -143,6 +153,16 @@ export function EmailList({
           <MinimalRow key={threadId} {...shared} />
         )
       })}
+      {emails.hasNextPage ? (
+        <button
+          type="button"
+          className="w-full border-t p-3 text-sm text-muted-foreground hover:bg-muted/50"
+          disabled={emails.isFetchingNextPage}
+          onClick={() => void emails.fetchNextPage()}
+        >
+          {emails.isFetchingNextPage ? "Loading more messages…" : "Load more messages"}
+        </button>
+      ) : null}
     </div>
   )
 }
@@ -155,7 +175,7 @@ interface RowProps {
   selected: boolean
   density: ListDensity
   showSnippets: boolean
-  selectionActive: boolean
+  narrow: boolean
   onSelect: (e: React.MouseEvent) => void
   onToggleSelect: () => void
 }
@@ -193,12 +213,10 @@ function senderInitials(name: string): string {
 
 function RowCheckbox({
   selected,
-  selectionActive,
   name,
   onToggleSelect,
 }: {
   selected: boolean
-  selectionActive: boolean
   name: string
   onToggleSelect: () => void
 }) {
@@ -209,12 +227,7 @@ function RowCheckbox({
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       aria-label={`Select conversation from ${name}`}
-      className={cn(
-        "after:hidden",
-        !selected &&
-          !selectionActive &&
-          "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
-      )}
+      className="shrink-0 after:hidden"
     />
   )
 }
@@ -241,11 +254,11 @@ function RowAvatar({
   )
 }
 
-function RowBadges({ email }: { email: EmailProperties }) {
+function RowBadges({ email, narrow = false }: { email: EmailProperties; narrow?: boolean }) {
   const labelsEnabled = useFeatureFlag("mail.labels")
   return (
     <>
-      {labelsEnabled ? <LabelChips email={email} /> : null}
+      {labelsEnabled && !narrow ? <LabelChips email={email} /> : null}
       {emailHasAttachments(email) ? (
         <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
       ) : null}
@@ -273,12 +286,8 @@ function rowBackground({
 // -- Gmail: single-line rows with avatar -------------------------------------
 
 function GmailRow(props: RowProps) {
-  const {
-    email,
-    density,
-    showSnippets,
-    onSelect,
-  } = props
+  if (props.narrow) return <OutlookRow {...props} />
+  const { email, density, showSnippets, onSelect } = props
   const sender = senderName(email)
   const subject = email.subject || "(no subject)"
   const isUnread = email.keywords?.$seen !== true
@@ -287,25 +296,20 @@ function GmailRow(props: RowProps) {
   return (
     <div
       className={cn(
-        "group/row flex w-full items-center gap-2 border-b px-3 text-sm transition-colors",
-        density === "compact"
-          ? "py-1"
-          : density === "cozy"
-            ? "py-1.5"
-            : "py-2",
+        "group/row flex w-full min-w-0 items-center gap-2 overflow-hidden border-b px-3 text-sm transition-colors",
+        density === "compact" ? "py-1" : density === "cozy" ? "py-1.5" : "py-2",
         rowBackground(props)
       )}
     >
       <RowCheckbox
         selected={props.selected}
-        selectionActive={props.selectionActive}
         name={sender}
         onToggleSelect={props.onToggleSelect}
       />
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+        className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden text-left"
       >
         <RowAvatar email={email} size="size-7" />
         <span
@@ -327,7 +331,7 @@ function GmailRow(props: RowProps) {
             </span>
           ) : null}
         </span>
-        <RowBadges email={email} />
+        <RowBadges email={email} narrow={props.narrow} />
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {time ? formatRelative(time) : ""}
         </span>
@@ -344,13 +348,12 @@ function OutlookRow(props: RowProps) {
   const subject = email.subject || "(no subject)"
   const isUnread = email.keywords?.$seen !== true
   const time = email.receivedAt ?? email.sentAt
-  const showSnippet =
-    showSnippets && email.preview && density !== "compact"
+  const showSnippet = showSnippets && email.preview && density !== "compact"
 
   return (
     <div
       className={cn(
-        "group/row relative flex w-full items-start gap-2 border-b px-3 transition-colors",
+        "group/row relative flex w-full min-w-0 items-start gap-2 overflow-hidden border-b px-3 transition-colors",
         density === "compact"
           ? "py-1.5"
           : density === "cozy"
@@ -367,21 +370,20 @@ function OutlookRow(props: RowProps) {
       ) : null}
       <RowCheckbox
         selected={props.selected}
-        selectionActive={props.selectionActive}
         name={sender}
         onToggleSelect={props.onToggleSelect}
       />
       <button
         type="button"
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-start gap-3 text-left"
+        className="flex min-w-0 flex-1 items-start gap-3 overflow-hidden text-left"
       >
         <RowAvatar
           email={email}
           size={density === "compact" ? "size-7" : "size-9"}
         />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-baseline gap-2">
+          <span className="flex min-w-0 items-baseline gap-2">
             <span
               className={cn(
                 "min-w-0 flex-1 truncate text-sm",
@@ -390,7 +392,7 @@ function OutlookRow(props: RowProps) {
             >
               {sender}
             </span>
-            <RowBadges email={email} />
+            <RowBadges email={email} narrow={props.narrow} />
             <span
               className={cn(
                 "shrink-0 text-xs tabular-nums",
@@ -430,94 +432,116 @@ function MinimalRow(props: RowProps) {
   const isUnread = email.keywords?.$seen !== true
   const time = email.receivedAt ?? email.sentAt
 
-  if (density === "compact") {
+  if (density === "compact" && !props.narrow) {
     return (
-      <button
-        onClick={onSelect}
+      <div
         className={cn(
-          "flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-sm transition-colors",
+          "group/row flex w-full min-w-0 items-center gap-2 overflow-hidden border-b px-3 py-1.5 text-sm transition-colors",
           rowBackground(props)
         )}
       >
-        <span
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            isUnread ? "bg-primary" : "bg-transparent"
-          )}
-          aria-hidden
+        <RowCheckbox
+          selected={props.selected}
+          name={sender}
+          onToggleSelect={props.onToggleSelect}
         />
-        <span
-          className={cn(
-            "w-32 shrink-0 truncate sm:w-40",
-            isUnread && "font-semibold"
-          )}
+        <button
+          type="button"
+          onClick={onSelect}
+          className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
         >
-          {sender}
-        </span>
-        <span className="min-w-0 flex-1 truncate">
-          <span className={cn(isUnread ? "font-medium" : "text-foreground/80")}>
-            {subject}
+          <span
+            className={cn(
+              "size-2 shrink-0 rounded-full",
+              isUnread ? "bg-primary" : "bg-transparent"
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "w-32 shrink-0 truncate sm:w-40",
+              isUnread && "font-semibold"
+            )}
+          >
+            {sender}
           </span>
-          {showSnippets && email.preview ? (
-            <span className="text-muted-foreground/80">
-              {" "}
-              &ndash; {email.preview}
+          <span className="min-w-0 flex-1 truncate">
+            <span
+              className={cn(isUnread ? "font-medium" : "text-foreground/80")}
+            >
+              {subject}
             </span>
-          ) : null}
-        </span>
-        <RowBadges email={email} />
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {time ? formatRelative(time) : ""}
-        </span>
-      </button>
+            {showSnippets && email.preview ? (
+              <span className="text-muted-foreground/80">
+                {" "}
+                &ndash; {email.preview}
+              </span>
+            ) : null}
+          </span>
+          <RowBadges email={email} narrow={props.narrow} />
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            {time ? formatRelative(time) : ""}
+          </span>
+        </button>
+      </div>
     )
   }
 
   return (
-    <button
-      onClick={onSelect}
+    <div
       className={cn(
-        "flex w-full flex-col gap-0.5 border-b px-3 text-left transition-colors",
+        "group/row flex w-full min-w-0 items-start gap-2 overflow-hidden border-b px-3 transition-colors",
         density === "cozy" ? "py-1.5" : "py-2.5",
         rowBackground(props)
       )}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            isUnread ? "bg-primary" : "bg-transparent"
-          )}
-          aria-hidden
-        />
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-sm",
-            isUnread && "font-semibold"
-          )}
-        >
-          {sender}
-        </span>
-        <RowBadges email={email} />
-        <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {time ? formatRelative(time) : ""}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 pl-4">
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-sm",
-            isUnread ? "font-medium" : "text-foreground/80"
-          )}
-        >
-          {subject}
-        </span>
-      </div>
-      {showSnippets && email.preview ? (
-        <span className="truncate pl-4 text-xs text-muted-foreground/80">
-          {email.preview}
-        </span>
-      ) : null}
-    </button>
+      <RowCheckbox
+        selected={props.selected}
+        name={sender}
+        onToggleSelect={props.onToggleSelect}
+      />
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden text-left"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            className={cn(
+              "size-2 shrink-0 rounded-full",
+              isUnread ? "bg-primary" : "bg-transparent"
+            )}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-sm",
+              isUnread && "font-semibold"
+            )}
+          >
+            {sender}
+          </span>
+          <RowBadges email={email} narrow={props.narrow} />
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+            {time ? formatRelative(time) : ""}
+          </span>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 pl-4">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-sm",
+              isUnread ? "font-medium" : "text-foreground/80"
+            )}
+          >
+            {subject}
+          </span>
+        </div>
+        {showSnippets && email.preview ? (
+          <span className="block w-full truncate pl-4 text-xs text-muted-foreground/80">
+            {email.preview}
+          </span>
+        ) : null}
+      </button>
+    </div>
   )
 }

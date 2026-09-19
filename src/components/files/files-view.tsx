@@ -76,10 +76,10 @@ export function FilesView() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
         <OpenSidebarTrigger />
         <h1 className="text-sm font-semibold">Files</h1>
-        <nav className="ml-4 flex min-w-0 items-center gap-1 text-sm">
+        <nav className="order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto text-sm sm:order-none sm:ml-4 sm:w-auto sm:flex-1">
           <button
             onClick={() => navigateTo({ id: null, name: "My Files" })}
             className="flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -111,13 +111,14 @@ export function FilesView() {
             variant="outline"
             size="sm"
             onClick={() => setFolderDialog(true)}
+            aria-label="New folder"
           >
             <FolderPlus className="size-4" />
-            New folder
+            <span className="hidden sm:inline">New folder</span>
           </Button>
-          <label className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-4xl bg-primary px-3 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80 disabled:pointer-events-none disabled:opacity-50">
+          <label aria-label="Upload files" className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-4xl bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-all hover:bg-primary/80 disabled:pointer-events-none disabled:opacity-50">
             <Upload className="size-4" />
-            Upload
+            <span className="hidden sm:inline">Upload</span>
             <input
               type="file"
               multiple

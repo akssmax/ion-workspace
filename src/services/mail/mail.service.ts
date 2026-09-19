@@ -201,15 +201,34 @@ export async function archiveEmails(ids: JmapId[]): Promise<void> {
 
 export async function moveEmails(
   ids: JmapId[],
-  toMailboxId: JmapId
+  toMailboxId: JmapId,
+  fromMailboxId?: JmapId
 ): Promise<void> {
   const client = await getJmapClient()
-  await client.mail.moveEmails(await resolveEmailIds(ids), toMailboxId)
+  await client.mail.moveEmails(
+    await resolveEmailIds(ids),
+    toMailboxId,
+    undefined,
+    fromMailboxId
+  )
 }
 
 export async function trashEmails(ids: JmapId[]): Promise<void> {
   const client = await getJmapClient()
   await client.mail.trash(await resolveEmailIds(ids))
+}
+
+export async function reportJunk(
+  ids: JmapId[],
+  phishing = false
+): Promise<void> {
+  const client = await getJmapClient()
+  await client.mail.reportJunk(await resolveEmailIds(ids), phishing)
+}
+
+export async function markNotJunk(ids: JmapId[]): Promise<void> {
+  const client = await getJmapClient()
+  await client.mail.markNotJunk(await resolveEmailIds(ids))
 }
 
 export async function restoreEmails(ids: JmapId[]): Promise<void> {
@@ -219,6 +238,29 @@ export async function restoreEmails(ids: JmapId[]): Promise<void> {
   const inbox = await client.mail.findRoleMailbox("inbox", accountId)
   if (!inbox) return
   await client.mail.moveEmails(await resolveEmailIds(ids), inbox.id)
+}
+
+export async function permanentlyDeleteEmails(ids: JmapId[]): Promise<void> {
+  const client = await getJmapClient()
+  const accountId = await getPrimaryAccountId()
+  if (!accountId) throw new Error("No mail account available.")
+  const trash = await client.mail.findRoleMailbox("trash", accountId)
+  if (!trash) throw new Error("Trash mailbox is unavailable.")
+  const emailIds = await resolveEmailIds(ids)
+  const emails = await client.mail.getEmailByIds(
+    emailIds,
+    {
+      properties: ["id", "mailboxIds"],
+    },
+    accountId
+  )
+  if (
+    emails.length !== emailIds.length ||
+    emails.some((email) => !email.mailboxIds[trash.id])
+  ) {
+    throw new Error("Only messages in Trash can be permanently deleted.")
+  }
+  await client.mail.destroyEmails(emailIds, accountId)
 }
 
 /**
@@ -234,7 +276,12 @@ export async function applyLabel(
   const accountId = await getPrimaryAccountId()
   if (!accountId) return
   client.mail.bindAccount(accountId)
-  await client.mail.applyLabel(await resolveEmailIds(ids), labelId, applied, accountId)
+  await client.mail.applyLabel(
+    await resolveEmailIds(ids),
+    labelId,
+    applied,
+    accountId
+  )
 }
 
 export async function sendDraft(input: SendDraftInput): Promise<string> {
@@ -262,10 +309,7 @@ export async function sendDraft(input: SendDraftInput): Promise<string> {
     // Remove the stored draft so it doesn't linger next to the sent copy.
     if (input.draftId) {
       try {
-        await client.mail.updateEmails(
-          { [input.draftId]: { mailboxIds: { trash: true } } },
-          accountId
-        )
+        await client.mail.destroyEmails([input.draftId], accountId)
       } catch {
         // best effort cleanup
       }
@@ -287,6 +331,8 @@ export async function saveDraft(input: {
   textBody?: string | null
   htmlBody?: string | null
   attachments?: UploadedBlob[]
+  inReplyTo?: string[] | null
+  references?: string[] | null
 }): Promise<string> {
   try {
     const client = await getJmapClient()
@@ -304,6 +350,8 @@ export async function saveDraft(input: {
         textBody: input.textBody ?? undefined,
         htmlBody: input.htmlBody ?? undefined,
         attachments: input.attachments,
+        inReplyTo: input.inReplyTo ?? undefined,
+        references: input.references ?? undefined,
       },
       { draftEmailId: input.draftEmailId },
       accountId

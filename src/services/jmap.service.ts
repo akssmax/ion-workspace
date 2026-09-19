@@ -8,13 +8,11 @@
  */
 
 import { getAppConfig } from "../server/auth.rpc"
-import { JmapClient } from "../jmap/client/JmapClient"
-import { MockJmapProvider } from "../jmap/provider/MockJmapProvider"
-import { RealJmapProvider } from "../jmap/provider/RealJmapProvider"
-import {
-  resolvePrimaryAccountId,
-  type JmapProvider,
-} from "../jmap/provider/provider"
+import type { JmapClient } from "../jmap/client/JmapClient"
+import { isDemoRuntime } from "@/lib/demo/runtime"
+
+import { resolvePrimaryAccountId } from "../jmap/provider/provider"
+import type { JmapProvider } from "../jmap/provider/provider"
 import { JMAP_CAPS } from "../jmap/types"
 
 let currentClient: JmapClient | null = null
@@ -25,12 +23,18 @@ export async function getJmapClient(): Promise<JmapClient> {
   if (currentClient) return currentClient
   if (!resolving) {
     resolving = (async () => {
-      const config = await getAppConfig()
+      const config = isDemoRuntime
+        ? { jmapMode: "mock" as const, publicEventSourceUrl: undefined }
+        : await getAppConfig()
       if (config.jmapMode === "real") {
+        const { RealJmapProvider } =
+          await import("../jmap/provider/RealJmapProvider")
         currentProvider = new RealJmapProvider({
           publicEventSourceUrl: config.publicEventSourceUrl,
         })
       } else {
+        const { MockJmapProvider } =
+          await import("../jmap/provider/MockJmapProvider")
         currentProvider = new MockJmapProvider()
       }
       const client = await currentProvider.createClient()

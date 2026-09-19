@@ -7,8 +7,9 @@
  */
 
 import { createServerFn } from "@tanstack/react-start"
-import { getSession, updateSession } from "./session.server"
+import { updateSession } from "./session.server"
 import { WORKSPACE_CONFIG } from "./config.server"
+import { activeStalwartToken } from "./stalwart-auth.server"
 
 class ProxyError extends Error {
   constructor(
@@ -21,23 +22,44 @@ class ProxyError extends Error {
 }
 
 async function requireAccessToken(): Promise<string> {
-  const session = await getSession()
-  if (!session?.accessToken) {
-    throw new ProxyError("No active session.", 401)
-  }
-  return session.accessToken
+  try { return await activeStalwartToken() }
+  catch { throw new ProxyError("Your mail session expired. Sign in again.", 401) }
 }
 
 /** Resolve URL templates with placeholders for accountId/blobId. */
 function expandTemplate(url: string, vars: Record<string, string>): string {
-  return url.replace(/\{([^}]+)\}/g, (_, key: string) => vars[key] ?? "")
+  return url.replace(/\{([^}]+)\}/g, (_, key: string) =>
+    encodeURIComponent(vars[key] ?? "")
+  )
+}
+
+/** Never fetch a client-chosen host with the server's Stalwart credentials. */
+function trustedEndpoint(
+  candidate: string | undefined,
+  fallback: string,
+  path: string
+): string {
+  const url = new URL(candidate ?? fallback)
+  const origin = new URL(WORKSPACE_CONFIG.stalwartOrigin)
+  const allowedPath = path.endsWith("/")
+    ? url.pathname.startsWith(path)
+    : url.pathname === path || url.pathname.startsWith(`${path}/`)
+  if (
+    url.origin !== origin.origin ||
+    !allowedPath ||
+    url.username ||
+    url.password
+  ) {
+    throw new ProxyError("Invalid mail server endpoint.", 400)
+  }
+  return url.toString()
 }
 
 export const proxyJmapRequest = createServerFn({ method: "POST" })
-  .validator((input: unknown) => input as { payload: unknown[]; url?: string })
+  .validator((input: unknown) => input as { payload: unknown; url?: string })
   .handler(async ({ data }) => {
     const token = await requireAccessToken()
-    const url = data.url ?? WORKSPACE_CONFIG.jmapPath
+    const url = trustedEndpoint(data.url, WORKSPACE_CONFIG.jmapPath, "/jmap")
     let response: Response
     try {
       response = await fetch(url, {
@@ -113,10 +135,16 @@ export const proxyUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const token = await requireAccessToken()
-    const baseUrl =
-      data.uploadUrl ??
-      `${WORKSPACE_CONFIG.stalwartOrigin}/api/upload/{accountId}`
-    const url = expandTemplate(baseUrl, { accountId: data.accountId })
+    const baseUrl = trustedEndpoint(
+      data.uploadUrl,
+      `${WORKSPACE_CONFIG.stalwartOrigin}/jmap/upload/{accountId}/`,
+      "/jmap/upload/"
+    )
+    const url = trustedEndpoint(
+      expandTemplate(baseUrl, { accountId: data.accountId }),
+      baseUrl,
+      "/jmap/upload/"
+    )
     const bytes = Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))
 
     const headers: Record<string, string> = {
@@ -164,13 +192,21 @@ export const proxyDownload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const token = await requireAccessToken()
-    const baseUrl =
-      data.downloadUrl ??
-      `${WORKSPACE_CONFIG.stalwartOrigin}/api/download/{accountId}/{blobId}`
-    const url = expandTemplate(baseUrl, {
-      accountId: data.accountId,
-      blobId: data.blobId,
-    })
+    const baseUrl = trustedEndpoint(
+      data.downloadUrl,
+      `${WORKSPACE_CONFIG.stalwartOrigin}/jmap/download/{accountId}/{blobId}/download`,
+      "/jmap/download/"
+    )
+    const url = trustedEndpoint(
+      expandTemplate(baseUrl, {
+        accountId: data.accountId,
+        blobId: data.blobId,
+        name: "download",
+        type: "*/*",
+      }),
+      baseUrl,
+      "/jmap/download/"
+    )
     let response: Response
     try {
       response = await fetch(url, {

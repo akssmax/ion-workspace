@@ -45,7 +45,8 @@ export function parseSearch(input: string): ParsedSearch {
   const negatedText: string[] = []
   let hasAdvanced = false
 
-  const tokens = query.match(/(?:"(?:[^"\\]|\\.)*"|[^\s]+)/g) ?? []
+  const tokens =
+    query.match(/[a-z]+:"(?:[^"\\]|\\.)*"|"(?:[^"\\]|\\.)*"|[^\s]+/gi) ?? []
 
   for (const raw of tokens) {
     const token = raw.replace(/^"|"$/g, "")
@@ -63,7 +64,7 @@ export function parseSearch(input: string): ParsedSearch {
     }
 
     const field = token.slice(0, colon).toLowerCase()
-    const value = token.slice(colon + 1)
+    const value = token.slice(colon + 1).replace(/^"|"$/g, "")
     if (!value) continue
 
     if (field === "is") {
@@ -111,6 +112,17 @@ export function parseSearch(input: string): ParsedSearch {
       continue
     }
 
+    if (field === "larger" || field === "smaller") {
+      const bytes = Number(value)
+      if (Number.isSafeInteger(bytes) && bytes >= 0) {
+        hasAdvanced = true
+        conditions.push(
+          field === "larger" ? { minSize: bytes } : { maxSize: bytes }
+        )
+      }
+      continue
+    }
+
     if (field === "from") {
       hasAdvanced = true
       conditions.push({ from: value })
@@ -146,7 +158,7 @@ export function parseSearch(input: string): ParsedSearch {
   }
 
   for (const term of negatedText) {
-    conditions.push({ not: { text: term } })
+    conditions.push({ operator: "NOT", conditions: [{ text: term }] })
   }
   if (textMatches.length) {
     conditions.push({ text: textMatches.join(" ") })
@@ -154,7 +166,7 @@ export function parseSearch(input: string): ParsedSearch {
 
   const filter: EmailFilterOperator | null =
     conditions.length > 1
-      ? { allOf: conditions }
+      ? { operator: "AND", conditions }
       : conditions.length === 1
         ? conditions[0]
         : null
@@ -171,5 +183,5 @@ export function filterForMailbox(
 ): EmailFilterOperator {
   const mailboxClause: EmailFilterCondition = { inMailbox: mailboxId }
   if (!parsed.filter) return mailboxClause
-  return { allOf: [mailboxClause, parsed.filter] }
+  return { operator: "AND", conditions: [mailboxClause, parsed.filter] }
 }

@@ -128,7 +128,7 @@ export function CalendarView() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-1 border-b px-2 py-2 sm:gap-2 sm:px-4">
         <OpenSidebarTrigger />
         <Button variant="outline" size="sm" onClick={goToday}>
           Today
@@ -149,20 +149,22 @@ export function CalendarView() {
         >
           <ChevronRight className="size-4" />
         </Button>
-        <h1 className="ml-2 text-base font-semibold">
+        <h1 className="min-w-0 truncate text-sm font-semibold sm:ml-2 sm:text-base">
           {formatDate(cursor, "MMMM yyyy")}
         </h1>
         <Button
           className="ml-auto"
           size="sm"
           onClick={() => openNewEvent()}
+          aria-label="New event"
         >
           <CalendarPlus className="size-4" />
-          New event
+          <span className="hidden sm:inline">New event</span>
         </Button>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border">
+      <div className="min-h-0 flex-1 overflow-x-auto">
+      <div className="grid h-full min-w-[560px] grid-cols-[repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border sm:min-w-0">
         {WEEKDAYS.map((d) => (
           <div
             key={d}
@@ -228,6 +230,7 @@ export function CalendarView() {
               </button>
             )
           })}
+      </div>
       </div>
 
       <Sheet

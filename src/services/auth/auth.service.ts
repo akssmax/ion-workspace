@@ -7,12 +7,12 @@ import {
   getAppConfig,
   login,
   logout,
-  type SessionInfo,
 } from "../../server/auth.rpc"
-import { resetJmapClient } from "../jmap.service"
+import type { SessionInfo } from "../../server/auth.rpc"
+import { isDemoRuntime, DEMO_SESSION } from "@/lib/demo/runtime"
 
 export async function fetchSession(): Promise<SessionInfo | null> {
-  return getAuthSession()
+  return isDemoRuntime ? DEMO_SESSION : getAuthSession()
 }
 
 export async function fetchAppConfig(): Promise<{
@@ -39,6 +39,11 @@ export async function authenticate(
 }
 
 export async function signOut(): Promise<void> {
+  if (isDemoRuntime) {
+    window.location.assign("/")
+    return
+  }
   await logout()
+  const { resetJmapClient } = await import("../jmap.service")
   resetJmapClient()
 }

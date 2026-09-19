@@ -1,0 +1,124 @@
+.ion-demo {
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ion-demo-bar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 20px;
+  background: #151515;
+  color: #fff;
+  border-bottom: 1px solid #444;
+  font:
+    11px/1.5 "Inter Variable",
+    sans-serif;
+}
+.ion-demo-bar strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+}
+.ion-demo-bar span {
+  color: #aaa;
+  font-size: 10px;
+}
+.ion-demo-bar nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.ion-demo-bar button {
+  cursor: pointer;
+}
+.ion-demo-bar :is(a, button):focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+.ion-demo-cta {
+  background: #fff;
+  color: #111;
+  padding: 8px 12px;
+  border-radius: 20px;
+}
+.ion-demo-workspace {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.ion-demo-app-shell > [data-slot="sidebar-wrapper"] {
+  min-height: 0;
+  height: 100%;
+}
+.ion-demo-workspace [data-slot="sidebar-inset"] {
+  height: 100%;
+}
+.ion-demo-workspace [data-slot="sidebar-container"] {
+  position: absolute;
+  height: 100%;
+}
+@media (max-width: 600px) {
+  .ion-demo-bar {
+    padding: 10px 12px;
+  }
+  .ion-demo-bar nav {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+}
+
+.ion-demo-workspace {
+  display: flex;
+  flex-direction: column;
+}
+.ion-demo-app-shell {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.ion-demo-app-nav {
+  display: none;
+}
+@media (max-width: 767px) {
+  .ion-demo-app-nav {
+    display: flex;
+    flex-shrink: 0;
+    border-bottom: 1px solid #ddd;
+    background: #fff;
+    color: #111;
+    padding: 5px 8px;
+    gap: 3px;
+  }
+  .ion-demo-app-nav button {
+    flex: 1;
+    padding: 8px 4px;
+    min-height: 40px;
+    font-size: 10px;
+    text-transform: capitalize;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .ion-demo-app-nav button[aria-pressed="true"] {
+    background: #eee;
+    font-weight: 600;
+  }
+}
+@media (max-width: 767px) {
+  .ion-demo-app-shell header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+.ion-demo-embedded .ion-demo-app-nav {
+  display: none;
+}

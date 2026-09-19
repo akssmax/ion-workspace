@@ -75,14 +75,16 @@ describe("parseSearch", () => {
 
   it("supports negated terms via -", () => {
     expect(parseSearch("budget -spam").filter).toEqual({
-      allOf: [{ not: { text: "spam" } }, { text: "budget" }],
+      operator: "AND",
+      conditions: [{ operator: "NOT", conditions: [{ text: "spam" }] }, { text: "budget" }],
     })
   })
 
-  it("combines advanced conditions under allOf", () => {
+  it("combines advanced conditions with the JMAP AND operator", () => {
     const parsed = parseSearch("from:finance is:unread has:attachment")
     expect(parsed.filter).toEqual({
-      allOf: [
+      operator: "AND",
+      conditions: [
         { from: "finance" },
         { notKeyword: "$seen" },
         { hasAttachment: true },
@@ -93,13 +95,24 @@ describe("parseSearch", () => {
   it("gives plain text terms the same weight as operators", () => {
     const parsed = parseSearch("urgent is:starred")
     expect(parsed.filter).toEqual({
-      allOf: [{ hasKeyword: "$flagged" }, { text: "urgent" }],
+      operator: "AND",
+      conditions: [{ hasKeyword: "$flagged" }, { text: "urgent" }],
     })
   })
 
   it("supports quoted phrases", () => {
     const parsed = parseSearch('"end of year" report')
     expect(parsed.filter).toEqual({ text: "end of year report" })
+  })
+
+  it("keeps quoted field values together and accepts size filters", () => {
+    expect(
+      parseSearch('subject:"quarterly report" larger:1024').filter
+    ).toEqual({
+      operator: "AND",
+      conditions: [{ subject: "quarterly report" }, { minSize: 1024 }],
+    })
+    expect(parseSearch("smaller:2048").filter).toEqual({ maxSize: 2048 })
   })
 })
 
@@ -112,14 +125,16 @@ describe("filterForMailbox", () => {
   it("combines the mailbox clause with a text filter", () => {
     const parsed = parseSearch("hello")
     expect(filterForMailbox(parsed, "mb1")).toEqual({
-      allOf: [{ inMailbox: "mb1" }, { text: "hello" }],
+      operator: "AND",
+      conditions: [{ inMailbox: "mb1" }, { text: "hello" }],
     })
   })
 
   it("combines the mailbox clause with an advanced filter", () => {
     const parsed = parseSearch("is:unread")
     expect(filterForMailbox(parsed, "mb1")).toEqual({
-      allOf: [{ inMailbox: "mb1" }, { notKeyword: "$seen" }],
+      operator: "AND",
+      conditions: [{ inMailbox: "mb1" }, { notKeyword: "$seen" }],
     })
   })
 })

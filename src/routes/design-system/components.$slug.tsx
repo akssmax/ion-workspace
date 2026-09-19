@@ -1,11 +1,16 @@
 import { createFileRoute, notFound } from "@tanstack/react-router"
 import { DocsFile, DocsPage } from "@/components/design-system/page"
+import { PRIMITIVE_NAV } from "@/content/design-system-nav"
 import { primitiveBySlug } from "@/design-system/primitives"
 
 export const Route = createFileRoute("/design-system/components/$slug")({
   component: PrimitiveRoute,
   head: ({ params }) => {
-    const doc = primitiveBySlug(params.slug)
+    // Keep route metadata independent of the component gallery so it can
+    // remain in the lazy route chunk instead of every page’s entry bundle.
+    const doc = PRIMITIVE_NAV.find(
+      (item) => item.href === `/design-system/components/${params.slug}`
+    )
     return {
       meta: [{ title: `${doc?.title ?? params.slug} · Design System` }],
     }

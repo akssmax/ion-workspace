@@ -165,14 +165,9 @@ export interface EmailFilterCondition {
   subject?: string
 }
 
-export interface EmailFilterSupport {
-  allOf?: EmailFilterOperator[]
-  anyOf?: EmailFilterOperator[]
-  not?: EmailFilterOperator
-}
-
 export type EmailFilterOperator =
-  (EmailFilterCondition & EmailFilterSupport) | EmailFilterCondition
+  | EmailFilterCondition
+  | { operator: "AND" | "OR" | "NOT"; conditions: EmailFilterOperator[] }
 
 export interface EmailSortComparator {
   property:
