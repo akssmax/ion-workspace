@@ -1,11 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { AlertCircle, KeyRound, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { authenticate, fetchAppConfig } from "@/services/auth/auth.service"
+import {
+  authenticate,
+  fetchAppConfig,
+  fetchSession,
+} from "@/services/auth/auth.service"
 import { useSession } from "@/hooks/use-session"
 import { qk } from "@/queries/keys"
 import { AuthBackground } from "@/components/effects/AuthBackground"
@@ -31,11 +35,17 @@ function LoginPage() {
   const [hint, setHint] = useState<string | null>(null)
 
   // Emails a hint with the configured demo credentials (mock mode only).
-  void fetchAppConfig().then((config) => {
-    if (config.jmapMode === "mock") {
-      setHint(`Mock mode — use ${config.mockUsername} / ${config.mockPassword}`)
-    }
-  })
+  useEffect(() => {
+    void fetchAppConfig()
+      .then((config) => {
+        if (config.jmapMode === "mock") {
+          setHint(
+            `Mock mode — use ${config.mockUsername} / ${config.mockPassword}`
+          )
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   if (session.data) {
     return (
@@ -54,11 +64,18 @@ function LoginPage() {
     setBusy(true)
     try {
       const info = await authenticate(username, password, mfaToken)
-      queryClient.setQueryData(["session"], info)
+      const persisted = await fetchSession()
+      if (!persisted || persisted.userId !== info.userId) {
+        throw new Error(
+          "Sign in succeeded, but your session was not saved. Check that cookies are enabled and try again."
+        )
+      }
+      queryClient.setQueryData(["session"], persisted)
       void queryClient.invalidateQueries({ queryKey: qk.preferences() })
       await navigate({ to: "/app", replace: true })
     } catch (err) {
-      if (err instanceof Error && err.message.includes("second factor")) setNeedsMfa(true)
+      if (err instanceof Error && err.message.includes("second factor"))
+        setNeedsMfa(true)
       setError(err instanceof Error ? err.message : "Sign in failed.")
     } finally {
       setBusy(false)
@@ -73,7 +90,9 @@ function LoginPage() {
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl bg-[oklch(0.18_0.04_125)] text-[oklch(0.88_0.22_125)]">
             <IonLogo wordmark={false} size={22} />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">Sign in to Ion</h1>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Sign in to Ion
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Mail, calendar, contacts &amp; files.
           </p>
@@ -113,7 +132,18 @@ function LoginPage() {
             </div>
           </div>
 
-          {needsMfa ? <div className="space-y-2"><Label htmlFor="mfa-token">Authentication code</Label><Input id="mfa-token" value={mfaToken} onChange={event => setMfaToken(event.target.value)} autoComplete="one-time-code" inputMode="numeric" /></div> : null}
+          {needsMfa ? (
+            <div className="space-y-2">
+              <Label htmlFor="mfa-token">Authentication code</Label>
+              <Input
+                id="mfa-token"
+                value={mfaToken}
+                onChange={(event) => setMfaToken(event.target.value)}
+                autoComplete="one-time-code"
+                inputMode="numeric"
+              />
+            </div>
+          ) : null}
 
           {error ? (
             <div className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -137,6 +167,8 @@ function LoginPage() {
 
 function RedirectToApp() {
   const navigate = useNavigate()
-  void navigate({ to: "/app", replace: true })
+  useEffect(() => {
+    void navigate({ to: "/app", replace: true })
+  }, [navigate])
   return <p className="text-sm text-muted-foreground">Redirecting…</p>
 }

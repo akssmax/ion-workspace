@@ -6,7 +6,11 @@
  * and never exposed to client JavaScript.
  */
 
-import { useSession, type SessionConfig } from "@tanstack/react-start/server"
+import {
+  getSession as readSession,
+  useSession,
+  type SessionConfig,
+} from "@tanstack/react-start/server"
 
 export interface SessionData {
   userId: string
@@ -42,8 +46,9 @@ const sessionConfig: SessionConfig = {
 
 export async function getSession(): Promise<SessionData | null> {
   try {
-    const manager = await useSession<SessionData>(sessionConfig)
-    const data = manager.data
+    // useSession creates and commits an empty cookie for anonymous requests.
+    // A late anonymous response can overwrite the cookie from a concurrent login.
+    const data = (await readSession<SessionData>(sessionConfig)).data
     if (!data || !data.userId) return null
     return data as SessionData
   } catch {
