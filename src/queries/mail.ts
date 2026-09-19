@@ -3,8 +3,9 @@
  * the JMAP client directly.
  */
 
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import type {
+  EmailProperties,
   EmailFilterOperator,
   JmapId,
   Mailbox,
@@ -108,24 +109,20 @@ export interface EmailListScope {
  * Emails in a mailbox (or globally when `mailboxId` is omitted), with a
  * parsed search filter applied on top.
  */
-export function useEmails(scope: EmailListScope) {
+export const MAIL_PAGE_SIZE = 25
+
+export function useEmails(scope: EmailListScope, page = 0) {
   const accountScope = useMailScopeKey()
   const { data: session } = useSession()
   const mailboxId = scope.mailboxId ?? "all"
   const query = scope.query ?? ""
-  const pageSize = scope.limit ?? 60
-  return useInfiniteQuery({
-    queryKey: [...qk.emails(mailboxId, query), accountScope],
-    queryFn: ({ pageParam }) => fetchEmailsForScope(scope, mailboxId, pageParam, session?.accountId),
-    initialPageParam: 0,
-    getNextPageParam: (last) =>
-      last.ids.length > 0 &&
-      (last.total == null
-        ? last.ids.length >= pageSize
-        : last.position + last.ids.length < last.total)
-        ? last.position + last.ids.length
-        : undefined,
+  const pageSize = scope.limit ?? MAIL_PAGE_SIZE
+  return useQuery({
+    queryKey: [...qk.emails(mailboxId, query), accountScope, pageSize, page],
+    queryFn: () => fetchEmailsForScope({ ...scope, limit: pageSize }, mailboxId, page * pageSize, session?.accountId),
     enabled: scope.mailboxId !== undefined || scope.query !== undefined,
+    staleTime: 30_000,
+    gcTime: 60_000,
   })
 }
 
@@ -212,7 +209,7 @@ export function useThread(threadId: string | null, enabled = true) {
     },
     enabled: !!threadId && enabled,
     select: (data): ThreadView => {
-      const last = data.emails[data.emails.length - 1]
+      const last: EmailProperties | undefined = data.emails.at(-1)
       const parsedSnippet = () => {
         if (data.thread.snippet) return data.thread.snippet
         if (last?.preview) return last.preview
@@ -312,6 +309,14 @@ export function useArchiveEmails() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (ids: JmapId[]) => mailService.archiveEmails(ids),
+    onSuccess: () => invalidateMailViews(qc),
+  })
+}
+
+export function useUnarchiveEmails() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: JmapId[]) => mailService.unarchiveEmails(ids),
     onSuccess: () => invalidateMailViews(qc),
   })
 }

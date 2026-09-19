@@ -1,73 +1,43 @@
-/**
- * Mailbox header — bulk actions for the visible conversation list.
- *
- * Sits on top of the email rows (not in the app chrome). Select-all, read,
- * star, archive, trash, more (label/move and extras), clear, and refresh
- * live here so the mailbox name + search can stay in the toolbar above.
- */
-
-import { useState } from "react"
-import {
-  Archive,
-  Mail,
-  MailOpen,
-  MoreHorizontal,
-  RefreshCw,
-  Star,
-  StarOff,
-  Trash2,
-  RotateCcw,
-  ShieldAlert,
-  X,
-} from "lucide-react"
+/** Selection and page controls for the current mailbox query. */
+import { useEffect, useState } from "react"
+import { Archive, ChevronDown, ChevronLeft, ChevronRight, Mail, MailOpen, RefreshCw, RotateCcw, ShieldAlert, Star, StarOff, Trash2, X } from "lucide-react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { cn } from "cn"
-import { useQueryClient } from "@tanstack/react-query"
-import { qk } from "@/queries/keys"
-import { ACCOUNT_KEY } from "@/queries/client"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useMailStore } from "@/stores/mail.store"
-import {
-  useArchiveEmails,
-  useMailboxes,
-  useMarkRead,
-  useMarkStarred,
-  useTrashEmails,
-  useRestoreEmails,
-  usePermanentlyDeleteEmails,
-  useReportJunk,
-  useMarkNotJunk,
-} from "@/queries/mail"
+import { useArchiveEmails, useUnarchiveEmails, useEmails, useMailboxes, useMarkRead, useMarkStarred, useTrashEmails, useRestoreEmails, usePermanentlyDeleteEmails, useReportJunk, useMarkNotJunk, MAIL_PAGE_SIZE } from "@/queries/mail"
+import { parseSearch } from "@/lib/search"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelMenu } from "@/modules/mail/labels"
 import { MoveMenu } from "@/modules/mail/move/move-menu"
-import {
-  TrashConfirmDialog,
-  trashIconButtonClassName,
-} from "./trash-confirm-dialog"
+import { PermanentDeleteDialog } from "./permanent-delete-dialog"
 
-export function MailboxHeader() {
+export function MailboxHeader({ mailboxId, query, page, onPageChange }: { mailboxId: string | null; query: string; page: number; onPageChange: (page: number) => void }) {
   const selectedThreadIds = useMailStore((s) => s.selectedThreadIds)
   const visibleThreadIds = useMailStore((s) => s.visibleThreadIds)
-  const selectThreads = useMailStore((s) => s.selectThreads)
+  const addThreads = useMailStore((s) => s.addThreads)
+  const removeThreads = useMailStore((s) => s.removeThreads)
   const clearSelection = useMailStore((s) => s.clearSelection)
-  const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const { data: mailboxes } = useMailboxes()
-  const mailbox = mailboxes?.find((m) => m.id === activeMailboxId)
+  const mailbox = mailboxes?.find((item) => item.id === mailboxId)
+  const isTrash = mailbox?.role === "trash"
+  const isArchive = mailbox?.role === "archive"
+  const isJunk = mailbox?.role === "junk"
+  const labelsEnabled = useFeatureFlag("mail.labels")
+  const parsed = parseSearch(query)
+  const scope = { mailboxId: parsed.mailboxNames.length ? undefined : (mailboxId ?? undefined), query: parsed.query || undefined }
+  const results = useEmails(scope, page)
+  const total = results.data?.total
+  const position = results.data?.position ?? page * MAIL_PAGE_SIZE
+  const count = results.data?.ids.length ?? 0
+  const hasNext = total == null ? count === MAIL_PAGE_SIZE : position + count < total
+  const allVisibleSelected = visibleThreadIds.length > 0 && visibleThreadIds.every((id) => selectedThreadIds.includes(id))
+  const hasSelection = selectedThreadIds.length > 0
+  const ids = [...selectedThreadIds]
   const queryClient = useQueryClient()
-
   const archive = useArchiveEmails()
+  const unarchive = useUnarchiveEmails()
   const trash = useTrashEmails()
   const restore = useRestoreEmails()
   const permanentlyDelete = usePermanentlyDeleteEmails()
@@ -75,247 +45,53 @@ export function MailboxHeader() {
   const markNotJunk = useMarkNotJunk()
   const starred = useMarkStarred()
   const read = useMarkRead()
-  const [trashConfirmOpen, setTrashConfirmOpen] = useState(false)
+  const [permanentDeleteOpen, setPermanentDeleteOpen] = useState(false)
 
-  const hasSelection = selectedThreadIds.length > 0
-  const allVisibleSelected =
-    visibleThreadIds.length > 0 &&
-    visibleThreadIds.every((id) => selectedThreadIds.includes(id))
-  const isTrash = mailbox?.role === "trash"
-  const isJunk = mailbox?.role === "junk"
-  const labelsEnabled = useFeatureFlag("mail.labels")
+  // Deleting the final row on a page can leave it empty.
+  useEffect(() => {
+    if (!results.isPending && page > 0 && total != null && page * MAIL_PAGE_SIZE >= total)
+      onPageChange(Math.max(0, Math.ceil(total / MAIL_PAGE_SIZE) - 1))
+  }, [results.isPending, total, page, onPageChange])
 
-  return (
-    <header
-      aria-label="Mailbox header"
-      className={cn(
-        "flex h-10 min-w-0 shrink-0 items-center overflow-hidden border-b px-2",
-        hasSelection && "bg-muted/40"
-      )}
-    >
-      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-        {isTrash ? <Button
-          variant="ghost"
-          size="icon-sm"
-          disabled={!hasSelection}
-          onClick={() => void restore.mutateAsync([...selectedThreadIds])}
-          aria-label="Restore to inbox"
-        ><RotateCcw className="size-4" /></Button> : null}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span className="flex shrink-0 items-center px-1">
-                <Checkbox
-                  checked={allVisibleSelected}
-                  onCheckedChange={(checked) =>
-                    checked
-                      ? selectThreads([...visibleThreadIds])
-                      : clearSelection()
-                  }
-                  disabled={visibleThreadIds.length === 0}
-                  aria-label="Select all"
-                />
-              </span>
-            }
-          >
-            <span />
-          </TooltipTrigger>
-          <TooltipContent>Select all</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!hasSelection}
-                onClick={() =>
-                  void read.mutateAsync({
-                    ids: [...selectedThreadIds],
-                    read: true,
-                  })
-                }
-                aria-label="Mark as read"
-              >
-                <Mail className="size-4" />
-              </Button>
-            }
-          >
-            <span />
-          </TooltipTrigger>
-          <TooltipContent>Mark as read</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!hasSelection}
-                onClick={() =>
-                  void starred.mutateAsync({
-                    ids: [...selectedThreadIds],
-                    starred: true,
-                  })
-                }
-                aria-label="Mark as starred"
-              >
-                <Star className="size-4" />
-              </Button>
-            }
-          >
-            <span />
-          </TooltipTrigger>
-          <TooltipContent>Star</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!hasSelection || isTrash}
-                onClick={() => void archive.mutateAsync([...selectedThreadIds])}
-                aria-label="Archive"
-              >
-                <Archive className="size-4" />
-              </Button>
-            }
-          >
-            <span />
-          </TooltipTrigger>
-          <TooltipContent>Archive</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!hasSelection}
-                onClick={() => setTrashConfirmOpen(true)}
-                aria-label={isTrash ? "Delete permanently" : "Move to trash"}
-                className={trashIconButtonClassName}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            }
-          >
-            <span />
-          </TooltipTrigger>
-          <TooltipContent>{isTrash ? "Delete permanently" : "Move to trash"}</TooltipContent>
-        </Tooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!hasSelection}
-                aria-label="More actions"
-                title="More actions"
-              >
-                <MoreHorizontal className="size-4" />
-              </Button>
-            }
-          />
-          <DropdownMenuContent align="start">
-            {labelsEnabled ? (
-              <LabelMenu
-                threadIds={[...selectedThreadIds]}
-                disabled={!hasSelection}
-              />
-            ) : null}
-            <MoveMenu
-              threadIds={[...selectedThreadIds]}
-              disabled={!hasSelection}
-            />
-            <DropdownMenuItem
-              onClick={() =>
-                void read.mutateAsync({
-                  ids: [...selectedThreadIds],
-                  read: false,
-                })
-              }
-            >
-              <MailOpen className="size-3.5" />
-              Mark as unread
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() =>
-                void starred.mutateAsync({
-                  ids: [...selectedThreadIds],
-                  starred: false,
-                })
-              }
-            >
-              <StarOff className="size-3.5" />
-              Remove star
-            </DropdownMenuItem>
-            {isJunk ? (
-              <DropdownMenuItem onClick={() => void markNotJunk.mutateAsync([...selectedThreadIds])}>
-                <ShieldAlert className="size-3.5" /> Not spam
-              </DropdownMenuItem>
-            ) : !isTrash ? (
-              <>
-                <DropdownMenuItem onClick={() => void reportJunk.mutateAsync({ ids: [...selectedThreadIds] })}>
-                  <ShieldAlert className="size-3.5" /> Report spam
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => void reportJunk.mutateAsync({ ids: [...selectedThreadIds], phishing: true })}>
-                  <ShieldAlert className="size-3.5" /> Report phishing
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      <div className="flex shrink-0 items-center">
-        {hasSelection ? (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={clearSelection}
-                  aria-label="Clear selection"
-                >
-                  <X className="size-4" />
-                </Button>
-              }
-            >
-              <span />
-            </TooltipTrigger>
-            <TooltipContent>Clear selection</TooltipContent>
-          </Tooltip>
-        ) : null}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label="Refresh"
-          onClick={() => {
-            void queryClient.invalidateQueries({
-              queryKey: [ACCOUNT_KEY, "emails"],
-            })
-            void queryClient.invalidateQueries({
-              queryKey: [ACCOUNT_KEY, "thread"],
-            })
-            void queryClient.invalidateQueries({
-              queryKey: [ACCOUNT_KEY, "search"],
-            })
-            void queryClient.invalidateQueries({ queryKey: qk.mailboxes() })
-          }}
-        >
-          <RefreshCw className="size-4" />
-        </Button>
-      </div>
-      <TrashConfirmDialog
-        open={trashConfirmOpen}
-        onOpenChange={setTrashConfirmOpen}
-        count={selectedThreadIds.length}
-        permanent={isTrash}
-        onConfirm={() => void (isTrash ? permanentlyDelete : trash).mutateAsync([...selectedThreadIds])}
-      />
-    </header>
-  )
+  return <header aria-label="Mailbox header" className="flex h-11 min-w-0 shrink-0 items-center gap-1 border-b px-2">
+    <Checkbox
+      checked={allVisibleSelected}
+      indeterminate={hasSelection && !allVisibleSelected}
+      onCheckedChange={(checked) => checked ? addThreads(visibleThreadIds) : removeThreads(visibleThreadIds)}
+      disabled={results.isPending || visibleThreadIds.length === 0}
+      aria-label={allVisibleSelected ? "Deselect this page" : "Select this page"}
+      className="mx-1"
+    />
+    {hasSelection ? <>
+      <span className="shrink-0 px-1 text-xs text-muted-foreground tabular-nums" role="status">{ids.length} selected</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label="Bulk actions" />}>
+          Actions <ChevronDown className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          {isTrash ? <DropdownMenuItem onClick={() => restore.mutate(ids, { onSuccess: clearSelection })}><RotateCcw className="size-4" />Restore to inbox</DropdownMenuItem> : isArchive ? <DropdownMenuItem onClick={() => unarchive.mutate(ids, { onSuccess: clearSelection })}><RotateCcw className="size-4" />Unarchive</DropdownMenuItem> : <DropdownMenuItem onClick={() => archive.mutate(ids, { onSuccess: clearSelection })}><Archive className="size-4" />Archive</DropdownMenuItem>}
+          <DropdownMenuItem onClick={() => read.mutate({ ids, read: true }, { onSuccess: clearSelection })}><Mail className="size-4" />Mark as read</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => read.mutate({ ids, read: false }, { onSuccess: clearSelection })}><MailOpen className="size-4" />Mark as unread</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => starred.mutate({ ids, starred: true }, { onSuccess: clearSelection })}><Star className="size-4" />Star</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => starred.mutate({ ids, starred: false }, { onSuccess: clearSelection })}><StarOff className="size-4" />Remove star</DropdownMenuItem>
+          {labelsEnabled ? <LabelMenu threadIds={ids} /> : null}
+          <MoveMenu threadIds={ids} />
+          {isJunk ? <DropdownMenuItem onClick={() => markNotJunk.mutate(ids, { onSuccess: clearSelection })}><ShieldAlert className="size-4" />Not spam</DropdownMenuItem> : !isTrash ? <>
+            <DropdownMenuItem onClick={() => reportJunk.mutate({ ids }, { onSuccess: clearSelection })}><ShieldAlert className="size-4" />Report spam</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => reportJunk.mutate({ ids, phishing: true }, { onSuccess: clearSelection })}><ShieldAlert className="size-4" />Report phishing</DropdownMenuItem>
+          </> : null}
+          <DropdownMenuItem variant="destructive" onClick={() => isTrash ? setPermanentDeleteOpen(true) : trash.mutate(ids, { onSuccess: clearSelection })}><Trash2 className="size-4" />{isTrash ? "Delete permanently" : "Move to trash"}</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <Button variant="ghost" size="icon-sm" onClick={clearSelection} aria-label="Clear selection"><X className="size-4" /></Button>
+    </> : <Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => void queryClient.invalidateQueries({ queryKey: ["acc", "emails"] })}><RefreshCw className="size-4" /></Button>}
+    <div className="ms-auto flex shrink-0 items-center gap-0.5">
+      <span className="me-1 whitespace-nowrap text-xs text-muted-foreground tabular-nums" aria-live="polite">
+        {results.isPending ? "Loading…" : results.isError ? "Couldn't load" : total === 0 ? "0 messages" : `${count ? position + 1 : 0}–${position + count}${total == null ? "" : ` of ${total.toLocaleString()}`}`}
+      </span>
+      <Button variant="ghost" size="icon-sm" aria-label="Previous page" disabled={page === 0 || results.isPending} onClick={() => onPageChange(page - 1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Next page" disabled={!hasNext || results.isPending || results.isError} onClick={() => onPageChange(page + 1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+    </div>
+    {isTrash ? <PermanentDeleteDialog open={permanentDeleteOpen} onOpenChange={setPermanentDeleteOpen} count={ids.length} onConfirm={() => permanentlyDelete.mutate(ids, { onSuccess: clearSelection })} /> : null}
+  </header>
 }

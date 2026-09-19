@@ -199,6 +199,12 @@ export async function archiveEmails(ids: JmapId[]): Promise<void> {
   await client.mail.archive(await resolveEmailIds(ids))
 }
 
+/** Return archived conversations to Inbox while retaining custom labels. */
+export async function unarchiveEmails(ids: JmapId[]): Promise<void> {
+  const client = await getJmapClient()
+  await client.mail.unarchive(await resolveEmailIds(ids))
+}
+
 export async function moveEmails(
   ids: JmapId[],
   toMailboxId: JmapId,

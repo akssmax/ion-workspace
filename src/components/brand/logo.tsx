@@ -8,6 +8,7 @@ interface IonLogoProps {
   wordmark?: boolean
   size?: number
   animateOnHover?: boolean
+  hoverFromParent?: boolean
 }
 
 function MarkPaths() {
@@ -31,6 +32,7 @@ export function IonLogo({
   wordmark = true,
   size = 28,
   animateOnHover = false,
+  hoverFromParent = false,
 }: IonLogoProps) {
   const reduceMotion = useReducedMotion()
   const rootClassName = cn(
@@ -53,13 +55,12 @@ export function IonLogo({
     <span className="sr-only">Ion</span>
   )
 
-  if (animateOnHover && !reduceMotion) {
+  if ((animateOnHover || hoverFromParent) && !reduceMotion) {
     return (
       <m.span
         className={rootClassName}
         initial="rest"
-        animate="rest"
-        whileHover="hover"
+        {...(hoverFromParent ? {} : { animate: "rest", whileHover: "hover" })}
       >
         <m.svg
           {...markProps}

@@ -73,4 +73,20 @@ describe("mail store selection", () => {
     useMailStore.getState().setVisibleThreadIds([...VISIBLE])
     expect(useMailStore.getState().visibleThreadIds).toBe(before)
   })
+
+  it("selects across pages and only deselects the current page", () => {
+    const store = useMailStore.getState()
+    store.addThreads(["t1", "t2"])
+    store.setVisibleThreadIds(["t6", "t7"])
+    store.addThreads(["t6", "t7", "t7"])
+    expect(useMailStore.getState().selectedThreadIds).toEqual(["t1", "t2", "t6", "t7"])
+    store.removeThreads(["t6", "t7"])
+    expect(useMailStore.getState().selectedThreadIds).toEqual(["t1", "t2"])
+  })
+
+  it("clears cross-page selection when changing mailbox", () => {
+    useMailStore.getState().addThreads(["t1", "t6"])
+    useMailStore.getState().setActiveMailbox("archive")
+    expect(useMailStore.getState().selectedThreadIds).toEqual([])
+  })
 })

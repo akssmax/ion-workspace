@@ -38,6 +38,8 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { NavUser } from "./nav-user"
 import { IonLogo } from "@/components/brand/logo"
+import { useReducedMotion } from "framer-motion"
+import * as m from "framer-motion/m"
 import { useWorkspaceStore  } from "@/stores/workspace.store"
 import type {WorkspaceApp} from "@/stores/workspace.store";
 import { useMailStore } from "@/stores/mail.store"
@@ -50,7 +52,8 @@ import { useFeatureFlag } from "@/features/flags"
 import { MailboxRow, NewFolderRow } from "@/modules/mail/mailboxes"
 import { useAddressBooks, useContacts } from "@/queries/contacts"
 import { Link } from "@tanstack/react-router"
-import { useLanguage, type TranslationKey } from "@/lib/language"
+import { useLanguage } from "@/lib/language"
+import type { TranslationKey } from "@/lib/language"
 
 const APPS: {
   id: WorkspaceApp
@@ -95,6 +98,7 @@ const CALENDAR_VIEWS: { id: CalendarView; label: string }[] = [
 ]
 
 export function SidebarShell() {
+  const reduceMotion = useReducedMotion()
   const { t, direction } = useLanguage()
   const app = useWorkspaceStore((s) => s.app)
   const setApp = useWorkspaceStore((s) => s.setApp)
@@ -120,16 +124,18 @@ export function SidebarShell() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                tooltip={{ children: t("Toggle sidebar"), hidden: false }}
-                onClick={toggleSidebar}
-                className="md:h-8 md:p-0"
-              >
-                <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-[oklch(0.88_0.22_125)] text-[oklch(0.2_0.05_125)]">
-                  <IonLogo wordmark={false} size={16} />
-                </span>
-              </SidebarMenuButton>
+              <m.div initial="rest" animate="rest" whileHover={reduceMotion ? undefined : "hover"} className="w-full">
+                <SidebarMenuButton
+                  size="lg"
+                  tooltip={{ children: t("Toggle sidebar"), hidden: false }}
+                  onClick={toggleSidebar}
+                  className="md:h-8 md:p-0"
+                >
+                  <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <IonLogo wordmark={false} size={16} hoverFromParent />
+                  </span>
+                </SidebarMenuButton>
+              </m.div>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
@@ -227,7 +233,7 @@ function PanelTitle({ app }: { app: WorkspaceApp }) {
           : "Contacts"
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
-      <span className="truncate text-sm font-medium">{t(title as TranslationKey)}</span>
+      <span className="truncate text-sm font-medium">{t(title)}</span>
       {app === "mail" && totalUnread > 0 ? (
         <span className="rounded-full bg-sidebar-accent px-1.5 py-0.5 text-[11px] font-medium tabular-nums">
           {totalUnread}

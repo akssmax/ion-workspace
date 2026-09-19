@@ -30,10 +30,12 @@ import {
 } from "@/components/ui/tooltip"
 import type { EmailAddress, EmailBodyPart, EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
-import { useComposerStore, type ComposeMode } from "@/stores/composer.store"
+import { useComposerStore } from "@/stores/composer.store"
+import type { ComposeMode } from "@/stores/composer.store"
 import {
   useThread,
   useArchiveEmails,
+  useUnarchiveEmails,
   useTrashEmails,
   useMarkRead,
   useMarkStarred,
@@ -59,9 +61,9 @@ import { usePreferences } from "@/queries/preferences"
 import { filenameDefaults, formatMailFilename } from "@/lib/mail-filenames"
 import { zipStoredFiles } from "@/lib/zip-store"
 import {
-  TrashConfirmDialog,
+  PermanentDeleteDialog,
   trashIconButtonClassName,
-} from "./trash-confirm-dialog"
+} from "./permanent-delete-dialog"
 import { InlineComposer } from "./composer"
 import { AttachmentViewer } from "./attachment-viewer"
 import { useLanguage } from "@/lib/language"
@@ -245,6 +247,7 @@ function ThreadActions({
   email: EmailProperties
 }) {
   const archive = useArchiveEmails()
+  const unarchive = useUnarchiveEmails()
   const trash = useTrashEmails()
   const restore = useRestoreEmails()
   const permanentlyDelete = usePermanentlyDeleteEmails()
@@ -253,11 +256,12 @@ function ThreadActions({
   const activeMailboxId = useMailStore((state) => state.activeMailboxId)
   const { data: mailboxes } = useMailboxes()
   const isTrash = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "trash") ?? false
+  const isArchive = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "archive") ?? false
   const isJunk = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "junk") ?? false
   const read = useMarkRead()
   const starred = useMarkStarred()
   const contributed = useContributions(threadActions)
-  const [trashConfirmOpen, setTrashConfirmOpen] = useState(false)
+  const [permanentDeleteOpen, setPermanentDeleteOpen] = useState(false)
 
   if (!email.id) return null
   const isStarred = email.keywords?.$flagged === true
@@ -269,16 +273,16 @@ function ThreadActions({
     run: () => void
     className?: string
   }[] = [
-    {
-      label: "Archive",
-      icon: <Archive className="size-4" />,
-      run: () => void archive.mutateAsync([threadId]),
-    },
+    ...(!isTrash ? [{
+      label: isArchive ? "Unarchive" : "Archive",
+      icon: isArchive ? <RotateCcw className="size-4" /> : <Archive className="size-4" />,
+      run: () => void (isArchive ? unarchive : archive).mutateAsync([threadId]),
+    }] : []),
     {
       label: isTrash ? "Delete permanently" : "Move to trash",
       icon: <Trash2 className="size-4" />,
       className: trashIconButtonClassName,
-      run: () => setTrashConfirmOpen(true),
+      run: () => isTrash ? setPermanentDeleteOpen(true) : void trash.mutateAsync([threadId]),
     },
     ...(isTrash ? [{
       label: "Restore to inbox",
@@ -345,12 +349,11 @@ function ThreadActions({
       {contributed.map((Action, i) => (
         <Action key={i} threadId={threadId} email={email} />
       ))}
-      <TrashConfirmDialog
-      open={trashConfirmOpen}
-      onOpenChange={setTrashConfirmOpen}
-      permanent={isTrash}
-      onConfirm={() => void (isTrash ? permanentlyDelete : trash).mutateAsync([threadId])}
-      />
+      {isTrash ? <PermanentDeleteDialog
+        open={permanentDeleteOpen}
+        onOpenChange={setPermanentDeleteOpen}
+        onConfirm={() => void permanentlyDelete.mutateAsync([threadId])}
+      /> : null}
     </div>
   )
 }
@@ -456,8 +459,8 @@ function EmailCard({ email, expanded, onToggle }: {
     const printable = window.open("", "_blank")
     if (!printable) return
     printable.opener = null
-    const sender = escapeHtml(email.from?.[0]?.email ?? "")
-    printable.document.write(`<!doctype html><html><head><title>${escapeHtml(subject)}</title><meta charset="utf-8"></head><body><h1>${escapeHtml(subject)}</h1><p>From: ${sender}</p><p>To: ${escapeHtml(fmtAddresses(email.to))}</p><p>${escapeHtml(time ? formatDateTime(time) : "")}</p><hr>${blocked.html}</body></html>`)
+    const printSender = escapeHtml(email.from?.[0]?.email ?? "")
+    printable.document.write(`<!doctype html><html><head><title>${escapeHtml(subject)}</title><meta charset="utf-8"></head><body><h1>${escapeHtml(subject)}</h1><p>From: ${printSender}</p><p>To: ${escapeHtml(fmtAddresses(email.to))}</p><p>${escapeHtml(time ? formatDateTime(time) : "")}</p><hr>${blocked.html}</body></html>`)
     printable.document.close()
     printable.print()
   }

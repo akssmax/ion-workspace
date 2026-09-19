@@ -116,6 +116,7 @@ export function Site({ children }: { children: ReactNode }) {
           </a>
           <nav aria-label="Main navigation">
             <a href="/product">Product</a>
+            <a href="/roadmap">Roadmap</a>
             <a href="/enterprise">Enterprise</a>
           </nav>
           <div className="ion-header-actions">
@@ -149,6 +150,7 @@ export function Site({ children }: { children: ReactNode }) {
               heading: "Product",
               links: [
                 ["Overview", "/product"],
+                ["Roadmap", "/roadmap"],
                 ["Mail", "/product#mail"],
                 ["Calendar", "/product#calendar"],
                 ["Contacts & files", "/product#contacts"],

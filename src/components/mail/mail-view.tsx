@@ -37,7 +37,8 @@ import { useFeatureFlag } from "@/features/flags"
 import { UpcomingIsland } from "@/modules/calendar/upcoming-island"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import { AdvancedSearch } from "./advanced-search"
-import { useLanguage, type TranslationKey } from "@/lib/language"
+import { useLanguage } from "@/lib/language"
+import type { TranslationKey } from "@/lib/language"
 
 const mailboxRoleLabels: Record<string, TranslationKey> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", junk: "Junk", trash: "Trash", starred: "Starred", important: "Important" }
 
@@ -58,15 +59,18 @@ export function MailView() {
   const [paneWidth, setPaneWidth] = useState<number | null>(null)
   const [rightSplit, setRightSplit] = useState(0.37)
   const [bottomSplit, setBottomSplit] = useState(0.46)
+  const [mailPage, setMailPage] = useState(0)
   const layout = useInboxLayout()
 
   const { data: rawMailboxes } = useMailboxes()
   const mailboxes = sortMailboxes(rawMailboxes ?? [])
   const mailbox = mailboxes.find((m) => m.id === activeMailboxId)
-  const mailboxLabel = (item: typeof mailbox) => item?.role && mailboxRoleLabels[item.role] ? t(mailboxRoleLabels[item.role]) : item?.name
+  const mailboxLabel = (item: typeof mailbox) => item?.role ? t(mailboxRoleLabels[item.role] ?? item.name) : item?.name
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const compact = isMobile || (paneWidth !== null && paneWidth < 620)
   const showMailboxMenu = sidebarState === "collapsed" || compact
+
+  useEffect(() => { setMailPage(0) }, [activeMailboxId, searchQuery])
 
   useEffect(() => {
     const element = panesRef.current
@@ -252,11 +256,12 @@ export function MailView() {
             )}
             style={showReading && !hiddenPane ? verticalSplit ? { height: `${bottomSplit * 100}%` } : { width: `${rightSplit * 100}%` } : undefined}
           >
-            <MailboxHeader />
+            <MailboxHeader mailboxId={activeMailboxId} query={searchQuery} page={mailPage} onPageChange={setMailPage} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <EmailList
                 mailboxId={activeMailboxId}
                 query={searchQuery}
+                page={mailPage}
                 featuredThreadId={focusedThreadId}
                 density={layout.listDensity}
                 showSnippets={layout.showSnippets}
@@ -295,9 +300,19 @@ export function MailView() {
               if (verticalSplit) setBottomSplit(update)
               else setRightSplit(update)
             }}
-            className={cn("group/separator relative z-10 shrink-0 touch-none bg-border outline-none hover:bg-primary/40 focus-visible:bg-primary/40", verticalSplit ? "h-1.5 w-full cursor-row-resize" : "h-full w-1.5 cursor-col-resize")}
+            className={cn(
+              "group/separator relative z-10 shrink-0 touch-none bg-border outline-none before:absolute before:bg-transparent before:content-[''] focus-visible:bg-primary",
+              verticalSplit
+                ? "h-px w-full cursor-row-resize before:-inset-y-2 before:inset-x-0"
+                : "h-full w-px cursor-col-resize before:inset-y-0 before:-inset-x-2"
+            )}
           >
-            <span className={cn("absolute rounded-full bg-muted-foreground/50 group-hover/separator:bg-primary group-focus-visible/separator:bg-primary", verticalSplit ? "top-1/2 left-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2" : "top-1/2 left-1/2 h-10 w-0.5 -translate-x-1/2 -translate-y-1/2")} />
+            <span className={cn(
+              "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100",
+              verticalSplit
+                ? "top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2"
+                : "top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2"
+            )} />
           </div>
         ) : null}
 

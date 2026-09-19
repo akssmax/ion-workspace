@@ -13,13 +13,15 @@
  * last-selected row. Clicking the rest of the row opens the conversation.
  */
 
-import { useEffect } from "react"
-import { Star, Paperclip, MailPlus } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen } from "lucide-react"
 import { cn } from "cn"
 import type { EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
 import { useComposerStore } from "@/stores/composer.store"
-import { useEmails } from "@/queries/mail"
+import { useEmails, useArchiveEmails, useUnarchiveEmails, useMailboxes, useTrashEmails, useMarkRead, useMarkStarred } from "@/queries/mail"
+import { usePreferences } from "@/queries/preferences"
+import type { UserPreferences } from "@/server/preferences.rpc"
 import { senderName, emailHasAttachments } from "@/lib/html"
 import { formatRelative } from "@/lib/dates"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -28,11 +30,13 @@ import { parseSearch } from "@/lib/search"
 import type { ListDensity, RowStyle } from "@/lib/inbox-layout"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelChips } from "@/modules/mail/labels"
-import { useLanguage, type Language } from "@/lib/language"
+import { useLanguage } from "@/lib/language"
+import type { Language } from "@/lib/language"
 
 export function EmailList({
   mailboxId,
   query,
+  page = 0,
   featuredThreadId,
   density = "comfortable",
   showSnippets = true,
@@ -41,6 +45,7 @@ export function EmailList({
 }: {
   mailboxId: string | null
   query: string
+  page?: number
   featuredThreadId: string | null
   density?: ListDensity
   showSnippets?: boolean
@@ -54,6 +59,9 @@ export function EmailList({
   const selectRange = useMailStore((s) => s.selectRange)
   const clearSelection = useMailStore((s) => s.clearSelection)
   const openCompose = useComposerStore((s) => s.openCompose)
+  const { data: preferences } = usePreferences()
+  const { data: mailboxes } = useMailboxes()
+  const isArchive = mailboxes?.some((mailbox) => mailbox.id === mailboxId && mailbox.role === "archive") ?? false
 
   const parsed = parseSearch(query)
   const scope = {
@@ -62,14 +70,14 @@ export function EmailList({
       : (mailboxId ?? undefined),
     query: parsed.query || undefined,
   }
-  const emails = useEmails(scope)
+  const emails = useEmails(scope, page)
 
   // Switching mailbox or editing the query drops stale selection.
   useEffect(() => {
     clearSelection()
   }, [mailboxId, query, clearSelection])
 
-  const rows = emails.data?.pages.flatMap((page) => page.emails) ?? []
+  const rows = emails.data?.emails ?? []
 
   // Publish visible thread ids so the toolbar's select-all can act on them.
   const setVisibleThreadIds = useMailStore((s) => s.setVisibleThreadIds)
@@ -87,6 +95,13 @@ export function EmailList({
         ))}
       </div>
     )
+  }
+
+  if (emails.isError) {
+    return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
+      <p>Couldn&apos;t load this page of messages.</p>
+      <button type="button" className="rounded-full border px-3 py-1.5 text-foreground hover:bg-muted" onClick={() => void emails.refetch()}>Try again</button>
+    </div>
   }
 
   if (rows.length === 0) {
@@ -122,16 +137,8 @@ export function EmailList({
   }
 
   return (
-    <div
-      className="h-full min-w-0 overflow-x-hidden overflow-y-auto"
-      onScroll={(event) => {
-        const el = event.currentTarget
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < 240 && emails.hasNextPage && !emails.isFetchingNextPage) {
-          void emails.fetchNextPage()
-        }
-      }}
-    >
-      {emails.data?.pages[0]?.state === "offline" ? (
+    <div className="h-full min-w-0 overflow-x-hidden overflow-y-auto">
+      {emails.data?.state === "offline" ? (
         <p role="status" className="border-b bg-muted px-3 py-1.5 text-xs text-muted-foreground">Offline · showing cached messages</p>
       ) : null}
       {rows.map((row) => {
@@ -148,26 +155,104 @@ export function EmailList({
           onSelect: (e: React.MouseEvent) => onRowClick(row, e),
           onToggleSelect: () => toggleThreadSelection(threadId),
         }
-        return rowStyle === "gmail" ? (
-          <GmailRow key={threadId} {...shared} />
-        ) : rowStyle === "outlook" ? (
-          <OutlookRow key={threadId} {...shared} />
-        ) : (
-          <MinimalRow key={threadId} {...shared} />
-        )
+        return <ActionRow key={threadId} email={row} preferences={preferences} isArchive={isArchive}>
+          {rowStyle === "gmail" ? (
+            <GmailRow {...shared} />
+          ) : rowStyle === "outlook" ? (
+            <OutlookRow {...shared} />
+          ) : (
+            <MinimalRow {...shared} />
+          )}
+        </ActionRow>
       })}
-      {emails.hasNextPage ? (
-        <button
-          type="button"
-          className="w-full border-t p-3 text-sm text-muted-foreground hover:bg-muted/50"
-          disabled={emails.isFetchingNextPage}
-          onClick={() => void emails.fetchNextPage()}
-        >
-          {emails.isFetchingNextPage ? t("Loading more messages…") : t("Load more messages")}
-        </button>
-      ) : null}
     </div>
   )
+}
+
+type SwipeAction = NonNullable<UserPreferences["swipeLeftAction"]>
+
+function ActionRow({ email, preferences, isArchive, children }: { email: EmailProperties; preferences?: UserPreferences; isArchive: boolean; children: React.ReactNode }) {
+  const archive = useArchiveEmails()
+  const unarchive = useUnarchiveEmails()
+  const trash = useTrashEmails()
+  const markRead = useMarkRead()
+  const markStarred = useMarkStarred()
+  const [offset, setOffset] = useState(0)
+  const offsetRef = useRef(0)
+  const start = useRef<{ x: number; y: number } | null>(null)
+  const suppressClick = useRef(false)
+  const busy = archive.isPending || unarchive.isPending || trash.isPending || markRead.isPending || markStarred.isPending
+  const isRead = email.keywords?.$seen === true
+  const isStarred = email.keywords?.$flagged === true
+
+  function run(action: SwipeAction) {
+    if (busy || action === "none") return
+    const ids = [email.threadId]
+    if (action === "archive") void (isArchive ? unarchive : archive).mutateAsync(ids)
+    if (action === "trash") void trash.mutateAsync(ids)
+    if (action === "read") void markRead.mutateAsync({ ids, read: !isRead })
+    if (action === "star") void markStarred.mutateAsync({ ids, starred: !isStarred })
+  }
+
+  function actionDetails(action: SwipeAction) {
+    switch (action) {
+      case "archive": return { label: isArchive ? "Unarchive" : "Archive", icon: isArchive ? RotateCcw : Archive, color: "bg-success text-success-foreground" }
+      case "trash": return { label: "Move to trash", icon: Trash2, color: "bg-destructive text-destructive-foreground" }
+      case "read": return { label: isRead ? "Mark unread" : "Mark read", icon: isRead ? Mail : MailOpen, color: "bg-info text-info-foreground" }
+      case "star": return { label: isStarred ? "Remove star" : "Star", icon: Star, color: "bg-warning text-warning-foreground" }
+      default: return { label: "No action", icon: Mail, color: "bg-muted text-muted-foreground" }
+    }
+  }
+
+  const swipeAction = offset > 0 ? preferences?.swipeRightAction ?? "archive" : preferences?.swipeLeftAction ?? "archive"
+  const swipe = actionDetails(swipeAction)
+  const SwipeIcon = swipe.icon
+
+  return <div
+    className="group/action relative min-w-0 overflow-hidden"
+    onClickCapture={event => {
+      if (suppressClick.current) {
+        event.stopPropagation()
+        event.preventDefault()
+        suppressClick.current = false
+      }
+    }}
+    onTouchStart={event => {
+      const touch = event.touches[0]
+      start.current = { x: touch.clientX, y: touch.clientY }
+    }}
+    onTouchMove={event => {
+      if (!start.current) return
+      const touch = event.touches[0]
+      const x = touch.clientX - start.current.x
+      const y = touch.clientY - start.current.y
+      if (Math.abs(x) > 8 && Math.abs(x) > Math.abs(y) * 1.4) {
+        offsetRef.current = Math.max(-100, Math.min(100, x))
+        setOffset(offsetRef.current)
+      }
+    }}
+    onTouchEnd={() => {
+      if (Math.abs(offsetRef.current) >= 70) {
+        suppressClick.current = true
+        run(offsetRef.current > 0 ? preferences?.swipeRightAction ?? "archive" : preferences?.swipeLeftAction ?? "archive")
+        window.setTimeout(() => { suppressClick.current = false }, 400)
+      }
+      start.current = null
+      offsetRef.current = 0
+      setOffset(0)
+    }}
+    onTouchCancel={() => { start.current = null; offsetRef.current = 0; setOffset(0) }}
+  >
+    {offset !== 0 ? <div aria-hidden className={cn("absolute inset-0 flex items-center px-5", offset > 0 ? "justify-start" : "justify-end", swipe.color)}><SwipeIcon className="size-5" /><span className="ms-2 text-xs font-medium">{swipe.label}</span></div> : null}
+    <div className="relative transition-transform duration-150" style={{ transform: `translateX(${offset}px)` }}>{children}</div>
+    <div className="pointer-events-none absolute inset-y-0 end-2 hidden items-center gap-0.5 bg-background/95 ps-2 shadow-[-8px_0_12px_var(--background)] group-hover/action:pointer-events-auto group-hover/action:flex group-focus-within/action:pointer-events-auto group-focus-within/action:flex max-md:!hidden">
+      {(["archive", "trash", "read", "star"] as const).map(action => {
+        const details = actionDetails(action)
+        const Icon = details.icon
+        return <button key={action} type="button" title={details.label} aria-label={details.label} disabled={busy} onClick={event => { event.stopPropagation(); run(action) }} className={cn("flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50", action === "trash" ? "hover:bg-destructive/15 hover:text-destructive" : action === "archive" ? "hover:bg-success hover:text-success-foreground" : action === "read" ? "hover:bg-info hover:text-info-foreground" : "hover:bg-warning hover:text-warning-foreground")}><Icon className="size-4" /></button>
+      })}
+    </div>
+  </div>
 }
 
 // -- Shared row pieces -------------------------------------------------------
@@ -459,13 +544,6 @@ function MinimalRow(props: RowProps) {
         >
           <span
             className={cn(
-              "size-2 shrink-0 rounded-full",
-              isUnread ? "bg-primary" : "bg-transparent"
-            )}
-            aria-hidden
-          />
-          <span
-            className={cn(
               "w-32 shrink-0 truncate sm:w-40",
               isUnread && "font-semibold"
             )}
@@ -489,6 +567,7 @@ function MinimalRow(props: RowProps) {
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
+          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", isUnread ? "bg-primary" : "bg-transparent")} />
         </button>
       </div>
     )
@@ -516,13 +595,6 @@ function MinimalRow(props: RowProps) {
         <div className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
-              "size-2 shrink-0 rounded-full",
-              isUnread ? "bg-primary" : "bg-transparent"
-            )}
-            aria-hidden
-          />
-          <span
-            className={cn(
               "min-w-0 flex-1 truncate text-sm",
               isUnread && "font-semibold"
             )}
@@ -533,8 +605,9 @@ function MinimalRow(props: RowProps) {
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
+          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", isUnread ? "bg-primary" : "bg-transparent")} />
         </div>
-        <div className="flex min-w-0 items-center gap-2 pl-4">
+        <div className="flex min-w-0 items-center gap-2">
           <span
             className={cn(
               "min-w-0 flex-1 truncate text-sm",
@@ -545,7 +618,7 @@ function MinimalRow(props: RowProps) {
           </span>
         </div>
         {showSnippets && email.preview ? (
-          <span className="block w-full truncate pl-4 text-xs text-muted-foreground/80">
+          <span className="block w-full truncate text-xs text-muted-foreground/80">
             {email.preview}
           </span>
         ) : null}

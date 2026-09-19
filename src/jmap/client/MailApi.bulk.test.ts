@@ -161,6 +161,23 @@ describe("bulk mail actions", () => {
     for (const label of labels) expect(email.mailboxIds[label.id]).toBe(true)
   })
 
+  it("unarchive returns archived mail to Inbox and keeps custom labels", async () => {
+    const { mail, mailboxes, inbox, byRole, ids } = await setup()
+    const labels = labelsOf(mailboxes).slice(0, 2)
+    await mail.applyLabel([ids[0]], labels[0].id, true)
+    await mail.applyLabel([ids[0]], labels[1].id, true)
+
+    await mail.archive([ids[0]])
+    await mail.unarchive([ids[0]])
+
+    const [email] = await mail.getEmailByIds([ids[0]], {
+      properties: ["id", "mailboxIds"],
+    })
+    expect(email.mailboxIds[inbox.id]).toBe(true)
+    expect(email.mailboxIds[byRole("archive").id]).not.toBe(true)
+    for (const label of labels) expect(email.mailboxIds[label.id]).toBe(true)
+  })
+
   it("moving from a label removes that source but retains other labels", async () => {
     const { mail, mailboxes, ids } = await setup()
     const [source, keep, target] = labelsOf(mailboxes).slice(0, 3)

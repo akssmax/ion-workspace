@@ -17,6 +17,7 @@ import { Route as EnterpriseRouteImport } from './routes/enterprise'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ProductRouteImport } from './routes/product'
 import { Route as RequestAccessRouteImport } from './routes/request-access'
+import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as DesignSystemIndexRouteImport } from './routes/design-system/index'
 import { Route as DesignSystemAccentsRouteImport } from './routes/design-system/accents'
@@ -69,6 +70,11 @@ const ProductRoute = ProductRouteImport.update({
 const RequestAccessRoute = RequestAccessRouteImport.update({
   id: '/request-access',
   path: '/request-access',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RoadmapRoute = RoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
+  '/roadmap': typeof RoadmapRoute
   '/settings': typeof SettingsRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/product'
     | '/request-access'
+    | '/roadmap'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -240,6 +250,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/product'
     | '/request-access'
+    | '/roadmap'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -263,6 +274,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/product'
     | '/request-access'
+    | '/roadmap'
     | '/settings'
     | '/design-system/accents'
     | '/design-system/auth'
@@ -287,6 +299,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ProductRoute: typeof ProductRoute
   RequestAccessRoute: typeof RequestAccessRoute
+  RoadmapRoute: typeof RoadmapRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -346,6 +359,13 @@ declare module '@tanstack/react-router' {
       path: '/request-access'
       fullPath: '/request-access'
       preLoaderRoute: typeof RequestAccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/roadmap': {
+      id: '/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -484,6 +504,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ProductRoute: ProductRoute,
   RequestAccessRoute: RequestAccessRoute,
+  RoadmapRoute: RoadmapRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport

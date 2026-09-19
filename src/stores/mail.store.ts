@@ -22,7 +22,8 @@ interface MailState {
   toggleThreadSelection: (id: string) => void
   /** Shift-click: add the visible range between anchor and target to the selection. */
   selectRange: (anchorId: string, targetId: string) => void
-  selectThreads: (ids: string[]) => void
+  addThreads: (ids: string[]) => void
+  removeThreads: (ids: string[]) => void
   clearSelection: () => void
   setVisibleThreadIds: (ids: string[]) => void
   setSearchQuery: (query: string) => void
@@ -80,7 +81,8 @@ export const useMailStore = create<MailState>()(
             selectedThreadIds: [...new Set([...s.selectedThreadIds, ...range])],
           }
         }),
-      selectThreads: (ids) => set({ selectedThreadIds: ids }),
+      addThreads: (ids) => set((s) => ({ selectedThreadIds: [...new Set([...s.selectedThreadIds, ...ids])] })),
+      removeThreads: (ids) => set((s) => ({ selectedThreadIds: s.selectedThreadIds.filter((id) => !ids.includes(id)) })),
       clearSelection: () => set({ selectedThreadIds: [] }),
       setVisibleThreadIds: (ids) =>
         set((s) =>

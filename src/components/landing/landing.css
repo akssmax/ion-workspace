@@ -532,6 +532,69 @@
   color: #666;
   margin-right: auto;
 }
+.ion-roadmap-index a {
+  min-height: 58px;
+}
+.ion-roadmap-index a svg {
+  margin-left: auto;
+  flex: none;
+}
+.ion-roadmap-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.ion-roadmap-intro .ion-body {
+  max-width: 320px;
+}
+.ion-roadmap-intro .ion-small {
+  margin-top: auto;
+  padding-top: 28px;
+}
+.ion-roadmap-list {
+  min-width: 0;
+}
+.ion-roadmap-list li {
+  padding: clamp(27px, 3.5vw, 44px);
+  border-bottom: 1px solid var(--border);
+}
+.ion-roadmap-list li:last-child {
+  border-bottom: 0;
+}
+.ion-roadmap-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 21px;
+}
+.ion-roadmap-status {
+  color: var(--muted-foreground);
+  font-size: 11px;
+}
+.ion-roadmap-list h3 {
+  font-size: clamp(20px, 2.1vw, 27px);
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  margin-bottom: 9px;
+}
+.ion-roadmap-list p {
+  max-width: 590px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.ion-roadmap-close .ion-button {
+  margin-top: 18px;
+}
+.ion-roadmap-aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.ion-roadmap-aside .ion-text-link {
+  margin-top: 12px;
+}
 .ion-product-preview {
   display: flex;
   align-items: center;

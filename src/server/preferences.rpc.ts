@@ -17,6 +17,8 @@ import { mailMetadataPool } from "./mail-metadata.server"
 import type { InboxLayoutPrefs } from "../lib/inbox-layout"
 
 export interface UserPreferences {
+  swipeLeftAction?: "archive" | "trash" | "read" | "star" | "none"
+  swipeRightAction?: "archive" | "trash" | "read" | "star" | "none"
   language?: string
   timezone?: string
   signatureText?: string
@@ -46,7 +48,7 @@ function scope(session: { userId: string; accountId?: string }): [string, string
 
 async function readStoredPreferences(session: { userId: string; accountId?: string; prefs?: unknown }): Promise<UserPreferences> {
   const database = mailMetadataPool()
-  if (!database) return (session.prefs as UserPreferences | undefined) ?? {}
+  if (!database) return session.prefs ?? {}
   const result = await database.query<{ data: UserPreferences }>(
     "SELECT data FROM user_preferences WHERE user_id = $1 AND account_id = $2", scope(session)
   )
@@ -63,9 +65,9 @@ async function readStoredPreferences(session: { userId: string; accountId?: stri
 }
 
 export const getPreferences = createServerFn({ method: "GET" }).handler(
-  async () => {
+  async (): Promise<UserPreferences> => {
     const session = await getSession()
-    return session ? readStoredPreferences(session) : ({} as UserPreferences)
+    return session ? readStoredPreferences(session) : {}
   }
 )
 

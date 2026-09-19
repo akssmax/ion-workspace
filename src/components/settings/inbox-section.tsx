@@ -18,6 +18,14 @@ import type {
 } from "@/lib/inbox-layout"
 import { SaveState } from "./settings-page"
 
+const SWIPE_OPTIONS = [
+  { value: "archive", label: "Archive" },
+  { value: "trash", label: "Move to trash" },
+  { value: "read", label: "Mark read or unread" },
+  { value: "star", label: "Star or unstar" },
+  { value: "none", label: "No action" },
+] as const
+
 const READING_PANE_OPTIONS: {
   value: ReadingPanePosition
   icon: React.ReactNode
@@ -220,6 +228,27 @@ export function InboxSection() {
         </Select>
       </section>
       <SaveState isSaving={savePreferences.isPending} isError={savePreferences.isError} />
+      <Separator />
+      <section className="space-y-3">
+        <div>
+          <Label>Mobile swipe actions</Label>
+          <p className="text-xs text-muted-foreground">Choose what swiping a conversation in either direction does.</p>
+        </div>
+        {(["right", "left"] as const).map((direction) => {
+          const key = direction === "right" ? "swipeRightAction" : "swipeLeftAction"
+          const value = preferences?.[key] ?? "archive"
+          return <div key={direction} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <Label htmlFor={`swipe-${direction}`}>Swipe {direction}</Label>
+            <Select value={value} onValueChange={next => {
+              if (SWIPE_OPTIONS.some(option => option.value === next)) void savePreferences.mutateAsync({ [key]: next })
+            }}>
+              <SelectTrigger id={`swipe-${direction}`} className="w-full sm:w-56"><SelectValue>{SWIPE_OPTIONS.find(option => option.value === value)?.label}</SelectValue></SelectTrigger>
+              <SelectContent>{SWIPE_OPTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+        })}
+        <SaveState isSaving={savePreferences.isPending} isError={savePreferences.isError} />
+      </section>
     </div>
   )
 }

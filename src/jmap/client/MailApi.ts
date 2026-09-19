@@ -728,6 +728,12 @@ export class MailApi {
     await this.moveEmails(ids, mailbox.id, accountId)
   }
 
+  async unarchive(ids: JmapId[], accountId?: string): Promise<void> {
+    const inbox = await this.findRoleMailbox("inbox", accountId)
+    if (!inbox) throw new Error("Inbox mailbox is unavailable.")
+    await this.moveEmails(ids, inbox.id, accountId)
+  }
+
   async trash(ids: JmapId[], accountId?: string): Promise<void> {
     const mailbox = await this.findRoleMailbox("trash", accountId)
     if (!mailbox) throw new Error("Trash mailbox is unavailable.")
