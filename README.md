@@ -25,3 +25,7 @@ To use the components in your app, import them as follows:
 ```tsx
 import { Button } from "@/components/ui/button";
 ```
+
+### Calendar feeds
+
+Read-only iCal subscriptions require `DATABASE_URL`, migration `003_calendar_feeds.sql`, and `CALENDAR_FEED_ENCRYPTION_KEY` (a stable, private 32+ character secret shared by web and worker processes). The feed URL is encrypted in PostgreSQL; cached events are stored per user/account. Schedule `pnpm exec tsx scripts/refresh-calendar-feeds.ts` hourly on a trusted worker with those same environment variables. The worker refreshes due feeds, honors ETag/Last-Modified, and retains the last successful snapshot when a fetch fails. No Stalwart credentials are sent to feed URLs. The scheduled worker must be deployed separately when the web host has no hourly job support.

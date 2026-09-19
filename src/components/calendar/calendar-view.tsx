@@ -1,445 +1,411 @@
-/**
- * Calendar: equal month-grid cells, with new events and event details
- * in a right-side sheet.
- */
-
-import { useMemo, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
   CalendarPlus,
-  Trash2,
-  Clock,
+  CalendarDays,
+  Upload,
+  RefreshCw,
+  ListFilter,
 } from "lucide-react"
-import { cn } from "cn"
-import { useCalendarStore } from "@/stores/calendar.store"
+import {
+  addDays,
+  endOfMonth,
+  format,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns"
+import { Button } from "@/components/ui/button"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  useCalendarStore,
+  type CalendarView as View,
+} from "@/stores/calendar.store"
 import {
   useCalendars,
-  useEventsForMonth,
-  useCreateEvent,
-  useDestroyEvent,
-  toJmapInstant,
+  useCalendarEvents,
+  useCalendarCapabilities,
 } from "@/queries/calendar"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet"
-import { formatDate, toDate, addDaysDelta, isSameMonthWith } from "@/lib/dates"
-import { CalendarEventChip } from "@/components/calendar/event-chip"
-import type { CalendarEvent } from "@/jmap/types/calendar"
+import { usePreferences } from "@/queries/preferences"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { EventEditor, emptyDraft } from "./event-editor"
+import { eventCalendarId, type CalendarDraft } from "@/lib/calendar-event"
+import type { CalendarEvent } from "@/jmap/types/calendar"
+import { CalendarImport } from "./calendar-import"
+import { useCalendarFeeds } from "@/queries/calendar-feeds"
+import { CalendarList } from "./calendar-list"
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+const CalendarCanvas = lazy(() => import("./calendar-canvas"))
+const VIEW_NAMES: Record<View, string> = {
+  month: "Month",
+  week: "Week",
+  day: "Day",
+  agenda: "Schedule",
+}
 
-const DURATIONS = [
-  { value: "PT30M", label: "30 minutes" },
-  { value: "PT1H", label: "1 hour" },
-  { value: "PT2H", label: "2 hours" },
-  { value: "P1D", label: "All day" },
-]
+function localeWeekStart(language: string): number {
+  try {
+    return (new Intl.Locale(language) as Intl.Locale & { weekInfo: { firstDay: number } }).weekInfo.firstDay % 7
+  } catch {
+    return 1
+  }
+}
+
+function windowFor(date: Date, view: View, weekStartsOn: number, scheduleDays: number) {
+  if (view === "month") {
+    const start = startOfWeek(startOfMonth(date), { weekStartsOn: weekStartsOn as 0 | 1 | 6 })
+    return { start, end: addDays(startOfWeek(endOfMonth(date), { weekStartsOn: weekStartsOn as 0 | 1 | 6 }), 7) }
+  }
+  if (view === "week") {
+    const start = startOfWeek(date, { weekStartsOn: weekStartsOn as 0 | 1 | 6 })
+    return { start, end: addDays(start, 7) }
+  }
+  if (view === "day") {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    return { start, end: addDays(start, 1) }
+  }
+  return { start: date, end: addDays(date, scheduleDays) }
+}
 
 export function CalendarView() {
-  const cursor = useCalendarStore((s) => s.cursor)
-  const setCursor = useCalendarStore((s) => s.setCursor)
-  const goToday = useCalendarStore((s) => s.goToday)
-  const step = useCalendarStore((s) => s.step)
-  const selectedEventId = useCalendarStore((s) => s.selectedEventId)
-  const setSelectedEvent = useCalendarStore((s) => s.setSelectedEvent)
-
-  const { data: events } = useEventsForMonth(cursor)
-  const { data: calendars } = useCalendars()
-  const createEvent = useCreateEvent()
-  const destroyEvent = useDestroyEvent()
-
-  const calById = useMemo(() => {
-    const map = new Map<string, { name: string; color?: string | null }>()
-    for (const c of calendars ?? [])
-      map.set(c.id, { name: c.name, color: c.color })
-    return map
-  }, [calendars])
-
-  const days = useMemo(() => buildMonthGrid(cursor).flat(), [cursor])
-  const eventsByDay = useMemo(
-    () => groupByDay(events ?? [], cursor),
-    [events, cursor]
+  const desktopView = useCalendarStore((state) => state.view)
+  const mobileView = useCalendarStore((state) => state.mobileView)
+  const cursor = useCalendarStore((state) => state.cursor)
+  const setCursor = useCalendarStore((state) => state.setCursor)
+  const goToday = useCalendarStore((state) => state.goToday)
+  const setView = useCalendarStore((state) => state.setView)
+  const setMobileView = useCalendarStore((state) => state.setMobileView)
+  const [mobile, setMobile] = useState(false)
+  const [editorEvent, setEditorEvent] = useState<CalendarEvent | null>(null)
+  const [initialDraft, setInitialDraft] = useState<CalendarDraft | null>(null)
+  const [showImport, setShowImport] = useState(false)
+  const [datePickerOpen, setDatePickerOpen] = useState(false)
+  const [showCalendars, setShowCalendars] = useState(false)
+  const hidden = useCalendarStore((state) => state.hiddenCalendarIds)
+  const [selectedDay, setSelectedDay] = useState<Date>(new Date())
+  const [visibleRange, setVisibleRange] = useState<{
+    start: Date
+    end: Date
+  } | null>(null)
+  const [scheduleDays, setScheduleDays] = useState(30)
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 639px)")
+    const sync = () => setMobile(query.matches)
+    sync()
+    query.addEventListener("change", sync)
+    return () => query.removeEventListener("change", sync)
+  }, [])
+  const view = mobile ? mobileView : desktopView
+  const prefs = usePreferences().data
+  const language = prefs?.language ?? "en"
+  const weekStartsOn = prefs?.calendarWeekStart === "sunday" ? 0 : prefs?.calendarWeekStart === "monday" ? 1 : prefs?.calendarWeekStart === "saturday" ? 6 : localeWeekStart(language)
+  const timeZone =
+    prefs?.timezone && prefs.timezone !== "auto"
+      ? prefs.timezone
+      : Intl.DateTimeFormat().resolvedOptions().timeZone
+  const computed = useMemo(() => windowFor(cursor, view, weekStartsOn, scheduleDays), [cursor, view, weekStartsOn, scheduleDays])
+  const range = visibleRange ?? computed
+  const calendars = useCalendars()
+  const capabilities = useCalendarCapabilities()
+  const events = useCalendarEvents({ ...range, timeZone })
+  const feeds = useCalendarFeeds()
+  const visibleEvents = useMemo(
+    () =>
+      [
+        ...(events.data ?? []),
+        ...(feeds.data ?? []).flatMap((feed) =>
+          feed.events.map(
+            (event, index) =>
+              ({
+                ...event,
+                id: `feed:${feed.id}:${index}`,
+                uid: event.uid ?? `feed-${index}`,
+                calendarId: `feed:${feed.id}`,
+                title: event.title ?? "(untitled)",
+                start: event.start ?? "",
+                duration: event.duration ?? "PT1H",
+              }) as CalendarEvent
+          )
+        ),
+      ].filter((event) => !hidden.includes(eventCalendarId(event))),
+    [events.data, feeds.data, hidden]
   )
-
-  const selected = (events ?? []).find((e) => e.id === selectedEventId) ?? null
-  const defaultCalId = calendars?.[0]?.id
-
-  const [adding, setAdding] = useState(false)
-  const [newTitle, setNewTitle] = useState("")
-  const [newTime, setNewTime] = useState("09:00")
-  const [newDuration, setNewDuration] = useState("PT1H")
-  const [newNotes, setNewNotes] = useState("")
-
-  const sheetOpen = adding || !!selected
-
-  function closeSheet() {
-    setAdding(false)
-    setSelectedEvent(null)
-    setNewTitle("")
-    setNewNotes("")
-    setNewTime("09:00")
-    setNewDuration("PT1H")
+  const writable = calendars.data?.find(
+    (calendar) =>
+      !calendar.isReadOnly && calendar.myRights?.mayAddItems !== false
+  )
+  const available = Boolean(calendars.data?.length || feeds.data?.length)
+  function openNew(start = new Date(), end?: Date, allDay = false) {
+    if (!end && !allDay)
+      start = new Date(Math.ceil(start.getTime() / 1_800_000) * 1_800_000)
+    if (!writable) return
+    const next = emptyDraft(start, writable.id, timeZone)
+    if (end) next.end = format(end, "yyyy-MM-dd'T'HH:mm")
+    next.allDay = allDay
+    setEditorEvent(null)
+    setInitialDraft(next)
   }
-
-  function openNewEvent(day?: Date) {
-    if (day) setCursor(day)
-    setSelectedEvent(null)
-    setNewTitle("")
-    setNewNotes("")
-    setAdding(true)
+  function navigate(direction: -1 | 1) {
+    setScheduleDays(30)
+    const next = new Date(cursor)
+    if (view === "month") {
+      const day = next.getDate()
+      next.setDate(1)
+      next.setMonth(next.getMonth() + direction)
+      next.setDate(
+        Math.min(
+          day,
+          new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()
+        )
+      )
+    } else
+      next.setDate(
+        next.getDate() +
+          direction * (view === "week" ? 7 : view === "agenda" ? 30 : 1)
+      )
+    setVisibleRange(null)
+    setCursor(next)
   }
-
-  async function addEvent() {
-    if (!newTitle.trim() || !defaultCalId) return
-    const allDay = newDuration === "P1D"
-    const start = allDay
-      ? startOfLocalDay(cursor)
-      : startFromDayAndTime(cursor, newTime)
-    await createEvent.mutateAsync({
-      calendarId: defaultCalId,
-      title: newTitle.trim(),
-      description: newNotes.trim() || null,
-      start: toJmapInstant(start),
-      duration: newDuration,
-      showWithoutTime: allDay,
-      allDay,
-      freeBusyStatus: "BUSY",
-    })
-    closeSheet()
-  }
-
+  const title =
+    view === "month"
+      ? format(cursor, "MMMM yyyy")
+      : view === "day"
+        ? format(cursor, "EEEE, MMMM d")
+        : `${format(computed.start, "MMM d")} – ${format(addDays(computed.end, -1), "MMM d, yyyy")}`
   return (
-    <div className="flex h-full min-w-0 flex-col">
-      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-1 border-b px-2 py-2 sm:gap-2 sm:px-4">
+    <div className="flex h-full min-w-0 flex-col bg-background">
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
         <OpenSidebarTrigger />
-        <Button variant="outline" size="sm" onClick={goToday}>
+        <Sheet open={showCalendars} onOpenChange={setShowCalendars}>
+          <SheetTrigger render={<Button className="md:hidden" variant="outline" size="icon-sm" aria-label="Calendars" />}>
+            <ListFilter className="size-4" />
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[min(88vw,22rem)]">
+            <SheetHeader><SheetTitle>Calendars</SheetTitle></SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3"><CalendarList /></div>
+          </SheetContent>
+        </Sheet>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setVisibleRange(null)
+            goToday()
+          }}
+        >
           Today
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => step(-1)}
-          aria-label="Previous"
-        >
-          <ChevronLeft className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => step(1)}
-          aria-label="Next"
-        >
-          <ChevronRight className="size-4" />
-        </Button>
-        <h1 className="min-w-0 truncate text-sm font-semibold sm:ml-2 sm:text-base">
-          {formatDate(cursor, "MMMM yyyy")}
+        <div className="flex">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Previous period"
+            onClick={() => navigate(-1)}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Next period"
+            onClick={() => navigate(1)}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-base">
+          {title}
         </h1>
-        <Button
-          className="ml-auto"
-          size="sm"
-          onClick={() => openNewEvent()}
-          aria-label="New event"
+        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+          <PopoverTrigger render={<Button variant="outline" size="sm" aria-label="Jump to date" />}>
+            <CalendarDays className="size-4" />
+            <span className="hidden sm:inline">{format(cursor, "MMM d, yyyy")}</span>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-auto gap-0 p-0">
+            <Calendar
+              key={format(cursor, "yyyy-MM")}
+              mode="single"
+              selected={cursor}
+              defaultMonth={cursor}
+              weekStartsOn={weekStartsOn as 0 | 1 | 6}
+              onSelect={(day) => {
+                if (!day) return
+                setVisibleRange(null)
+                setCursor(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12))
+                setDatePickerOpen(false)
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+        <select
+          aria-label="Calendar view"
+          className="h-9 rounded-lg border bg-background px-2 text-sm"
+          value={view}
+          onChange={(e) => {
+            setVisibleRange(null)
+            if (mobile) setMobileView(e.target.value as View)
+            else setView(e.target.value as View)
+          }}
         >
+          {(Object.keys(VIEW_NAMES) as View[]).map((key) => (
+            <option key={key} value={key}>
+              {VIEW_NAMES[key]}
+            </option>
+          ))}
+        </select>
+        <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+          <Upload className="size-4" />
+          <span className="hidden sm:inline">Import</span>
+        </Button>
+        <Button size="sm" disabled={!writable} onClick={() => openNew()}>
           <CalendarPlus className="size-4" />
-          <span className="hidden sm:inline">New event</span>
+          <span className="hidden sm:inline">Create event</span>
         </Button>
       </header>
-
-      <div className="min-h-0 flex-1 overflow-x-auto">
-      <div className="grid h-full min-w-[560px] grid-cols-[repeat(7,minmax(0,1fr))] grid-rows-[auto_repeat(6,minmax(0,1fr))] gap-px bg-border sm:min-w-0">
-        {WEEKDAYS.map((d) => (
-          <div
-            key={d}
-            className="bg-muted/30 px-2 py-2 text-center text-xs font-medium text-muted-foreground"
+      {calendars.isLoading || capabilities.isLoading ? (
+        <div className="p-6 text-sm text-muted-foreground">
+          Loading calendars…
+        </div>
+      ) : calendars.isError || capabilities.isError ? (
+        <div role="alert" className="p-6 text-sm text-destructive">
+          Could not load calendar capabilities.{" "}
+          <Button
+            variant="outline"
+            onClick={() => {
+              void calendars.refetch()
+              void capabilities.refetch()
+            }}
           >
-            {d}
-          </div>
-        ))}
-        {days.map((day) => {
-            const dayEvents = eventsByDay.get(dayKey(day)) ?? []
-            const inMonth = isSameMonthWith(day, cursor)
-            const isToday = dayKey(day) === dayKey(new Date())
-            const isCursor = dayKey(day) === dayKey(cursor)
-            return (
-              <button
-                key={day.toISOString()}
-                type="button"
-                onClick={() => openNewEvent(day)}
-                className={cn(
-                  "group flex min-h-0 min-w-0 flex-col gap-1 overflow-hidden bg-background p-1.5 text-left align-top transition-colors hover:bg-muted/40",
-                  !inMonth && "bg-muted/15 text-muted-foreground",
-                  isCursor && adding && "ring-1 ring-inset ring-ring"
-                )}
+            Retry
+          </Button>
+        </div>
+      ) : !capabilities.data?.available || !available ? (
+        <div className="m-auto max-w-sm p-6 text-center">
+          <h2 className="font-semibold">Calendar unavailable</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your account has no calendar available. Check the calendar
+            capability and account permissions on Stalwart.
+          </p>
+        </div>
+      ) : (
+        <>
+          {events.isError && (
+            <div
+              role="alert"
+              className="flex items-center gap-2 border-b p-3 text-sm text-destructive"
+            >
+              Could not load events.{" "}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void events.refetch()}
               >
-                <div className="flex shrink-0 items-center justify-between">
-                  <span
-                    className={cn(
-                      "flex size-6 items-center justify-center rounded-full text-xs tabular-nums",
-                      isToday &&
-                        "bg-primary font-semibold text-primary-foreground"
-                    )}
+                <RefreshCw className="size-3" /> Retry
+              </Button>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-auto">
+            <Suspense
+              fallback={
+                <div className="p-6 text-sm text-muted-foreground">
+                  Loading calendar…
+                </div>
+              }
+            >
+              <CalendarCanvas
+                view={view}
+                cursor={cursor}
+                events={visibleEvents}
+                calendars={[
+                  ...(calendars.data ?? []),
+                  ...(feeds.data ?? []).map((feed) => ({
+                    id: `feed:${feed.id}`,
+                    name: feed.name,
+                    color: feed.color,
+                    isReadOnly: true,
+                  })),
+                ]}
+                timeZone={timeZone}
+                language={language}
+                weekStartsOn={weekStartsOn}
+                scheduleDays={scheduleDays}
+                onRange={setVisibleRange}
+                onCreate={openNew}
+                onDay={mobile ? setSelectedDay : undefined}
+                onEvent={(event) => {
+                  setInitialDraft(null)
+                  setEditorEvent(event)
+                }}
+              />
+            </Suspense>
+            {view === "agenda" && <div className="flex justify-center border-t p-2"><Button variant="outline" onClick={() => { setVisibleRange(null); setScheduleDays((days) => days + 30) }}>Load 30 more days</Button></div>}
+            {mobile && view === "month" && (
+              <div className="border-t p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold">
+                    {format(selectedDay, "EEEE, MMMM d")}
+                  </h2>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openNew(selectedDay)}
                   >
-                    {formatDate(day, "d")}
-                  </span>
-                  <CalendarPlus className="size-3.5 text-muted-foreground opacity-0 group-hover:opacity-100" />
+                    Add event
+                  </Button>
                 </div>
-                <div className="min-h-0 flex-1 space-y-0.5 overflow-hidden">
-                  {dayEvents.slice(0, 3).map((ev) => {
-                    const cal = calById.get(ev.calendarId)
-                    return (
-                      <CalendarEventChip
-                        key={ev.id}
-                        title={ev.title || "(no title)"}
-                        color={cal?.color}
-                        fallbackKey={ev.calendarId}
-                        selected={ev.id === selectedEventId}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setSelectedEvent(
-                            ev.id === selectedEventId ? null : ev.id
-                          )
-                          setAdding(false)
-                        }}
-                      />
+                {visibleEvents.filter(
+                  (event) =>
+                    event.start.slice(0, 10) ===
+                    format(selectedDay, "yyyy-MM-dd")
+                ).length ? (
+                  visibleEvents
+                    .filter(
+                      (event) =>
+                        event.start.slice(0, 10) ===
+                        format(selectedDay, "yyyy-MM-dd")
                     )
-                  })}
-                  {dayEvents.length > 3 ? (
-                    <span className="px-1.5 text-[10px] text-muted-foreground">
-                      +{dayEvents.length - 3} more
-                    </span>
-                  ) : null}
-                </div>
-              </button>
-            )
-          })}
-      </div>
-      </div>
-
-      <Sheet
-        open={sheetOpen}
-        onOpenChange={(open) => {
-          if (!open) closeSheet()
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-md data-[side=right]:sm:max-w-md"
-        >
-          {selected ? (
-            <>
-              <SheetHeader>
-                <SheetTitle>{selected.title || "(no title)"}</SheetTitle>
-                <SheetDescription>
-                  {formatEventTime(selected)} ·{" "}
-                  {calById.get(selected.calendarId)?.name ?? "Calendar"}
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex flex-1 flex-col gap-4 px-6">
-                <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="size-4" />
-                  {formatEventTime(selected)}
-                </p>
-                {selected.description ? (
-                  <p className="text-sm leading-relaxed">
-                    {selected.description}
-                  </p>
+                    .map((event) => (
+                      <button
+                        key={event.id}
+                        type="button"
+                        className="block min-h-11 w-full border-b py-2 text-left text-sm"
+                        onClick={() => setEditorEvent(event)}
+                      >
+                        {event.title}
+                      </button>
+                    ))
                 ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No description.
-                  </p>
+                  <p className="text-sm text-muted-foreground">No events</p>
                 )}
               </div>
-              <SheetFooter>
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    openNewEvent(toDate(selected.start))
-                  }
-                >
-                  <CalendarPlus className="size-4" />
-                  New event
-                </Button>
-                <Button
-                  variant="destructive"
-                  onClick={async () => {
-                    await destroyEvent.mutateAsync(selected.id)
-                    closeSheet()
-                  }}
-                >
-                  <Trash2 className="size-4" />
-                  Delete
-                </Button>
-              </SheetFooter>
-            </>
-          ) : (
-            <>
-              <SheetHeader>
-                <SheetTitle>New event</SheetTitle>
-                <SheetDescription>
-                  {formatDate(cursor, "EEEE, MMMM d")}
-                </SheetDescription>
-              </SheetHeader>
-              <form
-                className="flex min-h-0 flex-1 flex-col"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void addEvent()
-                }}
-              >
-                <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="new-event-title">Title</Label>
-                    <Input
-                      id="new-event-title"
-                      autoFocus
-                      placeholder="Event title…"
-                      value={newTitle}
-                      onChange={(e) => setNewTitle(e.target.value)}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <Label htmlFor="new-event-time">Time</Label>
-                      <Input
-                        id="new-event-time"
-                        type="time"
-                        value={newTime}
-                        disabled={newDuration === "P1D"}
-                        onChange={(e) => setNewTime(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-event-duration">Duration</Label>
-                      <Select
-                        value={newDuration}
-                        onValueChange={(value) => {
-                          if (typeof value === "string") setNewDuration(value)
-                        }}
-                      >
-                        <SelectTrigger
-                          id="new-event-duration"
-                          className="w-full"
-                        >
-                          <SelectValue>
-                            {DURATIONS.find((d) => d.value === newDuration)
-                              ?.label ?? "Duration"}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DURATIONS.map((d) => (
-                            <SelectItem key={d.value} value={d.value}>
-                              {d.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="new-event-notes">Notes</Label>
-                    <Textarea
-                      id="new-event-notes"
-                      placeholder="Optional details…"
-                      value={newNotes}
-                      onChange={(e) => setNewNotes(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <SheetFooter>
-                  <Button type="button" variant="ghost" onClick={closeSheet}>
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={
-                      !newTitle.trim() ||
-                      !defaultCalId ||
-                      createEvent.isPending
-                    }
-                  >
-                    {createEvent.isPending ? "Adding…" : "Add event"}
-                  </Button>
-                </SheetFooter>
-              </form>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+            )}
+          </div>
+        </>
+      )}
+      <EventEditor
+        event={editorEvent}
+        initial={initialDraft}
+        calendars={[
+          ...(calendars.data ?? []),
+          ...(feeds.data ?? []).map((feed) => ({
+            id: `feed:${feed.id}`,
+            name: feed.name,
+            color: feed.color,
+            isReadOnly: true,
+          })),
+        ]}
+        onClose={() => {
+          setEditorEvent(null)
+          setInitialDraft(null)
+        }}
+      />
+      <CalendarImport
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        calendars={calendars.data ?? []}
+      />
     </div>
   )
-}
-
-function buildMonthGrid(cursor: Date): Date[][] {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1)
-  const start = addDaysDelta(first, -first.getDay())
-  const weeks: Date[][] = []
-  for (let w = 0; w < 6; w++) {
-    const row: Date[] = []
-    for (let d = 0; d < 7; d++) {
-      row.push(addDaysDelta(start, w * 7 + d))
-    }
-    weeks.push(row)
-  }
-  return weeks
-}
-
-function groupByDay(
-  events: CalendarEvent[],
-  cursor: Date
-): Map<string, CalendarEvent[]> {
-  const map = new Map<string, CalendarEvent[]>()
-  for (const week of buildMonthGrid(cursor)) {
-    for (const day of week) map.set(dayKey(day), [])
-  }
-  for (const ev of events) {
-    const key = dayKey(toDate(ev.start))
-    const bucket = map.get(key) ?? []
-    bucket.push(ev)
-    map.set(key, bucket)
-  }
-  for (const bucket of map.values()) {
-    bucket.sort((a, b) => a.start.localeCompare(b.start))
-  }
-  return map
-}
-
-function dayKey(d: Date): string {
-  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
-}
-
-function startOfLocalDay(day: Date): Date {
-  const d = new Date(day)
-  d.setHours(0, 0, 0, 0)
-  return d
-}
-
-function startFromDayAndTime(day: Date, time: string): Date {
-  const [hours, minutes] = time.split(":").map((n) => Number(n) || 0)
-  const d = new Date(day)
-  d.setHours(hours, minutes, 0, 0)
-  return d
-}
-
-function formatEventTime(ev: CalendarEvent): string {
-  const start = toDate(ev.start)
-  if (ev.allDay || ev.showWithoutTime) return formatDate(start, "EEE, MMM d")
-  return formatDate(start, "EEE, MMM d · HH:mm")
 }

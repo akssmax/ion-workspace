@@ -21,6 +21,24 @@ export function useCalendars() {
   })
 }
 
+export function useCreateCalendar() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; color?: string }) =>
+      calendarService.createCalendar(data.name, data.color),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.calendars() }),
+  })
+}
+
+export function useCalendarCapabilities() {
+  return useQuery({
+    queryKey: ["acc", "calendar-capabilities"],
+    queryFn: () => calendarService.getCalendarCapabilities(),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })
+}
+
 export function useEventsForMonth(month: Date) {
   const { start, end } = monthBounds(month)
   return useQuery({
@@ -28,6 +46,32 @@ export function useEventsForMonth(month: Date) {
     queryFn: () =>
       calendarService.getEventsInRange(start.toISOString(), end.toISOString()),
     staleTime: 60_000,
+  })
+}
+
+export function useCalendarEvents(input: {
+  start: Date
+  end: Date
+  calendarIds?: string[]
+  timeZone: string
+}) {
+  const start = input.start.toISOString()
+  const end = input.end.toISOString()
+  const ids = input.calendarIds?.slice().sort().join(",") ?? "all"
+  return useQuery({
+    queryKey: [...qk.events(ids, start, end), input.timeZone],
+    queryFn: () => calendarService.getEventsInRange(start, end, { calendarIds: input.calendarIds, timeZone: input.timeZone }),
+    select: (events) =>
+      input.calendarIds
+        ? events.filter((event) =>
+            input.calendarIds!.includes(
+              event.calendarId ?? Object.keys(event.calendarIds ?? {})[0]
+            )
+          )
+        : events,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    meta: { timeZone: input.timeZone },
   })
 }
 
@@ -47,8 +91,13 @@ export function useUpcomingEvents(horizonDays = 7) {
 export function useCreateEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (event: Parameters<typeof calendarService.createEvent>[0]) =>
-      calendarService.createEvent(event),
+    mutationFn: ({
+      event,
+      sendInvitations = true,
+    }: {
+      event: Parameters<typeof calendarService.createEvent>[0]
+      sendInvitations?: boolean
+    }) => calendarService.createEvent(event, sendInvitations),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["acc", "events"] }),
   })
 }
@@ -59,10 +108,12 @@ export function useUpdateEvent() {
     mutationFn: ({
       id,
       patch,
+      sendInvitations = true,
     }: {
       id: JmapId
       patch: Parameters<typeof calendarService.updateEvent>[1]
-    }) => calendarService.updateEvent(id, patch),
+      sendInvitations?: boolean
+    }) => calendarService.updateEvent(id, patch, sendInvitations),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["acc", "events"] }),
   })
 }

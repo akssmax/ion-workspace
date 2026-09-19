@@ -72,7 +72,9 @@ export interface CalendarEventReminder {
 
 export interface CalendarEvent {
   id: JmapId
-  calendarId: JmapId
+  baseEventId?: JmapId | null
+  calendarId?: JmapId
+  calendarIds?: Record<JmapId, boolean>
   uid: string
   title?: string | null
   description?: string | null
@@ -86,11 +88,32 @@ export interface CalendarEvent {
   allDay?: boolean
   recurrenceId?: string | null
   recurrenceRule?: RecurrenceRule | null
+  recurrenceRules?: RecurrenceRule[] | null
   overrides?: Record<string, { start?: string; duration?: string }>
   reminders?: CalendarEventReminder[] | null
   useDefaultAlarms?: boolean
   attendees?: Attendee[] | null
-  participants?: Attendee[] | null
+  participants?:
+    | Attendee[]
+    | Record<
+        string,
+        {
+          name?: string
+          email?: string
+          participationStatus?: string
+          roles?: Record<string, boolean>
+        }
+      >
+    | null
+  locations?: Record<string, { name: string; "@type"?: string }>
+  alerts?: Record<
+    string,
+    {
+      "@type": string
+      action: string
+      trigger: { "@type": string; offset: string; relativeTo: string }
+    }
+  >
   links?: {
     href: string
     rel?: string | null
@@ -104,7 +127,7 @@ export interface CalendarEventFilterCondition {
   after?: string
   before?: string
   inCalendar?: JmapId
-  uid?: string[]
+  uid?: string
   title?: string
   recurrenceId?: string
   source?: string
@@ -144,6 +167,8 @@ export interface CalendarEventQueryArgs {
   position?: number
   limit?: number | null
   calculateTotal?: boolean
+  expandRecurrences?: boolean
+  timeZone?: string
 }
 
 export interface CalendarEventQueryResponse {
@@ -158,6 +183,7 @@ export interface CalendarEventQueryResponse {
 export interface CalendarEventSetArgs {
   accountId: JmapId
   ifInState?: string
+  sendSchedulingMessages?: boolean
   create?: Record<string, Partial<CalendarEvent>>
   update?: Record<string, Partial<Record<string, unknown>>>
   destroy?: JmapId[]

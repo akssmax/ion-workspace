@@ -21,6 +21,7 @@ export interface UserPreferences {
   swipeRightAction?: "archive" | "trash" | "read" | "star" | "none"
   language?: string
   timezone?: string
+  calendarWeekStart?: "locale" | "sunday" | "monday" | "saturday"
   signatureText?: string
   signatures?: Record<string, { text?: string; html?: string }>
   displayDensity?: "comfortable" | "compact"

@@ -87,8 +87,20 @@ export class MockServer {
   private mailboxes: Mailbox[] = []
   private emails = new Map<string, StoredEmail>()
   private identities: { id: string; name: string; email: string }[] = []
-  private vacation = { id: "singleton", isEnabled: false, fromDate: null as string | null, toDate: null as string | null, subject: null as string | null, textBody: null as string | null }
-  private sieveScripts: { id: string; name: string; blobId: string; isActive: boolean }[] = []
+  private vacation = {
+    id: "singleton",
+    isEnabled: false,
+    fromDate: null as string | null,
+    toDate: null as string | null,
+    subject: null as string | null,
+    textBody: null as string | null,
+  }
+  private sieveScripts: {
+    id: string
+    name: string
+    blobId: string
+    isActive: boolean
+  }[] = []
   private calendars: {
     id: string
     name: string
@@ -408,21 +420,83 @@ export class MockServer {
         case "Identity/set":
           return H(["Identity/set", this.identitySet(args), callId])
         case "VacationResponse/get":
-          return H(["VacationResponse/get", { accountId: String(args.accountId), state: this.state("VacationResponse"), list: [this.vacation], notFound: [] }, callId])
+          return H([
+            "VacationResponse/get",
+            {
+              accountId: String(args.accountId),
+              state: this.state("VacationResponse"),
+              list: [this.vacation],
+              notFound: [],
+            },
+            callId,
+          ])
         case "VacationResponse/set":
-          this.vacation = { ...this.vacation, ...((args.update as Record<string, typeof this.vacation> | undefined)?.singleton ?? {}) }
-          return H(["VacationResponse/set", { accountId: String(args.accountId), oldState: this.state("VacationResponse"), newState: this.state("VacationResponse"), updated: { singleton: null } }, callId])
+          this.vacation = {
+            ...this.vacation,
+            ...((
+              args.update as Record<string, typeof this.vacation> | undefined
+            )?.singleton ?? {}),
+          }
+          return H([
+            "VacationResponse/set",
+            {
+              accountId: String(args.accountId),
+              oldState: this.state("VacationResponse"),
+              newState: this.state("VacationResponse"),
+              updated: { singleton: null },
+            },
+            callId,
+          ])
         case "SieveScript/get":
-          return H(["SieveScript/get", { accountId: String(args.accountId), state: this.state("SieveScript"), list: this.sieveScripts, notFound: [] }, callId])
+          return H([
+            "SieveScript/get",
+            {
+              accountId: String(args.accountId),
+              state: this.state("SieveScript"),
+              list: this.sieveScripts,
+              notFound: [],
+            },
+            callId,
+          ])
         case "SieveScript/validate":
-          return H(["SieveScript/validate", { accountId: String(args.accountId), error: null }, callId])
+          return H([
+            "SieveScript/validate",
+            { accountId: String(args.accountId), error: null },
+            callId,
+          ])
         case "SieveScript/set": {
-          const created: Record<string, { id: string }> = {}, updated: Record<string, null> = {}
-          const create = args.create as Record<string, { name: string; blobId: string }> | undefined
-          const update = args.update as Record<string, { blobId: string }> | undefined
-          if (create) for (const [key, item] of Object.entries(create)) { const id = `sieve-${this.nextIdCounter++}`; this.sieveScripts.push({ id, ...item, isActive: true }); created[key] = { id } }
-          if (update) for (const [id, item] of Object.entries(update)) { const script = this.sieveScripts.find(entry => entry.id === id); if (script) { script.blobId = item.blobId; script.isActive = true; updated[id] = null } }
-          return H(["SieveScript/set", { accountId: String(args.accountId), oldState: this.state("SieveScript"), newState: this.state("SieveScript"), created, updated }, callId])
+          const created: Record<string, { id: string }> = {},
+            updated: Record<string, null> = {}
+          const create = args.create as
+            Record<string, { name: string; blobId: string }> | undefined
+          const update = args.update as
+            Record<string, { blobId: string }> | undefined
+          if (create)
+            for (const [key, item] of Object.entries(create)) {
+              const id = `sieve-${this.nextIdCounter++}`
+              this.sieveScripts.push({ id, ...item, isActive: true })
+              created[key] = { id }
+            }
+          if (update)
+            for (const [id, item] of Object.entries(update)) {
+              const script = this.sieveScripts.find((entry) => entry.id === id)
+              if (script) {
+                script.blobId = item.blobId
+                script.isActive = true
+                updated[id] = null
+              }
+            }
+          return H([
+            "SieveScript/set",
+            {
+              accountId: String(args.accountId),
+              oldState: this.state("SieveScript"),
+              newState: this.state("SieveScript"),
+              created,
+              updated,
+            },
+            callId,
+          ])
         }
         case "Email/changes":
           return H(["Email/changes", this.changes("Email", args), callId])
@@ -430,6 +504,8 @@ export class MockServer {
           return H(["Mailbox/changes", this.changes("Mailbox", args), callId])
         case "Calendar/get":
           return H(["Calendar/get", this.calendarGet(args), callId])
+        case "Calendar/set":
+          return H(["Calendar/set", this.calendarSet(args), callId])
         case "CalendarEvent/query":
           return H([
             "CalendarEvent/query",
@@ -609,9 +685,7 @@ export class MockServer {
         continue
       }
       if (
-        this.mailboxes.some(
-          (m) => m.name.toLowerCase() === name.toLowerCase()
-        )
+        this.mailboxes.some((m) => m.name.toLowerCase() === name.toLowerCase())
       ) {
         notCreated[cid] = {
           type: "invalidProperties",
@@ -771,14 +845,17 @@ export class MockServer {
     if (f.inMailbox && !email.mailboxIds[f.inMailbox]) return false
     if (
       f.inMailboxOtherThan &&
-      !Object.keys(email.mailboxIds).some((id) => !f.inMailboxOtherThan!.includes(id))
+      !Object.keys(email.mailboxIds).some(
+        (id) => !f.inMailboxOtherThan!.includes(id)
+      )
     )
       return false
     if (f.hasKeyword && !email.keywords?.[f.hasKeyword]) return false
     if (f.notKeyword && email.keywords?.[f.notKeyword]) return false
     if (f.hasAttachment && !email.hasAttachment) return false
     if (f.after && email.receivedAt && email.receivedAt < f.after) return false
-    if (f.before && email.receivedAt && email.receivedAt >= f.before) return false
+    if (f.before && email.receivedAt && email.receivedAt >= f.before)
+      return false
     if (
       f.subject &&
       !(email.subject ?? "").toLowerCase().includes(f.subject.toLowerCase())
@@ -878,18 +955,22 @@ export class MockServer {
     )) {
       try {
         const id = this.newId("e")
-        const parent = patch.inReplyTo?.map((reference) =>
-          [...this.emails.values()].find((message) =>
-            message.id === reference || message.messageId === reference
+        const parent = patch.inReplyTo
+          ?.map((reference) =>
+            [...this.emails.values()].find(
+              (message) =>
+                message.id === reference || message.messageId === reference
+            )
           )
-        ).find(Boolean)
+          .find(Boolean)
         const mailboxIds = normalizeMailboxIds(
           patch.mailboxIds ?? {},
           this.mailboxes
         )
         const email: StoredEmail = {
           id,
-          threadId: (patch.threadId as string) ?? parent?.threadId ?? this.newId("thr"),
+          threadId:
+            (patch.threadId as string) ?? parent?.threadId ?? this.newId("thr"),
           messageId: `<${id}@mock.local>`,
           mailboxIds,
           keywords:
@@ -963,7 +1044,8 @@ export class MockServer {
         }
         if ("subject" in patch) email.subject = patch.subject as string | null
         if ("inReplyTo" in patch) email.inReplyTo = patch.inReplyTo as string[]
-        if ("references" in patch) email.references = patch.references as string[]
+        if ("references" in patch)
+          email.references = patch.references as string[]
         if ("to" in patch) email.to = patch.to as EmailProperties["to"]
         if ("cc" in patch) email.cc = patch.cc as EmailProperties["cc"]
         if ("bcc" in patch) email.bcc = patch.bcc as EmailProperties["bcc"]
@@ -973,8 +1055,7 @@ export class MockServer {
         if ("htmlBody" in patch)
           email.htmlBody = bodyContent(patch.htmlBody, patch.bodyValues)
         if ("attachments" in patch)
-          email.attachments =
-            patch.attachments as StoredEmail["attachments"]
+          email.attachments = patch.attachments as StoredEmail["attachments"]
         email.preview = extractPreviewEmail(email)
         email.version = (this.stateCounter.get("Email") ?? 0) + 1
         updated[id] = email as unknown as EmailProperties
@@ -1118,16 +1199,28 @@ export class MockServer {
   }
 
   private identitySet(args: Record<string, unknown>) {
-    const update = (args.update ?? {}) as Record<string, { name?: string; textSignature?: string }>
+    const update = (args.update ?? {}) as Record<
+      string,
+      { name?: string; textSignature?: string }
+    >
     const updated: Record<string, null> = {}
     const notUpdated: Record<string, { type: string }> = {}
     for (const [id, patch] of Object.entries(update)) {
       const identity = this.identities.find((item) => item.id === id)
-      if (!identity) { notUpdated[id] = { type: "notFound" }; continue }
+      if (!identity) {
+        notUpdated[id] = { type: "notFound" }
+        continue
+      }
       if (patch.name !== undefined) identity.name = patch.name
       updated[id] = null
     }
-    return { accountId: String(args.accountId), oldState: this.state("Identity"), newState: this.state("Identity"), updated, notUpdated }
+    return {
+      accountId: String(args.accountId),
+      oldState: this.state("Identity"),
+      newState: this.state("Identity"),
+      updated,
+      notUpdated,
+    }
   }
 
   // -- changes --------------------------------------------------------------
@@ -1205,28 +1298,56 @@ export class MockServer {
     }
   }
 
+  private calendarSet(args: Record<string, unknown>) {
+    const created: Record<string, { id: string }> = {}
+    for (const [clientId, value] of Object.entries(
+      (args.create ?? {}) as Record<string, { name: string; color?: string }>
+    )) {
+      const id = this.newId("cal")
+      this.calendars.push({ id, name: value.name, color: value.color })
+      created[clientId] = { id }
+    }
+    this.tick("Calendar")
+    return {
+      accountId: String(args.accountId),
+      oldState: this.state("Calendar"),
+      newState: this.state("Calendar"),
+      created,
+    }
+  }
+
   private calendarEventQuery(args: Record<string, unknown>) {
     const filter = (args.filter ?? {}) as {
       after?: string
       before?: string
       inCalendar?: string
+      uid?: string
+      anyOf?: { uid?: string }[]
     }
     const list = [...this.events.values()].filter((ev) => {
       if (filter.inCalendar && ev.calendarId !== filter.inCalendar) return false
+      if (filter.uid && ev.uid !== filter.uid) return false
+      if (
+        filter.anyOf?.length &&
+        !filter.anyOf.some((condition) => condition.uid === ev.uid)
+      )
+        return false
       const t = intervalStart(ev.start)
-      if (filter.after && t < filter.after) return false
+      if (filter.after && t < filter.after && !filter.anyOf) return false
       if (filter.before && t >= filter.before) return false
       return true
     })
     list.sort((a, b) => (a.start > b.start ? 1 : -1))
-    const ids = list.map((e) => e.id)
+    const position = Number(args.position ?? 0)
+    const limit = typeof args.limit === "number" ? args.limit : list.length
+    const ids = list.slice(position, position + limit).map((e) => e.id)
     return {
       accountId: String(args.accountId),
       queryState: this.state("CalendarEvent"),
       canCalculateChanges: true,
-      position: 0,
+      position,
       ids,
-      ...(args.calculateTotal ? { total: ids.length } : {}),
+      ...(args.calculateTotal ? { total: list.length } : {}),
     }
   }
 

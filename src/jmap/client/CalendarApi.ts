@@ -14,6 +14,7 @@ import type {
   CalendarEventSortComparator,
   JmapId,
 } from "../types/calendar"
+import { eventCalendarId } from "@/lib/calendar-event"
 
 export interface CalendarEventQueryOptions {
   filter?: CalendarEventFilter
@@ -21,6 +22,8 @@ export interface CalendarEventQueryOptions {
   limit?: number | null
   position?: number
   calculateTotal?: boolean
+  expandRecurrences?: boolean
+  timeZone?: string
 }
 
 export interface CalendarEventMutation {
@@ -60,6 +63,31 @@ export class CalendarApi {
     return res.list
   }
 
+  async createCalendar(
+    name: string,
+    color?: string,
+    accountId?: string
+  ): Promise<string> {
+    const response = await this.client.call<{
+      created?: Record<string, { id: string }>
+      notCreated?: Record<string, { type: string; description?: string }>
+    }>(
+      "Calendar/set",
+      {
+        accountId: this.acct(accountId),
+        create: { new: { name, color } },
+      },
+      "calset"
+    )
+    if (response.notCreated?.new)
+      throw new Error(
+        response.notCreated.new.description ?? response.notCreated.new.type
+      )
+    if (!response.created?.new?.id)
+      throw new Error("The calendar server did not confirm creation.")
+    return response.created.new.id
+  }
+
   /**
    * Query events across calendars, typically for a date range.
    */
@@ -82,6 +110,8 @@ export class CalendarApi {
         position: options.position,
         limit: options.limit ?? null,
         calculateTotal: options.calculateTotal,
+        expandRecurrences: options.expandRecurrences,
+        timeZone: options.timeZone,
       },
       "ceq0"
     )
@@ -99,48 +129,53 @@ export class CalendarApi {
   async getEventsInRange(
     start: string,
     end: string,
-    options: { calendarIds?: JmapId[] } = {},
+    options: { calendarIds?: JmapId[]; timeZone?: string } = {},
     accountId?: string
   ): Promise<CalendarEvent[]> {
     this.checkAccount()
     const acc = this.acct(accountId)
-    const qid = "crq"
-    const gid = "crg"
     const filter: CalendarEventFilter = {
-      after: start,
-      before: end,
+      after: start.slice(0, 19),
+      before: end.slice(0, 19),
     }
     if (options.calendarIds?.length === 1)
       filter.inCalendar = options.calendarIds[0]
 
-    const res = await this.client.invoke(
-      [
+    const events: CalendarEvent[] = []
+    let position = 0
+    for (;;) {
+      const query = await this.queryEvents(
+        filter,
         {
-          id: qid,
-          method: "CalendarEvent/query",
-          args: {
-            accountId: acc,
-            filter,
-            sort: [{ property: "start", isAscending: true }],
-            calculateTotal: true,
-          },
+          position,
+          limit: 250,
+          calculateTotal: true,
+          expandRecurrences: true,
+          timeZone: "Etc/UTC",
         },
-        {
-          id: gid,
-          method: "CalendarEvent/get",
-          args: { accountId: acc, ids: [`#${qid}`] },
-          resultOf: {
-            callId: qid,
-            name: "CalendarEvent/query",
-            path: "/ids/*",
-          },
-        },
-      ],
-      { accountId: acc }
-    )
-
-    const get = res.get<CalendarEventGetResponse>(gid)
-    return get.list
+        acc
+      )
+      if (!query.ids.length) break
+      for (let offset = 0; offset < query.ids.length; offset += 250) {
+        events.push(
+          ...(await this.getEventsByIds(
+            query.ids.slice(offset, offset + 250),
+            acc
+          ))
+        )
+      }
+      position += query.ids.length
+      if (
+        query.ids.length < 250 ||
+        (query.total !== undefined && position >= query.total)
+      )
+        break
+    }
+    return options.calendarIds?.length
+      ? events.filter((event) =>
+          options.calendarIds!.includes(eventCalendarId(event))
+        )
+      : events
   }
 
   async getEventsByIds(
@@ -160,22 +195,31 @@ export class CalendarApi {
    */
   async applyMutations(
     mutation: CalendarEventMutation,
-    options: { ifInState?: string } = {},
+    options: { ifInState?: string; sendSchedulingMessages?: boolean } = {},
     accountId?: string
   ): Promise<CalendarEventSetResponse> {
     this.checkAccount()
     const acc = this.acct(accountId)
     const args: CalendarEventSetArgs = { accountId: acc }
+    const protocolEvent = (event: Partial<CalendarEvent>) => {
+      if (this.client.isMock) return event
+      const { calendarId: _legacyCalendarId, allDay: _legacyAllDay, attendees: _legacyAttendees, ...jmapEvent } = event
+      void _legacyCalendarId
+      void _legacyAllDay
+      void _legacyAttendees
+      return jmapEvent
+    }
     if (options.ifInState) args.ifInState = options.ifInState
+    args.sendSchedulingMessages = options.sendSchedulingMessages ?? false
     if (mutation.create?.length) {
       args.create = {}
       mutation.create.forEach((ev, i) => {
-        args.create![`c${i}`] = ev
+        args.create![`c${i}`] = protocolEvent(ev)
       })
     }
     if (mutation.update?.length) {
       args.update = {}
-      for (const { id, patch } of mutation.update) args.update[id] = patch
+      for (const { id, patch } of mutation.update) args.update[id] = protocolEvent(patch as Partial<CalendarEvent>)
     }
     if (mutation.destroy?.length) args.destroy = mutation.destroy
 
@@ -197,22 +241,53 @@ export class CalendarApi {
 
   async createEvent(
     event: Partial<CalendarEvent>,
-    accountId?: string
+    accountId?: string,
+    sendSchedulingMessages = true
   ): Promise<string> {
-    const res = await this.applyMutations({ create: [event] }, {}, accountId)
-    return Object.values(res.created ?? {})[0]?.id ?? ""
+    const res = await this.applyMutations(
+      { create: [event] },
+      { sendSchedulingMessages },
+      accountId
+    )
+    if (res.notCreated?.c0)
+      throw new Error(res.notCreated.c0.description ?? res.notCreated.c0.type)
+    const id = res.created?.c0?.id
+    if (!id)
+      throw new Error(
+        "The calendar server did not confirm the event was created."
+      )
+    return id
   }
 
   async updateEvent(
     id: JmapId,
     patch: Partial<Record<string, unknown>>,
-    accountId?: string
+    accountId?: string,
+    sendSchedulingMessages = true
   ): Promise<void> {
-    await this.applyMutations({ update: [{ id, patch }] }, {}, accountId)
+    const res = await this.applyMutations(
+      { update: [{ id, patch }] },
+      { sendSchedulingMessages },
+      accountId
+    )
+    if (res.notUpdated?.[id])
+      throw new Error(res.notUpdated[id].description ?? res.notUpdated[id].type)
+    if (!(id in (res.updated ?? {})))
+      throw new Error("The calendar server did not confirm the update.")
   }
 
   async destroyEvent(id: JmapId, accountId?: string): Promise<void> {
-    await this.applyMutations({ destroy: [id] }, {}, accountId)
+    const res = await this.applyMutations(
+      { destroy: [id] },
+      { sendSchedulingMessages: true },
+      accountId
+    )
+    if (res.notDestroyed?.[id])
+      throw new Error(
+        res.notDestroyed[id].description ?? res.notDestroyed[id].type
+      )
+    if (!res.destroyed?.includes(id))
+      throw new Error("The calendar server did not confirm deletion.")
   }
 }
 

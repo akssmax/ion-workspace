@@ -1,7 +1,7 @@
+import { WhyIon } from "@/components/marketing/why-ion"
 import { Cell, LandingRow } from "./landing-grid"
 import {
   Action,
-  Benefits,
   DemoPreview,
   Eyebrow,
   FAQ,
@@ -53,87 +53,68 @@ export function LandingPage() {
           <DemoPreview />
         </Cell>
       </LandingRow>
-      <LandingRow>
-        <Cell md={7} className="ion-pad">
-          <Eyebrow>Built around the everyday</Eyebrow>
-          <h2 className="ion-heading">
-            The tools you reach for.
-            <br />
-            Now, within reach.
-          </h2>
-        </Cell>
-        <Cell md={5} className="ion-pad ion-align-end">
-          <p className="ion-body">
-            Your day doesn’t happen in one app. Ion brings four essentials
-            together, so you can move from one task to the next.
-          </p>
-          <TextLink href="/product">Explore the four apps</TextLink>
-        </Cell>
-      </LandingRow>
-      <Benefits />
-      <LandingRow id="how" tone="ion-inverse">
-        <Cell md={6} className="ion-pad">
+      <WhyIon />
+      <LandingRow id="how" className="ion-editorial">
+        <Cell className="ion-story-heading">
           <Eyebrow>Managed Ion · Private pilot</Eyebrow>
-          <h2 className="ion-display">
-            For your next
-            <br />
-            chapter of work.
-          </h2>
-          <p className="ion-body">
-            A more connected working day starts with a closer look. We’re
-            opening managed Ion to a limited pilot and learning with the
-            businesses that join.
-          </p>
-          <TextLink href="/request-access">Request pilot access</TextLink>
-        </Cell>
-        <Cell md={6} className="ion-pilot-steps">
-          {[
-            [
-              "01",
-              "Make yourself at home",
-              "Explore the sample workspace. Try the workflows your business uses every day.",
-            ],
-            [
-              "02",
-              "Tell us what you need",
-              "Share your team size and requirements so we can evaluate the fit.",
-            ],
-            [
-              "03",
-              "Explore a pilot together",
-              "If there’s a fit, discuss setup, scope, and next steps before getting started.",
-            ],
-          ].map(([n, t, c]) => (
-            <div key={n}>
-              <span>{n}</span>
-              <div>
-                <h3>{t}</h3>
-                <p className="ion-body">{c}</p>
-              </div>
+          <div className="ion-story-intro">
+            <h2>
+              Start with a look.
+              <br />
+              Build from there.
+            </h2>
+            <div>
+              <p>
+                Explore the workspace first. Then tell us what your business
+                needs, so we can shape the right pilot together.
+              </p>
+              <TextLink href="/request-access">Request pilot access</TextLink>
             </div>
-          ))}
+          </div>
         </Cell>
+        {[
+          [
+            "01",
+            "Try the workspace",
+            "Explore real workflows with sample data. No account or setup needed.",
+          ],
+          [
+            "02",
+            "Bring your requirements",
+            "Share your team size, current setup, and the work you want to improve.",
+          ],
+          [
+            "03",
+            "Define the pilot",
+            "If there’s a fit, agree on scope, setup, and next steps before getting started.",
+          ],
+        ].map(([number, title, copy]) => (
+          <Cell md={4} className="ion-pilot-card" key={number}>
+            <span>{number}</span>
+            <h3>{title}</h3>
+            <p>{copy}</p>
+          </Cell>
+        ))}
       </LandingRow>
-      <LandingRow id="enterprise" tone="ion-soft">
-        <Cell md={4} className="ion-pad">
+      <LandingRow
+        id="enterprise"
+        tone="ion-inverse"
+        className="ion-enterprise-band"
+      >
+        <Cell md={7} className="ion-pad">
           <Eyebrow>For larger organizations</Eyebrow>
-          <p className="ion-large-number">
-            A closer
-            <br />
-            look.
-          </p>
-        </Cell>
-        <Cell md={8} className="ion-pad">
           <h2 className="ion-heading">
-            Your requirements deserve
-            <br />a proper conversation.
+            A closer look.
+            <br />A proper conversation.
           </h2>
-          <p className="ion-body ion-readable">
-            Review how Ion is built, what’s available today, and the questions
-            to bring to an enterprise evaluation.
+        </Cell>
+        <Cell md={5} className="ion-pad ion-value-copy">
+          <p className="ion-body">
+            Review the architecture, current capabilities, and requirements to
+            discuss with your IT team.
           </p>
           <TextLink href="/enterprise">
-            Explore Ion for your organization
+            Evaluate Ion for your organization
           </TextLink>
         </Cell>
       </LandingRow>

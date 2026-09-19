@@ -4,8 +4,6 @@
  */
 
 import { create } from "zustand"
-import { persist, createJSONStorage } from "zustand/middleware"
-import { workspaceStorage } from "@/lib/demo/runtime"
 
 export type WorkspaceApp = "mail" | "calendar" | "contacts" | "files"
 
@@ -16,14 +14,10 @@ interface WorkspaceState {
   setPaletteOpen: (open: boolean) => void
 }
 
-export const useWorkspaceStore = create<WorkspaceState>()(
-  persist(
-    (set) => ({
-      app: "mail",
-      paletteOpen: false,
-      setApp: (app) => set({ app }),
-      setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
-    }),
-    { name: "workspace-shell", storage: createJSONStorage(workspaceStorage) }
-  )
-)
+// Navigation is session-local: fresh visits always start in Mail.
+export const useWorkspaceStore = create<WorkspaceState>()((set) => ({
+  app: "mail",
+  paletteOpen: false,
+  setApp: (app) => set({ app }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+}))

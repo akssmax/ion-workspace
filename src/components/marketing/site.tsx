@@ -1,6 +1,9 @@
 import { ThemeSwitch } from "@/components/theme/theme-switch"
+import { useState, useRef } from "react"
 import type { ReactNode } from "react"
 import {
+  Menu,
+  X,
   ArrowUpRight,
   ArrowRight,
   Plus,
@@ -104,28 +107,73 @@ export function Eyebrow({ children }: { children: ReactNode }) {
 
 export function Site({ children }: { children: ReactNode }) {
   const { data: session } = useSession()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
   return (
     <LandingShell>
       <a href="#main" className="landing-skip">
         Skip to content
       </a>
-      <header className="ion-header">
+      <header
+        className="ion-header"
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && menuOpen) {
+            setMenuOpen(false)
+            menuButton.current?.focus()
+          }
+        }}
+      >
         <div className="ion-header-inner">
           <a href="/" aria-label="Ion home" className="ion-brand">
             <IonLogo size={29} animateOnHover />
           </a>
-          <nav aria-label="Main navigation">
+          <nav className="ion-desktop-nav" aria-label="Main navigation">
             <a href="/product">Product</a>
             <a href="/roadmap">Roadmap</a>
             <a href="/enterprise">Enterprise</a>
           </nav>
           <div className="ion-header-actions">
             <a href={session ? "/app" : "/login"}>
-              {session ? "Open workspace" : "Sign in"}
+              {session ? (
+                <>
+                  <span className="ion-header-label-wide">Open workspace</span>
+                  <span className="ion-header-label-short">Workspace</span>
+                </>
+              ) : (
+                "Sign in"
+              )}
             </a>
-            <Action href="/demo">Try demo workspace</Action>
+            <Action href="/demo">
+              <span className="ion-header-label-wide">Try demo workspace</span>
+              <span className="ion-header-label-short">Try demo</span>
+            </Action>
           </div>
+          <button
+            ref={menuButton}
+            className="ion-menu-toggle"
+            type="button"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={menuOpen}
+            aria-controls="ion-mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
         </div>
+        <nav
+          id="ion-mobile-menu"
+          className="ion-mobile-menu"
+          aria-label="Mobile navigation"
+          hidden={!menuOpen}
+          onClick={() => setMenuOpen(false)}
+        >
+          <a href="/product">Product</a>
+          <a href="/roadmap">Roadmap</a>
+          <a href="/enterprise">Enterprise</a>
+          <a href={session ? "/app" : "/login"}>
+            {session ? "Open workspace" : "Sign in"}
+          </a>
+        </nav>
       </header>
       <main id="main">{children}</main>
       <footer className="ion-footer">
@@ -297,11 +345,9 @@ export function FAQ() {
       <Cell md={4} className="ion-pad">
         <Eyebrow>A little more clarity</Eyebrow>
         <h2 className="ion-heading">
-          Before you
+          A few things
           <br />
-          make yourself
-          <br />
-          at home.
+          to know.
         </h2>
       </Cell>
       <Cell md={8} className="ion-faq">

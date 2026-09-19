@@ -1,0 +1,64 @@
+.workspace-calendar {
+  --fc-classic-background: var(--background);
+  --fc-classic-foreground: var(--foreground);
+  --fc-classic-muted-foreground: var(--muted-foreground);
+  --fc-classic-faint-foreground: var(--muted-foreground);
+  --fc-classic-border: color-mix(in oklch, var(--border) 75%, var(--background));
+  --fc-classic-strong-border: var(--border);
+  --fc-classic-faint: color-mix(in oklch, var(--muted) 22%, transparent);
+  --fc-classic-muted: color-mix(in oklch, var(--muted) 45%, transparent);
+  --fc-classic-strong: color-mix(in oklch, var(--muted) 75%, transparent);
+  --fc-classic-today: color-mix(in oklch, var(--primary) 8%, transparent);
+  --fc-classic-highlight: color-mix(in oklch, var(--primary) 17%, transparent);
+  --fc-classic-now: var(--destructive);
+  --fc-classic-primary: var(--primary);
+  --fc-classic-primary-foreground: var(--primary-foreground);
+  --fc-classic-event: transparent;
+  --fc-classic-event-contrast: var(--foreground);
+  --fc-classic-button: var(--secondary);
+  --fc-classic-button-border: var(--border);
+  --fc-classic-button-foreground: var(--secondary-foreground);
+  --fc-classic-button-strong: var(--accent);
+  --fc-classic-button-strong-border: var(--border);
+  --fc-classic-button-outline: var(--ring);
+}
+.workspace-calendar .fc {
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  background: var(--background);
+}
+.workspace-calendar [role="grid"] {
+  border: 0;
+}
+.workspace-calendar [role="gridcell"] {
+  cursor: pointer;
+}
+.workspace-calendar [role="gridcell"]:hover {
+  background: color-mix(in oklch, var(--muted) 30%, transparent);
+}
+.workspace-calendar [role="gridcell"] [role="button"],
+.workspace-calendar [role="list"] [role="button"] {
+  cursor: pointer;
+  border-radius: calc(var(--radius) / 2);
+  overflow: hidden;
+}
+@media (max-width: 639px) {
+  .workspace-calendar[data-view="week"] {
+    overflow-x: auto;
+  }
+  .workspace-calendar[data-view="week"] [role="grid"] {
+    min-width: 740px !important;
+  }
+  .workspace-calendar[data-view="week"] [role="rowheader"] {
+    position: sticky;
+    inset-inline-start: 0;
+    z-index: 3;
+    background: var(--background);
+  }
+  .workspace-calendar[data-view="month"] [role="gridcell"] {
+    min-height: 52px;
+  }
+  .workspace-calendar[data-view="month"] [role="gridcell"] [role="button"] {
+    display: none;
+  }
+}

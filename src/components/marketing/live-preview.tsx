@@ -90,7 +90,7 @@ export function LivePreview() {
     </div>
   )
 }
-function PreviewFrame({
+export function PreviewFrame({
   surface,
   dark,
   onSurface,

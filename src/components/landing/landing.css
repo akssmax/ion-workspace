@@ -16,7 +16,7 @@
   font-family: "Inter Variable", sans-serif;
 }
 .landing section[id] {
-  scroll-margin-top: 24px;
+  scroll-margin-top: 120px;
 }
 .landing :is(a, button, summary, input, select, textarea):focus-visible {
   outline: 2px solid currentColor;
@@ -43,6 +43,9 @@
   top: 12px;
 }
 .ion-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   border-bottom: 1px solid var(--border);
   background: #fff;
 }
@@ -722,31 +725,6 @@
   overflow: hidden;
 }
 @media (max-width: 767px) {
-  .ion-header-inner {
-    display: flex;
-    flex-wrap: wrap;
-    padding: 16px 20px;
-    gap: 18px;
-  }
-  .ion-header nav {
-    order: 3;
-    width: 100%;
-    padding-top: 14px;
-    gap: 24px;
-  }
-  .ion-header-actions {
-    gap: 15px;
-    font-size: 11px;
-  }
-  .ion-header-actions .ion-button {
-    font-size: 10px;
-    padding: 10px 13px;
-    min-height: 44px;
-    gap: 6px;
-  }
-  .ion-brand {
-    font-size: 23px;
-  }
   .ion-hero-title {
     padding-top: 64px;
     padding-bottom: 42px;
@@ -766,7 +744,35 @@
     padding: 9px 10px;
   }
   .ion-footer-column {
-    padding: 30px 26px;
+    padding: 24px 20px;
+  }
+  .ion-footer-column h2 {
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+  .ion-footer-column a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+  .ion-footer-column:nth-last-child(2) {
+    grid-column: span 4;
+  }
+  .ion-footer-bottom {
+    padding: 22px 20px;
+    flex-direction: column-reverse;
+    align-items: flex-start;
+    font-size: 12px;
+  }
+  .ion-footer-theme {
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .ion-footer-theme [role="radio"] {
+    min-height: 44px;
   }
   .ion-cta-heading {
     padding-top: 48px;
@@ -1027,3 +1033,126 @@
     transform-origin: top left;
   }
 }
+
+/* Compact disclosure navigation on phones and tablets. */
+.ion-header-label-short, .ion-menu-toggle, .ion-header .ion-mobile-menu { display: none; }
+.ion-header nav a, .ion-header-actions > a:first-child {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+@media (max-width: 1023px) {
+  .ion-header-inner {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    min-height: 68px;
+    padding: 10px 24px;
+    gap: 12px;
+  }
+  .ion-header .ion-desktop-nav,
+  .ion-header-actions > a:first-child { display: none; }
+  .ion-header-actions .ion-button { min-height: 44px; padding: 10px 18px; }
+  .ion-menu-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .ion-menu-toggle:hover { background: var(--muted); }
+  .ion-header .ion-mobile-menu:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 8px 24px 20px;
+    max-height: calc(100svh - 68px);
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+  }
+  .ion-mobile-menu a { padding: 12px 4px; font-size: 16px; }
+  .ion-mobile-menu a:last-child { margin-top: 8px; border-top: 1px solid var(--border); }
+}
+@media (max-width: 479px) {
+  .ion-header-inner { padding-inline: 16px; gap: 8px; }
+  .ion-header-label-wide { display: none; }
+  .ion-header-label-short { display: inline; }
+  .ion-header-actions .ion-button { padding: 10px 14px; gap: 8px; font-size: 12px; }
+  .ion-header .ion-mobile-menu:not([hidden]) { padding-inline: 16px; }
+}
+
+.ion-value-copy { display: flex; flex-direction: column; justify-content: center; }
+.ion-value-copy .ion-text-link { align-self: flex-start; }
+.ion-value-art { display: flex; align-items: center; justify-content: center; min-height: 360px; }
+.ion-app-map, .ion-command-card { width: 100%; border: 1px solid var(--border); border-radius: 16px; background: var(--background); box-shadow: 0 20px 40px -30px #0005; overflow: hidden; }
+.ion-app-map-title { display: flex; justify-content: space-between; padding: 22px; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--muted-foreground); }
+.ion-app-map-title span { color: var(--foreground); font-size: 24px; font-weight: 600; }
+.ion-app-map-item { display: flex; align-items: center; gap: 20px; padding: 20px 22px; }
+.ion-app-map-item + .ion-app-map-item { border-top: 1px solid var(--border); }
+.ion-app-map-item strong { font-size: 15px; font-weight: 500; }
+.ion-app-map-item p { font-size: 12px; color: var(--muted-foreground); margin-top: 4px; }
+.ion-command-card > div { display: flex; align-items: center; gap: 14px; padding: 20px; font-size: 13px; }
+.ion-command-card > div > :last-child { margin-left: auto; }
+.ion-command-card .ion-command-title { border-bottom: 1px solid var(--border); color: var(--muted-foreground); }
+.ion-command-card kbd { border: 1px solid var(--border); border-radius: 5px; padding: 4px 7px; font-size: 11px; white-space: nowrap; }
+.ion-command-card > p { padding: 18px 20px; color: var(--muted-foreground); font-size: 11px; border-top: 1px solid var(--border); }
+.ion-comparison-item { padding: 30px clamp(24px, 4vw, 48px); border-bottom: 1px solid var(--border); }
+.ion-comparison-item a { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted-foreground); min-height: 44px; }
+.ion-comparison-item h3 { font-size: 21px; font-weight: 450; letter-spacing: -.03em; margin: 8px 0 12px; }
+.ion-comparison-item p, .ion-comparison-note { font-size: 13px; line-height: 1.75; color: var(--muted-foreground); }
+.ion-comparison-note { padding: 24px clamp(24px, 4vw, 48px); font-size: 11px; }
+@media (max-width: 767px) {
+  .ion-keyboard-art { order: 2; }
+  .ion-value-art { min-height: 0; }
+}
+
+/* Product-led editorial sections: large scenes, compact supporting details. */
+.ion-editorial .ion-story-heading { padding: clamp(40px, 7vw, 86px) clamp(24px, 5vw, 64px) 36px; border-bottom: 0; }
+.ion-story-intro { display: grid; grid-template-columns: 1.2fr 1fr; gap: 56px; align-items: end; }
+.ion-story-intro h2 { font-size: clamp(34px, 4.8vw, 60px); font-weight: 450; letter-spacing: -.055em; line-height: 1.06; }
+.ion-story-intro p { font-size: 15px; line-height: 1.8; color: var(--muted-foreground); max-width: 410px; margin-bottom: 20px; }
+.ion-story-intro > p { margin-bottom: 0; }
+.ion-product-scene { position: relative; padding: 34px 36px 78px; overflow: hidden; background: linear-gradient(180deg, var(--background), var(--muted)); }
+.ion-feature-window { width: 88%; margin-left: 12%; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--background); box-shadow: 0 25px 65px -30px #0005; }
+.ion-feature-window-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; font-size: 10px; color: var(--muted-foreground); border-bottom: 1px solid var(--border); }
+.ion-feature-window-bar > span:first-child { font-family: monospace; color: var(--foreground); }
+.ion-scene-note { position: absolute; bottom: 36px; left: 36px; width: 270px; padding: 24px; border: 1px solid var(--border); border-radius: 14px; background: var(--background); box-shadow: 0 18px 45px -25px #0008; }
+.ion-scene-note strong { display: block; font-weight: 500; font-size: 17px; letter-spacing: -.03em; margin: 20px 0 10px; }
+.ion-scene-note p { font-size: 12px; line-height: 1.7; color: var(--muted-foreground); }
+.ion-product-scene-reverse .ion-feature-window { margin-left: 0; }
+.ion-product-scene-reverse .ion-scene-note { left: auto; right: 36px; }
+.ion-feature-footnote, .ion-compare-card, .ion-pilot-card { padding: 32px clamp(24px, 4vw, 44px); }
+.ion-feature-footnote > span, .ion-pilot-card > span { font-family: monospace; font-size: 11px; color: var(--muted-foreground); }
+.ion-feature-footnote h3, .ion-compare-card h3, .ion-pilot-card h3 { font-size: 19px; line-height: 1.3; letter-spacing: -.025em; font-weight: 500; margin: 18px 0 12px; }
+.ion-feature-footnote p, .ion-compare-card p, .ion-pilot-card p { font-size: 13px; line-height: 1.8; color: var(--muted-foreground); }
+.ion-shortcut-feature .ion-text-link { margin-top: 20px; }
+.ion-shortcut-strip { display: flex; flex-direction: column; justify-content: center; padding: 28px 40px; gap: 20px; }
+.ion-shortcut-strip > div { display: flex; gap: 20px; align-items: center; font-size: 12px; color: var(--muted-foreground); }
+.ion-shortcut-strip kbd { min-width: 88px; text-align: center; padding: 10px; border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 7px; background: var(--background); color: var(--foreground); font-size: 11px; }
+.ion-compare-card a { display: inline-flex; gap: 8px; align-items: center; font-size: 12px; min-height: 44px; color: var(--muted-foreground); }
+.ion-pilot-card > span { display: inline-flex; align-items: center; justify-content: center; height: 36px; width: 36px; border: 1px solid var(--border); border-radius: 50%; }
+.ion-enterprise-band .ion-heading { margin-bottom: 0; }
+@media (max-width: 767px) {
+  .ion-story-intro { grid-template-columns: 1fr; gap: 24px; }
+  .ion-story-intro p { font-size: 14px; }
+  .ion-product-scene { padding: 8px 16px 24px; }
+  .ion-feature-window { width: 100%; margin-left: 0; }
+  .ion-feature-window .ion-live-viewport { height: 420px; }
+  .ion-feature-window-bar { padding: 12px; font-size: 9px; }
+  .ion-scene-note, .ion-product-scene-reverse .ion-scene-note { position: relative; inset: auto; width: auto; margin: -20px 12px 0; z-index: 1; padding: 20px; }
+  .ion-scene-note strong { margin-top: 12px; }
+  .ion-shortcut-strip { padding: 28px 24px; }
+  .ion-feature-footnote, .ion-pilot-card, .ion-compare-card { padding-block: 26px; }
+}
+
+.ion-reason-card { display: flex; flex-direction: column; align-items: flex-start; }
+.ion-reason-icon { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 24px; }
+.ion-reason-label { font-size: 11px; color: var(--muted-foreground); }
+.ion-reason-card h3 { font-size: 24px; margin-top: 12px; }
+.ion-reason-card p { margin-bottom: 24px; }
+.ion-reason-card .ion-text-link { margin-top: auto; color: var(--foreground); }
+.ion-reason-proof { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 28px clamp(24px, 4vw, 44px); background: var(--muted); }
+.ion-reason-proof strong { font-size: 15px; font-weight: 500; }
+.ion-reason-proof p { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+@media (max-width: 767px) { .ion-reason-proof { flex-direction: column; align-items: flex-start; } }

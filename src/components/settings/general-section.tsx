@@ -109,6 +109,29 @@ export function GeneralSection() {
       <Separator />
 
       <SettingRow
+        id="pref-calendar-week-start"
+        label="Calendar week starts on"
+        hint="Applies to Month and Week views."
+      >
+        <Select
+          value={prefs?.calendarWeekStart ?? "locale"}
+          onValueChange={(value) =>
+            void save.mutateAsync({ calendarWeekStart: value as "locale" | "sunday" | "monday" | "saturday" })
+          }
+        >
+          <SelectTrigger id="pref-calendar-week-start" className="w-52"><SelectValue>{labelFor([{value:"locale",label:"Language default"},{value:"sunday",label:"Sunday"},{value:"monday",label:"Monday"},{value:"saturday",label:"Saturday"}])}</SelectValue></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="locale">Language default</SelectItem>
+            <SelectItem value="sunday">Sunday</SelectItem>
+            <SelectItem value="monday">Monday</SelectItem>
+            <SelectItem value="saturday">Saturday</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingRow>
+
+      <Separator />
+
+      <SettingRow
         id="pref-default-view"
         label={t("Default app")}
         hint={t("The app you land in. Changing it switches you there now.")}

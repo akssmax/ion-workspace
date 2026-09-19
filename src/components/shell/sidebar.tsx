@@ -53,6 +53,7 @@ import { MailboxRow, NewFolderRow } from "@/modules/mail/mailboxes"
 import { useAddressBooks, useContacts } from "@/queries/contacts"
 import { Link } from "@tanstack/react-router"
 import { useLanguage } from "@/lib/language"
+import { CalendarList } from "@/components/calendar/calendar-list"
 import type { TranslationKey } from "@/lib/language"
 
 const APPS: {
@@ -311,6 +312,7 @@ function CalendarPanel() {
   const view = useCalendarStore((s) => s.view)
   const setView = useCalendarStore((s) => s.setView)
   return (
+    <>
     <SidebarGroup>
       <SidebarGroupLabel>{t("Views")}</SidebarGroupLabel>
       <SidebarGroupContent>
@@ -328,6 +330,8 @@ function CalendarPanel() {
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
+    <CalendarList />
+    </>
   )
 }
 

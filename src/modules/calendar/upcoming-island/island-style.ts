@@ -80,7 +80,7 @@ export function islandAccent(
   if (phase === "live" || phase === "soon") return PHASE_ACCENT[phase]
   const fromCalendar = parseAccent(calendarColor)
   if (fromCalendar) return fromCalendar
-  return KIND_ACCENT[eventKind(event)] ?? accentForKey(event.calendarId)
+  return KIND_ACCENT[eventKind(event)] ?? accentForKey(event.calendarId ?? Object.keys(event.calendarIds ?? {})[0] ?? event.id)
 }
 
 export function islandTone(accent: AccentName) {

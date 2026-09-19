@@ -31,7 +31,9 @@ export function CalendarEventChip({
   const parsed = parseAccent(color ?? undefined)
   const hex = !accent && !parsed && color && isHexColor(color) ? color : null
   const named =
-    accent ?? parsed ?? (hex ? null : fallbackKey ? accentForKey(fallbackKey) : null)
+    accent ??
+    parsed ??
+    (hex ? null : fallbackKey ? accentForKey(fallbackKey) : null)
   const tone = named ? accentClasses(named) : null
 
   return (
