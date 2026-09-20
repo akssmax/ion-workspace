@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { accentClasses, isHexColor, resolveAccent } from "@/lib/accents"
@@ -47,25 +48,24 @@ export function CalendarList() {
   }
 
   return (
-    <div className="space-y-3 px-2 py-3">
+    <div className="w-full min-w-0 space-y-3 px-2 py-3">
       <div className="flex items-center justify-between gap-2 px-2">
-        <h3 className="text-xs font-medium text-muted-foreground">My calendars</h3>
+        <h3 className="truncate text-xs font-medium text-muted-foreground">My calendars</h3>
         {!capabilities.data?.accountReadOnly && (
-          <Button
+          <Tooltip><TooltipTrigger render={<Button
             type="button"
             variant="ghost"
             size="icon-sm"
             aria-label="Add calendar"
-            title="Add calendar"
             onClick={() => setAdding(true)}
-          >
+          />}>
             <Plus className="size-4" />
-          </Button>
+          </TooltipTrigger><TooltipContent>Add calendar</TooltipContent></Tooltip>
         )}
       </div>
       {calendars.isLoading && <p className="px-2 text-xs text-muted-foreground">Loading calendars…</p>}
       {calendars.data?.map((calendar) => (
-        <label key={calendar.id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm hover:bg-sidebar-accent sm:min-h-9">
+        <label key={calendar.id} className="flex min-h-10 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2 text-sm hover:bg-sidebar-accent sm:min-h-9">
           <Checkbox
             aria-label={`Show ${calendar.name} calendar`}
             checked={!hidden.includes(calendar.id)}
@@ -73,7 +73,7 @@ export function CalendarList() {
           />
           <ColorDot color={calendar.color} id={calendar.id} />
           <span className="min-w-0 flex-1 truncate">{calendar.name}</span>
-          {calendar.isReadOnly && <span className="text-[10px] text-muted-foreground">Read only</span>}
+          {calendar.isReadOnly && <span className="shrink-0 text-[10px] text-muted-foreground">Read only</span>}
         </label>
       ))}
       {adding && (
@@ -92,7 +92,7 @@ export function CalendarList() {
           {feeds.data.map((feed) => {
             const id = `feed:${feed.id}`
             return (
-              <label key={id} className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg px-2 text-sm hover:bg-sidebar-accent sm:min-h-9">
+              <label key={id} className="flex min-h-10 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2 text-sm hover:bg-sidebar-accent sm:min-h-9">
                 <Checkbox
                   aria-label={`Show ${feed.name} calendar`}
                   checked={!hidden.includes(id)}
@@ -100,7 +100,7 @@ export function CalendarList() {
                 />
                 <ColorDot color={feed.color} id={id} />
                 <span className="min-w-0 flex-1 truncate">{feed.name}</span>
-                <span className="text-[10px] text-muted-foreground">Read only</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">Read only</span>
               </label>
             )
           })}

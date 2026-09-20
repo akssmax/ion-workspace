@@ -3,6 +3,8 @@
 Single source of truth for building the mail product to Gmail/Outlook parity and
 beyond, on a JMAP-native, modular, feature-flagged architecture.
 
+> **Current audit (September 2026):** Sections 1 and 4 below preserve the original baseline and milestone proposals. The table in §3 has been updated for delivered work. Sorting and quick filters now run through JMAP before pagination; a configurable real-account worker adds queued send, a ten-second undo window, Outbox, and snooze when deployed. The remaining core work is real Stalwart scheduling validation, deploying the minute-level worker, improving offline writes and long-list navigation, and completing mobile/accessibility audits. Already delivered: mailbox CRUD, labels, advanced/saved search, Sieve sender rules, draft autosave, identities, templates, signatures, attachment preview, DOMPurify, remote-image blocking, print/export, conversation expansion, and push invalidation. Unsupported scheduling is explicitly disabled; immediate send stays available.
+
 - **Stack:** TanStack Start/Router/Query, Tailwind v4, base-ui (shadcn `base-luma`), Tiptap, Zustand, Dexie, Zod
 - **Backend contract:** JMAP (RFC 8620/8621) via Stalwart (real mode) or the in-memory `MockServer` (dev default)
 - **Golden rule:** JMAP is the source of truth. No local email database. Dexie/IndexedDB is cache/offline only.
@@ -163,33 +165,33 @@ Flag id `—` = core (never flagged). Priorities map to milestones in §4.
 |---|---|---|---|---|---|---|
 | 0 | Product architecture (entities, layering) | yes | existing `src/services`, `src/jmap` | — | — | M0 |
 | 1 | Inbox (threaded list, unread, previews, selection) | yes | `components/mail/email-list.tsx` | — | `Email/query` + `collapseThreads` | M0 |
-| 1a | Inbox: infinite/paginated loading | no | core list | — | `Email/query` position/anchor | M1 |
-| 1b | Inbox: real-time updates | part | core + sync wiring | — | `Email/changes`, push | M0 |
+| 1a | Inbox: infinite/paginated loading | part (pages + jump) | core list | — | `Email/query` position/anchor | M1 |
+| 1b | Inbox: real-time updates | part (push invalidation) | core + sync wiring | — | `Email/changes`, push | M0 |
 | 2 | Mailbox/folder system (read) | yes | `shell/sidebar.tsx` | — | `Mailbox/get` | M0 |
-| 2a | Mailbox CRUD + custom folders | no | `modules/mail/mailboxes` | `mail.mailboxes` | `Mailbox/set` (client + mock) | M0 |
-| 3 | Labels (multi-mailbox model) | no | `modules/mail/labels` | `mail.labels` | `Mailbox/set`, multi-membership | M0 |
+| 2a | Mailbox CRUD + custom folders | yes | `modules/mail/mailboxes` | `mail.mailboxes` | `Mailbox/set` (client + mock) | M0 |
+| 3 | Labels (multi-mailbox model) | yes | `modules/mail/labels` | `mail.labels` | `Mailbox/set`, multi-membership | M0 |
 | 4 | Threaded conversations | part | `thread-view.tsx` | — | `Thread/get` | M0 (collapse/expand, quoted-content folding in M1) |
 | 5 | Reading pane + actions | part | `thread-view.tsx` | — | — | M0 (add move/label/snooze/print via contribution points) |
 | 6 | Compose (Tiptap) | yes | `components/mail/composer.tsx` | — | `Email/set`, `EmailSubmission/set` | M0 (fix duplicate-extension bug) |
 | 7 | Recipient system (autocomplete, chips) | part | composer + `queries/contacts.ts` | — | `Contact/query` | M1 (recents, validation warnings, groups) |
-| 8 | Drafts (autosave, restore, indicators) | part | `modules/mail/drafts` | — | `Email/set` update, debounce queue | M0 |
-| 9 | Send (stateful pipeline) | part | composer + `mail.service.sendDraft` | — | `EmailSubmission/set` | M0 (sending/sent/failed states) |
-| 10 | Scheduled send | no | `modules/mail/scheduled-send` | `mail.scheduledSend` | `EmailSubmission/set` `holdFor`/future-dated or app-level scheduler | M1 |
-| 11 | Snooze | no | `modules/mail/snooze` | `mail.snooze` | mailbox + `$snoozed` keyword + `receivedAt` restore job | M1 |
+| 8 | Drafts (autosave, restore, indicators) | yes | composer | — | `Email/set` update, debounce queue | M0 |
+| 9 | Send (stateful pipeline) | yes | composer + mail service | — | `EmailSubmission/set` | M0 |
+| 10 | Scheduled send | part (worker validation pending) | mail jobs + composer | — | durable queue + `EmailSubmission/set` | M1 |
+| 11 | Snooze | part (worker validation pending) | mail jobs + conversation | — | archive + `$snoozed` + restore job | M1 |
 | 12 | Search (operators) | yes | `lib/search.ts` | — | `Email/query` filter | M0 (wire `in:` name→id resolution) |
-| 13 | Advanced search UI + saved searches | no | `modules/mail/advanced-search` | `mail.advancedSearch` | same filter object | M1 |
-| 14 | Bulk actions | part | core toolbar + `modules/mail/bulk-actions` | — | batched `Email/set` | M0 (select-all, unread, move/label hooks) |
+| 13 | Advanced search UI + saved searches | yes | `components/mail/advanced-search.tsx` | — | same filter object | M1 |
+| 14 | Bulk actions | yes | core toolbar | — | batched `Email/set` | M0 |
 | 15 | Star/flag | yes | core | — | `$flagged` | M0 |
 | 16 | Read/unread | yes | core | — | `$seen` | M0 (add toolbar mark-unread) |
 | 17 | Archive | yes | core | — | mailbox membership | M0 |
-| 18 | Trash/delete/restore/empty | part | core | — | `Email/set` mailboxIds/destroy | M1 (empty-trash) |
-| 19 | Spam/phishing | no | `modules/mail/spam` | `mail.spam` | `$junk`, `$phishing` keywords | M1 |
+| 18 | Trash/delete/restore/empty | yes | core | — | `Email/set` mailboxIds/destroy | M1 |
+| 19 | Spam/phishing | yes | core | — | `$junk`, `$phishing` keywords | M1 |
 | 20 | Attachments (up/download) | yes | core | — | upload/download endpoints | M0 |
-| 21 | Attachment viewer (image/PDF/text preview) | no | `modules/mail/attachment-viewer` | `mail.attachmentViewer` | download blob → object URL | M1 |
-| 22 | Image handling (block remote, CID inline) | no | `lib/email-renderer/images.ts` | `mail.remoteImages` | bodyValues + CID rewrite | M1 |
-| 23 | Signatures (per identity) | no | `modules/mail/signatures` | `mail.signatures` | prefs storage; composer injection | M1 |
-| 24 | Templates | no | `modules/mail/templates` | `mail.templates` | prefs storage; `{{var}}` interpolation | M1 |
-| 25 | Filters/rules | no | `modules/mail/filters` | `mail.filters` | client-side engine over `Email/query` filters; server sieve later | M1 |
+| 21 | Attachment viewer (image/PDF/text preview) | yes | `components/mail/attachment-viewer.tsx` | — | download blob → object URL | M1 |
+| 22 | Image handling (block remote, CID inline) | part | `lib/email-renderer/images.ts` | — | bodyValues + CID rewrite | M1 |
+| 23 | Signatures (per identity) | yes | composing settings + composer | — | prefs storage; composer injection | M1 |
+| 24 | Templates | yes | composer + settings | — | account metadata | M1 |
+| 25 | Filters/rules | part (Sieve sender rules) | settings | — | SieveScript | M1 |
 | 26 | Smart inbox categories | no | `modules/mail/smart-inbox` | `mail.smartInbox` | deterministic rules over metadata | M2 |
 | 27 | "Waiting on" | no | `modules/mail/waiting-on` | `mail.waitingOn` | Sent ∩ no-reply heuristic via `Email/query` | M2 |
 | 28 | Follow-up reminders | no | `modules/mail/follow-ups` | `mail.followUps` | keyword + local scheduler | M2 |
@@ -202,15 +204,15 @@ Flag id `—` = core (never flagged). Priorities map to milestones in §4.
 | 35 | AI reply | no | inside ai-assistant | `mail.ai` | — | M2 |
 | 36 | AI action extraction | no | inside ai-assistant | `mail.ai` | — | M2 |
 | 37 | Unified workspace search | no | `modules/workspace/search` | `workspace.unifiedSearch` | per-app `*/query` fan-out | M2 |
-| 38 | Offline mode | part (dormant) | `modules/system/offline` | `system.offline` | Dexie + sync engine + mutation queue | M3 |
-| 39 | Real-time updates | part (dormant) | core sync wiring | — | `startPush` + `*/changes` | M0 |
+| 38 | Offline mode | part (cached reading) | sync engine | — | Dexie + mutation queue later | M3 |
+| 39 | Real-time updates | part (push invalidation) | core sync wiring | — | `startPush` + `*/changes` | M0 |
 | 40 | Multiple accounts | no | `modules/system/accounts` | `system.multiAccount` | `accountId` in all query keys (replace `ACCOUNT_KEY = "acc"`) | M3 |
 | 41 | Multiple identities | part | `modules/mail/identities` | `mail.identities` | `Identity/get` (exists) | M1 |
-| 42 | Outbox | no | `modules/mail/outbox` | `mail.outbox` | submission state + scheduled queue | M1 |
-| 43 | Undo send | no | `modules/mail/undo-send` | `mail.undoSend` | delayed `EmailSubmission/set` | M1 |
+| 42 | Outbox | part (worker validation pending) | mail jobs + Outbox dialog | — | server queue | M1 |
+| 43 | Undo send | part (10-second queued window) | composer + Outbox | — | delayed submission | M1 |
 | 44 | Confidential/protected email | no | `modules/mail/confidential` | `mail.confidential` | server capability required | M3 |
-| 45 | Print/export (.eml, print thread) | no | `modules/mail/print-export` | `mail.printExport` | `Email/get` full + blob | M1 |
-| 46 | Raw message / headers | no | `modules/mail/raw-message` | `mail.rawMessage` | `Email/get` `headers`, `bodyStructure` | M1 |
+| 45 | Print/export (.eml, print thread) | yes | thread view | — | `Email/get` full + blob | M1 |
+| 46 | Raw message / headers | yes | thread view | — | `Email/get` `headers`, `bodyStructure` | M1 |
 | 47 | Keyboard shortcuts (full map + `?` help) | part | core + contributions | — | — | M1 |
 | 48 | Command palette (full coverage) | part | core + contributions | — | — | M1 |
 | 49 | Notifications | no | `modules/system/notifications` | `system.notifications` | push events → toast/Web Notification | M2 |

@@ -57,7 +57,7 @@ export const roadmapItems: RoadmapItem[] = [
     area: "Mail",
     description:
       "Scheduled sending, undo send, snooze, reminders, and an outbox with retry controls.",
-    status: "planned",
+    status: "in-progress",
   },
   {
     title: "From email to action",
@@ -71,7 +71,7 @@ export const roadmapItems: RoadmapItem[] = [
     area: "Platform",
     description:
       "Cached reading, queued actions, and reconciliation after the connection returns.",
-    status: "planned",
+    status: "in-progress",
   },
   {
     title: "Shared inboxes",

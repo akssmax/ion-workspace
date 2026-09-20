@@ -377,19 +377,23 @@ export class JmapClient {
       )
     }
 
-    // The first element is the capability invocation; skip it.
+    // Responses may or may not carry a leading capability invocation (the
+    // mock server emits one; the real transport returns Stalwart's
+    // `methodResponses` which does not). Match strictly by call id instead of
+    // assuming an offset, so both transports parse identically.
+    const expected = new Set(calls.map((call) => call.id))
     const invocations: ParsedInvocation[] = []
-    for (const entry of raw.slice(1)) {
+    for (const entry of raw) {
       if (!Array.isArray(entry) || entry.length < 3) continue
       const [method, args, callId] = entry as [
         string,
         Record<string, unknown>,
         string,
       ]
+      if (typeof callId !== "string" || !expected.has(callId)) continue
       const isError =
         method === "error" ||
-        (Array.isArray(entry) &&
-          entry.length >= 4 &&
+        (entry.length >= 4 &&
           typeof entry[3] === "object" &&
           (entry[3] as { DS?: string }).DS === "0")
       invocations.push({

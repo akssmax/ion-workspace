@@ -15,6 +15,7 @@ import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import type { WorkspaceApp } from "@/stores/workspace.store"
 import { SaveState, SettingRow } from "./settings-page"
+import { SettingsGroup } from "./settings-group"
 import { LANGUAGES, useLanguage } from "@/lib/language"
 
 const TIMEZONES = [
@@ -55,137 +56,168 @@ export function GeneralSection() {
   const { t } = useLanguage()
 
   return (
-    <div>
-      <SettingRow
-        id="pref-language"
-        label={t("Language")}
-        hint={t("Used across the workspace interface.")}
-      >
-        <Select
-          value={prefs?.language ?? "en"}
-          onValueChange={(value) =>
-            void save.mutateAsync({ language: value as string })
-          }
+    <div className="space-y-8">
+      <SettingsGroup title="Language and region">
+        <SettingRow
+          id="pref-language"
+          label={t("Language")}
+          hint={t("Used across the workspace interface.")}
         >
-          <SelectTrigger id="pref-language" className="w-52">
-            <SelectValue>{labelFor(LANGUAGES)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {LANGUAGES.map((l) => (
-              <SelectItem key={l.value} value={l.value}>
-                {l.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+          <Select
+            value={prefs?.language ?? "en"}
+            onValueChange={(value) =>
+              void save.mutateAsync({ language: value as string })
+            }
+          >
+            <SelectTrigger id="pref-language" className="w-52">
+              <SelectValue>{labelFor(LANGUAGES)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {LANGUAGES.map((l) => (
+                <SelectItem key={l.value} value={l.value}>
+                  {l.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
 
-      <Separator />
+        <Separator />
 
-      <SettingRow
-        id="pref-timezone"
-        label={t("Timezone")}
-        hint={t("Used for dates and times across mail and calendar.")}
-      >
-        <Select
-          value={prefs?.timezone ?? "auto"}
-          onValueChange={(value) =>
-            void save.mutateAsync({ timezone: value as string })
-          }
+        <SettingRow
+          id="pref-timezone"
+          label={t("Timezone")}
+          hint={t("Used for dates and times across mail and calendar.")}
         >
-          <SelectTrigger id="pref-timezone" className="w-52">
-            <SelectValue>{(value: string) => value === "auto" ? t("Automatic (device)") : labelFor(TIMEZONES)(value)}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {TIMEZONES.map((tz) => (
-              <SelectItem key={tz.value} value={tz.value}>
-                {tz.value === "auto" ? t("Automatic (device)") : tz.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+          <Select
+            value={prefs?.timezone ?? "auto"}
+            onValueChange={(value) =>
+              void save.mutateAsync({ timezone: value as string })
+            }
+          >
+            <SelectTrigger id="pref-timezone" className="w-52">
+              <SelectValue>
+                {(value: string) =>
+                  value === "auto"
+                    ? t("Automatic (device)")
+                    : labelFor(TIMEZONES)(value)
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {TIMEZONES.map((tz) => (
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.value === "auto" ? t("Automatic (device)") : tz.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
 
-      <Separator />
+        <Separator />
 
-      <SettingRow
-        id="pref-calendar-week-start"
-        label="Calendar week starts on"
-        hint="Applies to Month and Week views."
-      >
-        <Select
-          value={prefs?.calendarWeekStart ?? "locale"}
-          onValueChange={(value) =>
-            void save.mutateAsync({ calendarWeekStart: value as "locale" | "sunday" | "monday" | "saturday" })
-          }
+        <SettingRow
+          id="pref-calendar-week-start"
+          label="Calendar week starts on"
+          hint="Applies to Month and Week views."
         >
-          <SelectTrigger id="pref-calendar-week-start" className="w-52"><SelectValue>{labelFor([{value:"locale",label:"Language default"},{value:"sunday",label:"Sunday"},{value:"monday",label:"Monday"},{value:"saturday",label:"Saturday"}])}</SelectValue></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="locale">Language default</SelectItem>
-            <SelectItem value="sunday">Sunday</SelectItem>
-            <SelectItem value="monday">Monday</SelectItem>
-            <SelectItem value="saturday">Saturday</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingRow>
+          <Select
+            value={prefs?.calendarWeekStart ?? "locale"}
+            onValueChange={(value) =>
+              void save.mutateAsync({
+                calendarWeekStart: value as
+                  "locale" | "sunday" | "monday" | "saturday",
+              })
+            }
+          >
+            <SelectTrigger id="pref-calendar-week-start" className="w-52">
+              <SelectValue>
+                {labelFor([
+                  { value: "locale", label: "Language default" },
+                  { value: "sunday", label: "Sunday" },
+                  { value: "monday", label: "Monday" },
+                  { value: "saturday", label: "Saturday" },
+                ])}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="locale">Language default</SelectItem>
+              <SelectItem value="sunday">Sunday</SelectItem>
+              <SelectItem value="monday">Monday</SelectItem>
+              <SelectItem value="saturday">Saturday</SelectItem>
+            </SelectContent>
+          </Select>
+        </SettingRow>
+      </SettingsGroup>
 
-      <Separator />
-
-      <SettingRow
-        id="pref-default-view"
-        label={t("Default app")}
-        hint={t("The app you land in. Changing it switches you there now.")}
-      >
-        <Select
-          value={prefs?.defaultView ?? "mail"}
-          onValueChange={(value) => {
-            const app = value as WorkspaceApp
-            void save.mutateAsync({ defaultView: app })
-            setApp(app)
-          }}
+      <SettingsGroup title="Workspace defaults">
+        <SettingRow
+          id="pref-default-view"
+          label={t("Default app")}
+          hint={t("The app you land in. Changing it switches you there now.")}
         >
-          <SelectTrigger id="pref-default-view" className="w-52">
-            <SelectValue>{(value: string) => t(labelFor(APPS)(value) as "Mail" | "Calendar" | "Contacts" | "Files")}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {APPS.map((a) => (
-              <SelectItem key={a.value} value={a.value}>
-                {t(a.label as "Mail" | "Calendar" | "Contacts" | "Files")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+          <Select
+            value={prefs?.defaultView ?? "mail"}
+            onValueChange={(value) => {
+              const app = value as WorkspaceApp
+              void save.mutateAsync({ defaultView: app })
+              setApp(app)
+            }}
+          >
+            <SelectTrigger id="pref-default-view" className="w-52">
+              <SelectValue>
+                {(value: string) =>
+                  t(
+                    labelFor(APPS)(value) as
+                      "Mail" | "Calendar" | "Contacts" | "Files"
+                  )
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {APPS.map((a) => (
+                <SelectItem key={a.value} value={a.value}>
+                  {t(a.label as "Mail" | "Calendar" | "Contacts" | "Files")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
 
-      <Separator />
+        <Separator />
 
-      <SettingRow
-        id="pref-density"
-        label={t("Display density")}
-        hint={t("Overall spacing of the interface.")}
-      >
-        <Select
-          value={prefs?.displayDensity ?? "comfortable"}
-          onValueChange={(value) =>
-            void save.mutateAsync({
-              displayDensity: value as "comfortable" | "compact",
-            })
-          }
+        <SettingRow
+          id="pref-density"
+          label={t("Display density")}
+          hint={t("Overall spacing of the interface.")}
         >
-          <SelectTrigger id="pref-density" className="w-52">
-            <SelectValue>{(value: string) => t(labelFor(DENSITIES)(value) as "Comfortable" | "Compact")}</SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {DENSITIES.map((d) => (
-              <SelectItem key={d.value} value={d.value}>
-                {t(d.label as "Comfortable" | "Compact")}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </SettingRow>
+          <Select
+            value={prefs?.displayDensity ?? "comfortable"}
+            onValueChange={(value) =>
+              void save.mutateAsync({
+                displayDensity: value as "comfortable" | "compact",
+              })
+            }
+          >
+            <SelectTrigger id="pref-density" className="w-52">
+              <SelectValue>
+                {(value: string) =>
+                  t(labelFor(DENSITIES)(value) as "Comfortable" | "Compact")
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {DENSITIES.map((d) => (
+                <SelectItem key={d.value} value={d.value}>
+                  {t(d.label as "Comfortable" | "Compact")}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </SettingRow>
 
-      <SaveState isSaving={save.isPending} isError={save.isError} />
+        <SaveState isSaving={save.isPending} isError={save.isError} />
+      </SettingsGroup>
     </div>
   )
 }

@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { useSidebar } from "@/components/ui/sidebar"
 import {
@@ -38,6 +39,8 @@ import { UpcomingIsland } from "@/modules/calendar/upcoming-island"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import { AdvancedSearch } from "./advanced-search"
 import { useLanguage } from "@/lib/language"
+import { usePreferences, useSavePreferences } from "@/queries/preferences"
+import type { MailQuickFilter, MailSort } from "@/lib/mail-list"
 import type { TranslationKey } from "@/lib/language"
 
 const mailboxRoleLabels: Record<string, TranslationKey> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", junk: "Junk", trash: "Trash", starred: "Starred", important: "Important" }
@@ -60,17 +63,29 @@ export function MailView() {
   const [rightSplit, setRightSplit] = useState(0.37)
   const [bottomSplit, setBottomSplit] = useState(0.46)
   const [mailPage, setMailPage] = useState(0)
+  const [quickFilters, setQuickFilters] = useState<MailQuickFilter[]>([])
+  const { data: preferences } = usePreferences()
+  const savePreferences = useSavePreferences()
   const layout = useInboxLayout()
 
   const { data: rawMailboxes } = useMailboxes()
   const mailboxes = sortMailboxes(rawMailboxes ?? [])
   const mailbox = mailboxes.find((m) => m.id === activeMailboxId)
+  // Never send an unresolved/stale mailbox id (e.g. a mock id persisted from a
+  // previous session) to the server — Stalwart rejects unknown ids with a 400.
+  const resolvedMailboxId = mailbox?.id ?? null
+  const sort = preferences?.mailSortByMailbox?.[activeMailboxId ?? "all"] ?? "newest"
+  const listScope = { sort, sent: mailbox?.role === "sent", quickFilters }
+  function changeSort(value: MailSort) {
+    savePreferences.mutate({ mailSortByMailbox: { ...preferences?.mailSortByMailbox, [activeMailboxId ?? "all"]: value } })
+  }
   const mailboxLabel = (item: typeof mailbox) => item?.role ? t(mailboxRoleLabels[item.role] ?? item.name) : item?.name
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const compact = isMobile || (paneWidth !== null && paneWidth < 620)
   const showMailboxMenu = sidebarState === "collapsed" || compact
 
-  useEffect(() => { setMailPage(0) }, [activeMailboxId, searchQuery])
+  useEffect(() => { setMailPage(0) }, [activeMailboxId, searchQuery, sort, quickFilters])
+  useEffect(() => { setQuickFilters([]) }, [activeMailboxId])
 
   useEffect(() => {
     const element = panesRef.current
@@ -125,10 +140,13 @@ export function MailView() {
     setPaneView("list+reading")
   }
 
-  // Fresh sessions have no active mailbox — default to the Inbox so the
-  // list isn't empty until the user picks a folder.
+  // Default to the Inbox when there is no active mailbox, or when the stored
+  // id no longer exists for this account (switching mock → real, deleted
+  // folder, account change).
   useEffect(() => {
-    if (activeMailboxId || !rawMailboxes?.length) return
+    if (!rawMailboxes?.length) return
+    if (activeMailboxId && rawMailboxes.some((m) => m.id === activeMailboxId))
+      return
     const inbox =
       rawMailboxes.find((m) => m.role === "inbox") ?? rawMailboxes[0]
     setActiveMailbox(inbox.id)
@@ -225,20 +243,21 @@ export function MailView() {
             >
               /
             </kbd>
-            <button
+            <Tooltip><TooltipTrigger render={<button
               type="button"
               aria-label="Open command palette (Command K)"
-              title="Open command palette"
               onClick={() => setPaletteOpen(true)}
               className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
-            >
+            />}>
               <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
                 ⌘ K
               </kbd>
-            </button>
+            </TooltipTrigger><TooltipContent>Open command palette</TooltipContent></Tooltip>
           </div>
         </div>
-        {upcomingIsland ? <UpcomingIsland /> : null}
+        {upcomingIsland ? (
+          <div className="ms-auto"><UpcomingIsland /></div>
+        ) : null}
       </header>
 
       <div ref={panesRef} className={cn("flex min-h-0 min-w-0 flex-1 overflow-hidden", verticalSplit && "flex-col")}>
@@ -256,12 +275,15 @@ export function MailView() {
             )}
             style={showReading && !hiddenPane ? verticalSplit ? { height: `${bottomSplit * 100}%` } : { width: `${rightSplit * 100}%` } : undefined}
           >
-            <MailboxHeader mailboxId={activeMailboxId} query={searchQuery} page={mailPage} onPageChange={setMailPage} />
+            <MailboxHeader mailboxId={resolvedMailboxId} query={searchQuery} page={mailPage} onPageChange={setMailPage} sort={sort} onSortChange={changeSort} quickFilters={quickFilters} onQuickFiltersChange={setQuickFilters} sent={listScope.sent} />
             <div className="min-h-0 flex-1 overflow-hidden">
               <EmailList
-                mailboxId={activeMailboxId}
+                mailboxId={resolvedMailboxId}
                 query={searchQuery}
                 page={mailPage}
+                sort={sort}
+                sent={listScope.sent}
+                quickFilters={quickFilters}
                 featuredThreadId={focusedThreadId}
                 density={layout.listDensity}
                 showSnippets={layout.showSnippets}
@@ -273,7 +295,7 @@ export function MailView() {
         ) : null}
 
         {showList && showReading && !hiddenPane ? (
-          <div
+          <Tooltip><TooltipTrigger render={<div
             role="separator"
             tabIndex={0}
             aria-label={verticalSplit ? "Resize message list height" : "Resize message list width"}
@@ -281,7 +303,6 @@ export function MailView() {
             aria-valuemin={20}
             aria-valuemax={80}
             aria-valuenow={Math.round((verticalSplit ? bottomSplit : rightSplit) * 100)}
-            title="Drag to resize; double-click to reset"
             onPointerDown={startResize}
             onDoubleClick={() => verticalSplit ? setBottomSplit(0.46) : setRightSplit(0.37)}
             onKeyDown={(event) => {
@@ -306,14 +327,14 @@ export function MailView() {
                 ? "h-px w-full cursor-row-resize before:-inset-y-2 before:inset-x-0"
                 : "h-full w-px cursor-col-resize before:inset-y-0 before:-inset-x-2"
             )}
-          >
+          />}>
             <span className={cn(
               "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100",
               verticalSplit
                 ? "top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2"
                 : "top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2"
             )} />
-          </div>
+          </TooltipTrigger><TooltipContent>Drag to resize; double-click to reset</TooltipContent></Tooltip>
         ) : null}
 
         {showReading ? (

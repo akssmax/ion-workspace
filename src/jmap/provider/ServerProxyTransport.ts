@@ -19,6 +19,7 @@ import type {
 } from "../client/transport"
 import type { JmapSession } from "../types"
 import { JMAP_CAPS } from "../types"
+import { assertJmapRequest } from "../client/validate"
 
 export interface ServerProxyTransportOptions {
   /** Public same-origin SSE URL for JMAP push (optional; falls back to polling). */
@@ -31,26 +32,35 @@ export function toJmapRequest(payload: unknown[], session: JmapSession): { using
   const using = requested.filter((capability) => advertised.has(capability))
   if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("VacationResponse/")) && advertised.has("urn:ietf:params:jmap:vacationresponse")) using.push("urn:ietf:params:jmap:vacationresponse")
   if (payload.slice(1).some((item) => (item as unknown[])[0]?.toString().startsWith("SieveScript/")) && advertised.has("urn:ietf:params:jmap:sieve")) using.push("urn:ietf:params:jmap:sieve")
-  const methodCalls = payload.slice(1).map((item) => {
+    const methodCalls = payload.slice(1).map((item) => {
     const [method, rawArgs, id, options] = item as [string, Record<string, unknown>, string, { resultOf?: { callId: string; name: string; path: string } }?]
     const args = structuredClone(rawArgs)
     if (options?.resultOf) {
+      // RFC 8620 ResultReference is `{ resultOf, name, path }`; the client
+      // stores the originating call id under `callId`, so remap it.
       const reference = options.resultOf
+      const resultReference = {
+        resultOf: reference.callId,
+        name: reference.name,
+        ...(reference.path ? { path: reference.path } : {}),
+      }
       if (Array.isArray(args.ids) && args.ids.some((value) => typeof value === "string" && value.startsWith("#"))) {
         delete args.ids
-        args["#ids"] = reference
+        args["#ids"] = resultReference
       }
       const create = args.create as Record<string, Record<string, unknown>> | undefined
       if (create) for (const entry of Object.values(create)) {
         if (typeof entry.emailId === "string" && entry.emailId.startsWith("#")) {
           delete entry.emailId
-          entry["#emailId"] = reference
+          entry["#emailId"] = resultReference
         }
       }
     }
     return [method, args, id]
   })
-  return { using: [...new Set(using)], methodCalls }
+  const request = { using: [...new Set(using)], methodCalls }
+  assertJmapRequest(request)
+  return request
 }
 
 export class ServerProxyTransport implements Transport {

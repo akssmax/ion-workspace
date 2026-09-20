@@ -2,7 +2,7 @@
  * Files: breadcrumb navigation over the node tree, upload & folder creation.
  */
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   Upload,
   FolderPlus,
@@ -34,6 +34,12 @@ import {
 import { formatDate } from "@/lib/dates"
 import type { FileNode } from "@/jmap/types/files"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import {
+  AttachmentThumb,
+  DocumentViewer,
+  fileNodeSource,
+  kindForMime,
+} from "@/components/viewer"
 
 export function FilesView() {
   const path = useFilesStore((s) => s.path)
@@ -50,6 +56,28 @@ export function FilesView() {
   const [folderDialog, setFolderDialog] = useState(false)
   const [folderName, setFolderName] = useState("")
   const [busy, setBusy] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+
+  const files = useMemo(
+    () =>
+      [...(nodes ?? [])].sort(
+        (a, b) =>
+          Number(a.isFile) - Number(b.isFile) || a.name.localeCompare(b.name)
+      ),
+    [nodes]
+  )
+  const fileNodes = useMemo(() => files.filter((node) => node.isFile), [files])
+  const fileIndexOf = useMemo(
+    () => new Map(fileNodes.map((node, index) => [node.id, index])),
+    [fileNodes]
+  )
+  const sources = useMemo(
+    () =>
+      fileNodes.map((node) =>
+        fileNodeSource(node, (target) => download.mutateAsync(target))
+      ),
+    [fileNodes, download.mutateAsync]
+  )
 
   function fmtSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -140,36 +168,49 @@ export function FilesView() {
             <Skeleton key={i} className="h-24" />
           ))
         ) : nodes && nodes.length > 0 ? (
-          [...nodes]
-            .sort(
-              (a, b) =>
-                Number(a.isFile) - Number(b.isFile) ||
-                a.name.localeCompare(b.name)
-            )
-            .map((node) => (
+          files.map((node) => {
+            const fileIndex = fileIndexOf.get(node.id) ?? 0
+            const isImage =
+              node.isFile &&
+              kindForMime(node.contentType ?? "", node.name) === "image"
+            return (
               <div
                 key={node.id}
                 className="group flex flex-col rounded-xl border bg-card p-3 transition-colors hover:bg-muted/40"
               >
                 {node.isFile ? (
-                  <button
-                    onClick={() => void downloadNode(node)}
-                    className="flex min-w-0 flex-col items-start text-left"
-                  >
-                    <FileIcon className="size-8 text-muted-foreground" />
-                    <p className="mt-2 w-full truncate text-sm font-medium">
-                      {node.name}
-                    </p>
-                  </button>
+                  isImage ? (
+                    <AttachmentThumb
+                      source={sources[fileIndex]}
+                      onOpen={() => setPreviewIndex(fileIndex)}
+                      className="h-24 w-full"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setPreviewIndex(fileIndex)}
+                      className="flex min-w-0 flex-col items-start text-left"
+                    >
+                      <FileIcon className="size-8 text-muted-foreground" />
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={() => navigateTo({ id: node.id, name: node.name })}
                     className="flex min-w-0 flex-col items-start text-left"
                   >
                     <Folder className="size-8 text-primary" />
-                    <p className="mt-2 w-full truncate text-sm font-medium">
-                      {node.name}
-                    </p>
+                  </button>
+                )}
+                {node.isFile ? (
+                  <p className="mt-2 w-full truncate text-sm font-medium">
+                    {node.name}
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => navigateTo({ id: node.id, name: node.name })}
+                    className="mt-2 w-full truncate text-left text-sm font-medium"
+                  >
+                    {node.name}
                   </button>
                 )}
                 <div className="mt-2 flex w-full items-center gap-2 text-xs text-muted-foreground">
@@ -220,7 +261,8 @@ export function FilesView() {
                   </Button>
                 </div>
               </div>
-            ))
+            )
+          })
         ) : (
           <div className="col-span-full flex h-40 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
             <Folder className="size-8 text-muted-foreground/40" />
@@ -269,6 +311,17 @@ export function FilesView() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DocumentViewer
+        open={previewIndex !== null}
+        onOpenChange={(value) => {
+          if (!value) setPreviewIndex(null)
+        }}
+        items={sources}
+        index={previewIndex ?? 0}
+        onIndexChange={setPreviewIndex}
+        title="Files"
+      />
     </div>
   )
 }

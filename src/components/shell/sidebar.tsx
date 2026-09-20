@@ -36,6 +36,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { NavUser } from "./nav-user"
 import { IonLogo } from "@/components/brand/logo"
 import { useReducedMotion } from "framer-motion"
@@ -43,17 +44,20 @@ import * as m from "framer-motion/m"
 import { useWorkspaceStore  } from "@/stores/workspace.store"
 import type {WorkspaceApp} from "@/stores/workspace.store";
 import { useMailStore } from "@/stores/mail.store"
-import { useCalendarStore  } from "@/stores/calendar.store"
-import type {CalendarView} from "@/stores/calendar.store";
 import { useFilesStore } from "@/stores/files.store"
 import { useComposerStore } from "@/stores/composer.store"
 import { useMailboxes, sortMailboxes } from "@/queries/mail"
+import { usePreferences } from "@/queries/preferences"
+import { accentClasses } from "@/lib/accents"
+import { resolveTagAppearance } from "@/lib/tag-appearance"
+import { cn } from "cn"
 import { useFeatureFlag } from "@/features/flags"
 import { MailboxRow, NewFolderRow } from "@/modules/mail/mailboxes"
 import { useAddressBooks, useContacts } from "@/queries/contacts"
 import { Link } from "@tanstack/react-router"
 import { useLanguage } from "@/lib/language"
 import { CalendarList } from "@/components/calendar/calendar-list"
+import { CalendarMiniPicker } from "@/components/calendar/calendar-mini-picker"
 import type { TranslationKey } from "@/lib/language"
 
 const APPS: {
@@ -90,13 +94,6 @@ const FOLDER_ICONS: Record<string, React.ReactNode> = {
   archive: <Archive className="size-4" />,
   trash: <Trash2 className="size-4" />,
 }
-
-const CALENDAR_VIEWS: { id: CalendarView; label: string }[] = [
-  { id: "month", label: "Month" },
-  { id: "week", label: "Week" },
-  { id: "day", label: "Day" },
-  { id: "agenda", label: "Agenda" },
-]
 
 export function SidebarShell() {
   const reduceMotion = useReducedMotion()
@@ -191,17 +188,17 @@ export function SidebarShell() {
         </SidebarContent>
         <SidebarFooter>
           {isDemoRuntime ? (
-            <div className="flex flex-col items-center gap-1 py-2" title="Alex Morgan · Sample account" aria-label="Alex Morgan, sample account">
+            <Tooltip><TooltipTrigger render={<div className="flex flex-col items-center gap-1 py-2" role="img" tabIndex={0} aria-label="Alex Morgan, sample account" />}>
               <Avatar>
                 <AvatarFallback>AM</AvatarFallback>
               </Avatar>
-            </div>
+            </TooltipTrigger><TooltipContent>Alex Morgan · Sample account</TooltipContent></Tooltip>
           ) : <NavUser />}
         </SidebarFooter>
       </Sidebar>
 
       {/* Secondary panel — contextual navigation per app. */}
-      <Sidebar collapsible="none" className="hidden flex-1 md:flex">
+      <Sidebar collapsible="none" className="hidden min-w-0 flex-1 md:flex">
         <SidebarHeader className="h-14 shrink-0 flex-row items-center gap-2 border-b px-3 py-0">
           <SidebarTrigger className="group-data-[collapsible=icon]:hidden" />
           <PanelTitle app={app} />
@@ -251,6 +248,7 @@ function MailboxPanel() {
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const setSearchQuery = useMailStore((s) => s.setSearchQuery)
   const { data: rawMailboxes } = useMailboxes()
+  const { data: prefs } = usePreferences()
   const mailboxes = sortMailboxes(rawMailboxes ?? [])
   const folderManagement = useFeatureFlag("mail.mailboxes")
 
@@ -271,7 +269,17 @@ function MailboxPanel() {
             const icon = mb.role ? (
               (FOLDER_ICONS[mb.role] ?? <Inbox className="size-4" />)
             ) : (
-              <Inbox className="size-4" />
+              (() => {
+                const appearance = resolveTagAppearance(
+                  prefs?.tagAppearance?.[mb.id],
+                  mb.id
+                )
+                return (
+                  <appearance.Icon
+                    className={cn("size-4", accentClasses(appearance.color).icon)}
+                  />
+                )
+              })()
             )
             if (folderManagement) {
               return (
@@ -308,29 +316,10 @@ function MailboxPanel() {
 }
 
 function CalendarPanel() {
-  const { t } = useLanguage()
-  const view = useCalendarStore((s) => s.view)
-  const setView = useCalendarStore((s) => s.setView)
   return (
     <>
-    <SidebarGroup>
-      <SidebarGroupLabel>{t("Views")}</SidebarGroupLabel>
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {CALENDAR_VIEWS.map((item) => (
-            <SidebarMenuItem key={item.id}>
-              <SidebarMenuButton
-                onClick={() => setView(item.id)}
-                isActive={view === item.id}
-              >
-                <span>{t(item.label as TranslationKey)}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-    <CalendarList />
+      <CalendarMiniPicker />
+      <CalendarList />
     </>
   )
 }

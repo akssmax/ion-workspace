@@ -1,6 +1,6 @@
 /**
- * Compose UI: modal for new/draft messages; inline panel for reply /
- * reply-all / forward so the thread stays in view.
+ * Compose UI. New messages and reopened drafts open in a docked panel that
+ * reuses the inline reply chrome, so composing never takes over the screen.
  */
 
 import { useEffect, useRef, useState } from "react"
@@ -43,6 +43,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { DatePicker } from "@/components/ui/date-picker"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -72,39 +74,50 @@ import type { EmailProperties } from "@/jmap/types/mail"
 import { emailTextBody, emailHtmlBody } from "@/lib/html"
 import { useMailTemplates, useSaveMailTemplate, useDeleteMailTemplate } from "@/queries/mail-templates"
 import { usePreferences } from "@/queries/preferences"
+import { useMailJobsCapability, useQueueMailSend } from "@/queries/mail-jobs"
 
 function isInlineMode(mode: ComposeMode): boolean {
   return mode === "reply" || mode === "reply-all" || mode === "forward"
 }
 
-/** Modal composer for new messages and reopened drafts. */
-export function ComposeDialog() {
+/**
+ * New-message / draft composer. Docked to the bottom-end corner like Gmail's
+ * compose window, using the same panel surface as the inline reply composer.
+ * Rendered app-wide so Compose shortcut / command palette work in any app.
+ */
+export function ComposeDock() {
   const open = useComposerStore((s) => s.open)
   const mode = useComposerStore((s) => s.mode)
   const closeCompose = useComposerStore((s) => s.closeCompose)
   const [expanded, setExpanded] = useState(false)
 
+  useEffect(() => {
+    if (!open || isInlineMode(mode)) setExpanded(false)
+  }, [open, mode])
+
   if (!open || isInlineMode(mode)) return null
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && closeCompose()}>
-      <DialogContent
-        showCloseButton={false}
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-end px-3 pb-3 sm:px-4 sm:pb-4">
+      <div
         className={cn(
-          "flex max-h-[min(90vh,900px)] w-[min(760px,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden rounded-xl p-0 sm:max-w-none",
-          expanded && "h-[calc(100vh-2rem)] w-[calc(100vw-2rem)]"
+          "pointer-events-auto flex w-full flex-col overflow-hidden rounded-xl border bg-card shadow-lg",
+          expanded
+            ? "h-[min(85vh,760px)] sm:w-[min(52rem,calc(100vw-2rem))]"
+            : "max-h-[min(70vh,640px)] sm:w-[min(42rem,calc(100vw-2rem))]"
         )}
       >
-        <DialogHeader className="flex-row items-center border-b bg-muted/40 px-5 py-3">
-          <DialogTitle>
+        <div className="flex shrink-0 items-center gap-1 border-b px-3 py-2">
+          <span className="truncate text-sm font-medium">
             {mode === "draft" ? "Edit draft" : "New message"}
-          </DialogTitle>
+          </span>
           <div className="ml-auto flex items-center gap-1">
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon"
+              className="size-8"
               aria-label={expanded ? "Restore size" : "Expand compose"}
-              onClick={() => setExpanded(!expanded)}
+              onClick={() => setExpanded((value) => !value)}
             >
               {expanded ? (
                 <Minimize2 className="size-4" />
@@ -114,17 +127,18 @@ export function ComposeDialog() {
             </Button>
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon"
+              className="size-8"
               aria-label="Close compose"
               onClick={closeCompose}
             >
               <X className="size-4" />
             </Button>
           </div>
-        </DialogHeader>
-        <ComposerForm variant="dialog" />
-      </DialogContent>
-    </Dialog>
+        </div>
+        <ComposerForm variant="dock" />
+      </div>
+    </div>
   )
 }
 
@@ -212,10 +226,11 @@ export function InlineComposer({ pinned }: { pinned: boolean }) {
   )
 }
 
-function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
+function ComposerForm({ variant }: { variant: "dock" | "inline" }) {
   const composer = useComposerStore()
   const { open, mode, updateCompose, closeCompose } = composer
   const inline = variant === "inline"
+  const isReply = isInlineMode(mode)
 
   const identities = useIdentities()
   const { data: preferences } = usePreferences()
@@ -273,11 +288,11 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
         link: { openOnClick: false },
       }),
       Placeholder.configure({
-        placeholder: inline ? "Write a reply…" : "Write your message…",
+        placeholder: isReply ? "Write a reply…" : "Write your message…",
       }),
       CharacterCount,
     ],
-    content: inline ? "" : (composer.quotedText ?? ""),
+    content: isReply ? "" : (composer.quotedText ?? ""),
     onTransaction: () => setEditTick((t) => t + 1),
     editorProps: {
       attributes: {
@@ -338,11 +353,18 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
   }, [open, mode, draft.data, editor, updateCompose])
 
   const send = useSendEmail()
+  const sendLater = useQueueMailSend()
+  const requestId = useRef(crypto.randomUUID())
+  const jobsCapability = useMailJobsCapability()
   const saveDraft = useSaveDraft()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showCc, setShowCc] = useState(false)
   const [showRecipients, setShowRecipients] = useState(false)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleDate, setScheduleDate] = useState("")
+  const [scheduleTime, setScheduleTime] = useState("09:00")
+  useEffect(() => { if (open) requestId.current = crypto.randomUUID() }, [open])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [saveState, setSaveState] = useState<
@@ -407,7 +429,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
 
   const canSend = composer.to.length > 0 && !!identity
 
-  async function sendEmail() {
+  async function sendEmail(scheduledFor?: string) {
     if (!identity || composer.to.length === 0) return
     if (![...composer.to, ...composer.cc, ...composer.bcc].every((recipient) => isValidEmail(recipient.email))) {
       setError("Check the recipient addresses before sending.")
@@ -419,7 +441,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
     try {
       const html = editor?.getHTML() ?? ""
       const text = editor?.getText() ?? ""
-      await send.mutateAsync({
+      const input = {
         identityId: identity.id,
         from: [{ name: identity.name, email: identity.email ?? identity.name }],
         to: composer.to,
@@ -434,8 +456,15 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
           ? composer.attachments
           : undefined,
         draftId: composer.draftEmailId,
-      })
-      composer.setSendState("sent")
+      }
+      if (jobsCapability.data) {
+        await sendLater.mutateAsync({ input, scheduledFor, requestId: requestId.current })
+        composer.setSendState("queued")
+      } else {
+        await send.mutateAsync(input)
+        composer.setSendState("sent")
+      }
+      setScheduleOpen(false)
       closeCompose()
     } catch (err) {
       const message =
@@ -558,34 +587,45 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
       )}
     >
       {identities.data && identities.data.length > 1 ? (
-        <div className="flex items-center gap-2 border-b px-5 py-2 text-sm">
-          <Label htmlFor="compose-from" className="text-muted-foreground">From</Label>
+        <div className="flex items-center gap-2 border-b px-4 py-2 text-sm">
+          <Label htmlFor="compose-from" className="w-9 shrink-0 text-xs text-muted-foreground uppercase">From</Label>
           <Select value={identity?.id ?? identities.data[0]?.id} onValueChange={value => { if (typeof value === "string") updateCompose({ identityId: value }) }}>
             <SelectTrigger id="compose-from" className="min-w-0 flex-1"><SelectValue>{identity ? `${identity.name} <${identity.email}>` : "Choose identity"}</SelectValue></SelectTrigger>
             <SelectContent>{identities.data.map(item => <SelectItem key={item.id} value={item.id}>{item.name} &lt;{item.email}&gt;</SelectItem>)}</SelectContent>
           </Select>
         </div>
       ) : null}
-      {inline && composer.to.length > 0 && !showRecipients ? (
+      {isReply && composer.to.length > 0 && !showRecipients ? (
         <button
           type="button"
-          className="flex min-h-12 items-center gap-2 border-b px-5 text-left text-sm hover:bg-muted/30"
+          className="flex min-h-12 items-center gap-2 border-b px-4 text-left text-sm hover:bg-muted/30"
           onClick={() => setShowRecipients(true)}
         >
-          <span className="text-muted-foreground">To</span>
-          <span className="truncate">
+          <span className="w-9 shrink-0 text-xs text-muted-foreground uppercase">To</span>
+          <span className="min-w-0 flex-1 truncate">
             {composer.to.map((r) => r.name || r.email).join(", ")}
           </span>
-          <ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground" />
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
         </button>
       ) : (
-        <div className="border-b px-4 py-2">
+        <div className="flex items-start gap-2 border-b px-4 py-2">
           <RecipientField
+            className="min-w-0 flex-1"
             label="To"
             value={composer.to}
             onChange={(to) => updateCompose({ to })}
             placeholder="Recipients"
+            autoFocus={!isReply}
           />
+          {!ccVisible ? (
+            <button
+              type="button"
+              className="shrink-0 py-0.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={() => setShowCc(true)}
+            >
+              Cc Bcc
+            </button>
+          ) : null}
         </div>
       )}
       {ccVisible ? (
@@ -593,30 +633,21 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
           <div className="border-b px-4 py-2">
             <RecipientField
               label="Cc"
-              value={composer.cc ?? []}
+              value={composer.cc}
               onChange={(cc) => updateCompose({ cc })}
             />
           </div>
           <div className="border-b px-4 py-2">
             <RecipientField
               label="Bcc"
-              value={composer.bcc ?? []}
+              value={composer.bcc}
               onChange={(bcc) => updateCompose({ bcc })}
             />
           </div>
         </>
       ) : null}
-      {(!inline || showRecipients || composer.to.length === 0) && !ccVisible ? (
-        <button
-          type="button"
-          className="self-end px-5 py-1 text-xs text-muted-foreground hover:text-foreground"
-          onClick={() => setShowCc(true)}
-        >
-          Cc / Bcc
-        </button>
-      ) : null}
 
-      {!inline || mode === "forward" ? (
+      {!isReply || mode === "forward" ? (
         <div className="border-b px-4 py-2">
           <Label htmlFor="compose-subject" className="sr-only">
             Subject
@@ -626,7 +657,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             placeholder="Subject"
             value={composer.subject}
             onChange={(e) => updateCompose({ subject: e.target.value })}
-            className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+            className="h-auto rounded-none border-0 bg-transparent px-0 py-0.5 shadow-none focus-visible:ring-0"
           />
         </div>
       ) : null}
@@ -647,19 +678,17 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
           className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5"
         >
           {formattingTools.map((tool) => (
-            <Button
-              key={tool.label}
+            <Tooltip key={tool.label}><TooltipTrigger render={<Button
               type="button"
               variant="ghost"
               size="icon-sm"
               className="size-8"
               aria-label={tool.label}
-              title={tool.label}
               aria-pressed={!!tool.active}
               onClick={tool.run}
-            >
+            />}>
               {tool.icon}
-            </Button>
+            </TooltipTrigger><TooltipContent>{tool.label}</TooltipContent></Tooltip>
           ))}
         </div>
         <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
@@ -710,8 +739,7 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
 
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 px-4 py-3",
-          inline && "sticky bottom-0 border-t bg-card"
+          "sticky bottom-0 flex flex-wrap items-center gap-2 border-t bg-card px-4 py-3"
         )}
       >
         <Button
@@ -728,6 +756,21 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             </>
           )}
         </Button>
+        {jobsCapability.data ? <>
+          <Button type="button" variant="outline" disabled={!canSend || busy} onClick={() => setScheduleOpen(true)}>Send later</Button>
+          <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
+            <DialogContent className="sm:max-w-sm">
+              <DialogHeader><DialogTitle>Schedule message</DialogTitle></DialogHeader>
+              <p className="text-sm text-muted-foreground">A copy of this message will be queued. Cancel it in Outbox before editing the draft.</p>
+              <div className="grid gap-3">
+                <Label htmlFor="send-date">Date</Label><DatePicker id="send-date" value={scheduleDate} onChange={setScheduleDate} />
+                <Label htmlFor="send-time">Time</Label><Input id="send-time" type="time" value={scheduleTime} onChange={event => setScheduleTime(event.target.value)} />
+                <Button disabled={busy || !scheduleDate || !scheduleTime || new Date(`${scheduleDate}T${scheduleTime}`).getTime() < Date.now() + 60_000} onClick={() => void sendEmail(new Date(`${scheduleDate}T${scheduleTime}`).toISOString())}>Schedule send</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </> : null}
+        {jobsCapability.data === false ? <span className="hidden text-xs text-muted-foreground sm:inline">Scheduling unavailable</span> : null}
         <input
           ref={fileRef}
           type="file"
@@ -753,16 +796,15 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             }
           }}
         />
-        <Button
+        <Tooltip><TooltipTrigger render={<Button
           variant="ghost"
           size="icon-sm"
           aria-label="Attach files"
-          title="Attach files"
           onClick={() => fileRef.current?.click()}
           disabled={busy}
-        >
+        />}>
           <Paperclip className="size-4" />
-        </Button>
+        </TooltipTrigger><TooltipContent>Attach files</TooltipContent></Tooltip>
         {templatesAvailable ? (
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="ghost" size="sm" type="button" />}>
@@ -797,16 +839,15 @@ function ComposerForm({ variant }: { variant: "dialog" | "inline" }) {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
-        <Button
+        <Tooltip><TooltipTrigger render={<Button
           variant="ghost"
           size="icon-sm"
           aria-label="Discard message"
-          title="Discard message"
           onClick={closeCompose}
           className="ml-auto"
-        >
+        />}>
           <Trash2 className="size-4" />
-        </Button>
+        </TooltipTrigger><TooltipContent>Discard message</TooltipContent></Tooltip>
       </div>
     </div>
   )
@@ -821,11 +862,15 @@ function RecipientField({
   value,
   onChange,
   placeholder,
+  autoFocus,
+  className,
 }: {
   label: string
   value: Recipient[]
   onChange: (recipients: Recipient[]) => void
   placeholder?: string
+  autoFocus?: boolean
+  className?: string
 }) {
   const [text, setText] = useState("")
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -854,10 +899,10 @@ function RecipientField({
   const ok = value.length ? true : null
 
   return (
-    <div>
+    <div className={cn("min-w-0", className)}>
       <Label className="sr-only">{label}</Label>
-      <div className="flex flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1.5">
-        <span className="w-8 shrink-0 text-right text-xs text-muted-foreground uppercase">
+      <div className="flex flex-wrap items-center gap-1.5 px-0.5">
+        <span className="w-9 shrink-0 text-xs text-muted-foreground uppercase">
           {label}
         </span>
         {value.map((r) => (
@@ -878,6 +923,7 @@ function RecipientField({
         ))}
         <div className="relative min-w-[8rem] flex-1">
           <input
+            autoFocus={autoFocus}
             className="w-full bg-transparent text-sm outline-none"
             placeholder={ok ? "" : (placeholder ?? "recipients…")}
             value={text}

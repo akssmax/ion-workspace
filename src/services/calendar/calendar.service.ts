@@ -6,7 +6,6 @@ import type { Calendar, CalendarEvent, JmapId } from "../../jmap/types/calendar"
 import { getJmapClient, getPrimaryAccountId } from "../jmap.service"
 import { JMAP_CAPS } from "../../jmap/types"
 import { parseCalendarFile, type ParsedCalendarFile } from "@/lib/ical-import"
-import { parseCalendarUpload } from "@/server/calendar-import.rpc"
 import { isDemoRuntime } from "@/lib/demo/runtime"
 
 export interface CalendarCapabilities {
@@ -179,27 +178,36 @@ export async function parseIcsContents(
   contents: string
 ): Promise<ParsedCalendarFile> {
   if (contents.length > 10_000_000) throw new Error("File exceeds 10 MB.")
-  const client = await getJmapClient()
-  const session = await client.session()
-  const accountId = await getPrimaryAccountId(JMAP_CAPS.CALENDARS)
-  if (
-    accountId &&
-    session.capabilities["urn:ietf:params:jmap:calendars:parse"]
-  ) {
-    const data = new TextEncoder().encode(contents)
-    const blob = await client.upload(accountId, data.buffer, {
-      contentType: "text/calendar",
-      filename: "import.ics",
-    })
-    const response = await client.call<{
-      parsed?: Record<string, Partial<CalendarEvent>[]>
-      notParsable?: string[]
-    }>("CalendarEvent/parse", { accountId, blobIds: [blob.blobId] }, "icsparse")
-    if (response.notParsable?.length)
-      throw new Error("Stalwart could not parse this calendar file.")
-    return { events: response.parsed?.[blob.blobId] ?? [], errors: [] }
+  if (!isDemoRuntime) {
+    try {
+      const client = await getJmapClient()
+      const session = await client.session()
+      const accountId = await getPrimaryAccountId(JMAP_CAPS.CALENDARS)
+      if (
+        accountId &&
+        session.capabilities["urn:ietf:params:jmap:calendars:parse"]
+      ) {
+        const data = new TextEncoder().encode(contents)
+        const blob = await client.upload(accountId, data.buffer, {
+          contentType: "text/calendar",
+          filename: "import.ics",
+        })
+        const response = await client.call<{
+          parsed?: Record<string, Partial<CalendarEvent>[]>
+          notParsable?: string[]
+        }>(
+          "CalendarEvent/parse",
+          { accountId, blobIds: [blob.blobId] },
+          "icsparse"
+        )
+        if (response.notParsable?.length)
+          throw new Error("Stalwart could not parse this calendar file.")
+        return { events: response.parsed?.[blob.blobId] ?? [], errors: [] }
+      }
+    } catch {
+      // Stalwart's upload/parser is unavailable (e.g. 404 on this server
+      // version); fall back to parsing the file locally so import still works.
+    }
   }
-  return isDemoRuntime
-    ? parseCalendarFile(contents)
-    : parseCalendarUpload({ data: contents })
+  return parseCalendarFile(contents)
 }

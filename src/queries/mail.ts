@@ -19,6 +19,9 @@ import { ACCOUNT_KEY } from "./client"
 import { getPrimaryAccountId } from "../services/jmap.service"
 import { syncEngine } from "../jmap/sync/sync.engine"
 import { useSession } from "../hooks/use-session"
+import { combineMailFilters, MAIL_QUICK_FILTERS, mailSortComparators, type MailQuickFilter, type MailSort } from "@/lib/mail-list"
+import { getJmapClient } from "../services/jmap.service"
+import { JMAP_CAPS } from "../jmap/types"
 
 function useMailScopeKey(): string {
   const { data } = useSession()
@@ -103,6 +106,9 @@ export interface EmailListScope {
   mailboxId?: string
   query?: string
   limit?: number
+  sort?: MailSort
+  sent?: boolean
+  quickFilters?: MailQuickFilter[]
 }
 
 /**
@@ -111,6 +117,22 @@ export interface EmailListScope {
  */
 export const MAIL_PAGE_SIZE = 25
 
+export function useMailSortCapabilities() {
+  const accountScope = useMailScopeKey()
+  return useQuery({
+    queryKey: [ACCOUNT_KEY, "mail-sort-capabilities", accountScope],
+    queryFn: async (): Promise<string[]> => {
+      const client = await getJmapClient()
+      const session = await client.session()
+      const accountId = session.primaryAccounts[JMAP_CAPS.MAIL]
+      const accountCaps = session.accounts[accountId]?.accountCapabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined
+      const sessionCaps = session.capabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined
+      return accountCaps?.emailQuerySortOptions ?? sessionCaps?.emailQuerySortOptions ?? ["receivedAt"]
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useEmails(scope: EmailListScope, page = 0) {
   const accountScope = useMailScopeKey()
   const { data: session } = useSession()
@@ -118,7 +140,7 @@ export function useEmails(scope: EmailListScope, page = 0) {
   const query = scope.query ?? ""
   const pageSize = scope.limit ?? MAIL_PAGE_SIZE
   return useQuery({
-    queryKey: [...qk.emails(mailboxId, query), accountScope, pageSize, page],
+    queryKey: [...qk.emails(mailboxId, query), accountScope, pageSize, page, scope.sort ?? "newest", !!scope.sent, [...(scope.quickFilters ?? [])].sort().join(",")],
     queryFn: () => fetchEmailsForScope({ ...scope, limit: pageSize }, mailboxId, page * pageSize, session?.accountId),
     enabled: scope.mailboxId !== undefined || scope.query !== undefined,
     staleTime: 30_000,
@@ -142,20 +164,26 @@ async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string, pos
         ids.length === 1
           ? { inMailbox: ids[0] }
           : { operator: "OR", conditions: ids.map((id) => ({ inMailbox: id })) }
-      filter = filter ? { operator: "AND", conditions: [clause, filter] } : clause
+      filter = combineMailFilters(clause, filter)
     }
   } else if (mailboxId !== "all") {
     // Keep the mailbox context when searching inside a folder.
-    filter = filter
-      ? { operator: "AND", conditions: [{ inMailbox: mailboxId }, filter] }
-      : { inMailbox: mailboxId }
+    filter = combineMailFilters({ inMailbox: mailboxId }, filter)
   }
+
+  filter = combineMailFilters(filter, ...MAIL_QUICK_FILTERS.filter(({ value }) => scope.quickFilters?.includes(value)).map(({ clause }) => clause))
 
   let accountId = cachedAccountId
   try {
     accountId ??= (await getPrimaryAccountId()) ?? undefined
+    const client = await getJmapClient()
+    const jmapSession = await client.session()
+    const sortOptions = (accountId ? jmapSession.accounts[accountId]?.accountCapabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined : undefined)?.emailQuerySortOptions
+      ?? (jmapSession.capabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined)?.emailQuerySortOptions
+      ?? ["receivedAt"]
     const result = await mailService.getEmails(mailboxId, {
       filter,
+      sort: mailSortComparators(scope.sort ?? "newest", scope.sent, sortOptions),
       limit: scope.limit ?? 60,
       position,
       calculateTotal: true,
@@ -163,7 +191,10 @@ async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string, pos
     if (accountId) void syncEngine.storeMailPage(accountId, result.emails).catch(() => {})
     return result
   } catch (error) {
-    if (!accountId || scope.query || !canReadOffline(error)) throw error
+    if (!accountId || scope.query || scope.sort && scope.sort !== "newest" || scope.quickFilters?.length || !canReadOffline(error)) {
+      if (canReadOffline(error) && (scope.sort && scope.sort !== "newest" || scope.quickFilters?.length)) throw new Error("Reconnect to sort or filter messages; cached mail is shown newest first.")
+      throw error
+    }
     return syncEngine.offlineMailPage(accountId, mailboxId, position, scope.limit ?? 60)
   }
 }
@@ -379,6 +410,14 @@ export function usePermanentlyDeleteEmails() {
   })
 }
 
+export function useEmptyTrash() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => mailService.emptyTrash(),
+    onSuccess: () => invalidateMailViews(qc),
+  })
+}
+
 export function useSendEmail() {
   const qc = useQueryClient()
   return useMutation({
@@ -387,6 +426,8 @@ export function useSendEmail() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["acc", "emails"] })
       void qc.invalidateQueries({ queryKey: qk.mailboxes() })
+      // The sent reply lands in the same thread; refresh any open thread view.
+      void qc.invalidateQueries({ queryKey: [ACCOUNT_KEY, "thread"] })
     },
   })
 }

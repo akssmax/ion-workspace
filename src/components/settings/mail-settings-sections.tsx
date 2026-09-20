@@ -11,7 +11,11 @@ import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { useCreateMailbox, useDeleteMailbox, useIdentities, useMailboxes, useRenameMailbox, useUpdateIdentity } from "@/queries/mail"
 import { useDeleteMailTemplate, useMailTemplates, useSaveMailTemplate } from "@/queries/mail-templates"
 import { filenameDefaults, formatMailFilename, type FilenameKind } from "@/lib/mail-filenames"
+import { resolveTagAppearance } from "@/lib/tag-appearance"
+import type { TagAppearance } from "@/lib/tag-appearance"
+import { TagAppearanceBadge, TagAppearanceControl, TagAppearanceDraftControl } from "@/modules/mail/labels"
 import { SaveState } from "./settings-page"
+import { SettingsGroup } from "./settings-group"
 import { useSaveVacationResponse, useVacationResponse, type VacationResponse } from "@/queries/mail-vacation"
 import { useMailFilters, useSaveMailFilters } from "@/queries/mail-filters"
 import { getMailConnectionStatus } from "@/server/mail-connection.rpc"
@@ -46,13 +50,16 @@ export function ComposingSection() {
   const { data: prefs } = usePreferences()
   const save = useSavePreferences()
   const identities = useIdentities()
-  return <div className="space-y-5">
+  return <div className="space-y-8">
+    <SettingsGroup title="Sending and replies" contentClassName="space-y-4 py-4">
     <label className="block space-y-1 text-sm font-medium">Default sending identity
       <SettingsSelect id="default-identity" value={prefs?.defaultIdentityId ?? "default"} options={[{ value: "default", label: "First available identity" }, ...(identities.data ?? []).map(identity => ({ value: identity.id, label: `${identity.name} <${identity.email}>` }))]} onChange={value => void save.mutateAsync({ defaultIdentityId: value === "default" ? "" : value })} />
     </label>
     <label className="block space-y-1 text-sm font-medium">Reply default
       <SettingsSelect id="reply-default" value={prefs?.replyDefault ?? "reply"} options={[{ value: "reply", label: "Reply to sender" }, { value: "reply-all", label: "Reply to everyone" }]} onChange={value => void save.mutateAsync({ replyDefault: value as "reply" | "reply-all" })} />
     </label>
+    </SettingsGroup>
+    <SettingsGroup title="Signatures" contentClassName="space-y-4 py-4">
     <label className="block space-y-1 text-sm font-medium">Signature placement
       <SettingsSelect id="signature-placement" value={prefs?.signaturePlacement ?? "above"} options={[{ value: "above", label: "Above quoted text" }, { value: "below", label: "Below quoted text" }]} onChange={value => void save.mutateAsync({ signaturePlacement: value as "above" | "below" })} />
     </label>
@@ -62,6 +69,7 @@ export function ComposingSection() {
     {(identities.data ?? []).map(identity => <label key={identity.id} className="block space-y-1 text-sm font-medium">Signature for {identity.email}
       <Textarea value={prefs?.signatures?.[identity.id]?.text ?? ""} onChange={event => void save.mutateAsync({ signatures: { ...prefs?.signatures, [identity.id]: { ...prefs?.signatures?.[identity.id], text: event.target.value } } })} placeholder="Uses default signature when empty" />
     </label>)}
+    </SettingsGroup>
     <SaveState isSaving={save.isPending} isError={save.isError} />
   </div>
 }
@@ -118,13 +126,41 @@ export function IdentitiesSection() {
 
 export function FoldersSection({ tags }: { tags: boolean }) {
   const { data: mailboxes, isError } = useMailboxes()
+  const { data: prefs } = usePreferences()
+  const save = useSavePreferences()
   const create = useCreateMailbox(), rename = useRenameMailbox(), remove = useDeleteMailbox()
   const [name, setName] = useState("")
+  const [draft, setDraft] = useState<TagAppearance>({})
   const custom = (mailboxes ?? []).filter(mailbox => !mailbox.role)
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault()
+    const trimmed = name.trim()
+    if (!trimmed) return
+    try {
+      const result = await create.mutateAsync(trimmed)
+      const newId = result.created?.new.id
+      if (tags && newId) await save.mutateAsync({ tagAppearance: { ...prefs?.tagAppearance, [newId]: draft } })
+      setName("")
+      setDraft({})
+    } catch {
+      /* create.isError surfaces the message below */
+    }
+  }
+
   return <div className="space-y-4">
-    <p className="text-sm text-muted-foreground">{tags ? "Labels are stored as JMAP mailbox memberships, so a message can have several." : "Folders are managed by the connected mail server."}</p>
-    <form className="flex gap-2" onSubmit={event => { event.preventDefault(); if (name.trim()) void create.mutateAsync(name.trim()).then(() => setName("")) }}><Input aria-label="New folder name" value={name} onChange={event => setName(event.target.value)} placeholder="New folder name" /><Button type="submit" disabled={!name.trim()}>Create</Button></form>
-    {isError ? <p className="text-sm text-destructive">Could not load folders.</p> : custom.map(mailbox => <div key={mailbox.id} className="flex items-center gap-2 rounded-lg border p-2"><span className="min-w-0 flex-1 truncate text-sm">{mailbox.name}</span><Button variant="ghost" size="sm" onClick={() => { const next = window.prompt("Rename folder", mailbox.name); if (next?.trim() && next !== mailbox.name) void rename.mutateAsync({ id: mailbox.id, name: next.trim() }) }}>Rename</Button><Button variant="ghost" size="icon-sm" aria-label={`Delete ${mailbox.name}`} onClick={() => { if (window.confirm(`Delete ${mailbox.name}?`)) void remove.mutateAsync(mailbox.id) }}><Trash2 className="size-4" /></Button></div>)}
+    <p className="text-sm text-muted-foreground">{tags ? "Labels are stored as JMAP mailbox memberships, so a message can have several. Pick an icon and color to make them easy to scan." : "Folders are managed by the connected mail server."}</p>
+    <form className="flex gap-2" onSubmit={submit}><Input aria-label="New folder name" value={name} onChange={event => setName(event.target.value)} placeholder="New folder name" />{tags ? <TagAppearanceDraftControl name={name} color={draft.color} icon={draft.icon} onChange={setDraft} /> : null}<Button type="submit" disabled={!name.trim() || create.isPending}>Create</Button></form>
+    {isError ? <p className="text-sm text-destructive">Could not load folders.</p> : custom.map(mailbox => {
+      const appearance = resolveTagAppearance(prefs?.tagAppearance?.[mailbox.id], mailbox.id)
+      return <div key={mailbox.id} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
+        {tags ? <TagAppearanceBadge color={appearance.color} icon={appearance.icon} /> : null}
+        <span className="min-w-0 flex-1 truncate text-sm">{mailbox.name}</span>
+        {tags ? <TagAppearanceControl id={mailbox.id} name={mailbox.name} /> : null}
+        <Button variant="ghost" size="sm" onClick={() => { const next = window.prompt("Rename folder", mailbox.name); if (next?.trim() && next !== mailbox.name) void rename.mutateAsync({ id: mailbox.id, name: next.trim() }) }}>Rename</Button>
+        <Button variant="ghost" size="icon-sm" aria-label={`Delete ${mailbox.name}`} onClick={() => { if (window.confirm(`Delete ${mailbox.name}?`)) void remove.mutateAsync(mailbox.id) }}><Trash2 className="size-4" /></Button>
+      </div>
+    })}
     {(create.isError || rename.isError || remove.isError) ? <p className="text-sm text-destructive">The mail server rejected this folder change.</p> : null}
   </div>
 }

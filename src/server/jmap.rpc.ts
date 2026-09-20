@@ -9,7 +9,7 @@
 import { createServerFn } from "@tanstack/react-start"
 import { updateSession } from "./session.server"
 import { WORKSPACE_CONFIG } from "./config.server"
-import { activeStalwartToken } from "./stalwart-auth.server"
+import { activeStalwartAuthorization } from "./stalwart-auth.server"
 
 class ProxyError extends Error {
   constructor(
@@ -22,7 +22,7 @@ class ProxyError extends Error {
 }
 
 async function requireAccessToken(): Promise<string> {
-  try { return await activeStalwartToken() }
+  try { return await activeStalwartAuthorization() }
   catch { throw new ProxyError("Your mail session expired. Sign in again.", 401) }
 }
 
@@ -66,7 +66,7 @@ export const proxyJmapRequest = createServerFn({ method: "POST" })
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: token,
         },
         body: JSON.stringify(data.payload),
         signal: AbortSignal.timeout(30_000),
@@ -80,20 +80,72 @@ export const proxyJmapRequest = createServerFn({ method: "POST" })
     if (!response.ok) {
       if (response.status === 401)
         throw new ProxyError("Session expired, please log in again.", 401)
+      const detail = await describeJmapError(response)
+      // Surface the method calls that were rejected so the dev terminal can
+      // pinpoint the offending request; the client message stays concise.
+      console.error(
+        `[jmap-proxy] ${response.status} ${detail || "(no detail)"} :: ${methodNames(data.payload)} :: ${safeJson(data.payload)}`
+      )
       if (response.status >= 500)
         throw new ProxyError(
-          "The mail server reported a problem.",
+          detail
+            ? `The mail server reported a problem: ${detail}`
+            : "The mail server reported a problem.",
           response.status,
           true
         )
       throw new ProxyError(
-        `The mail server rejected the request (${response.status}).`,
+        detail
+          ? `The mail server rejected the request (${response.status}): ${detail}`
+          : `The mail server rejected the request (${response.status}).`,
         response.status
       )
     }
 
     return (await response.json()) as any
   })
+
+/** Human-readable JMAP error detail without echoing an entire request body. */
+async function describeJmapError(response: Response): Promise<string> {
+  try {
+    const text = await response.text()
+    if (!text) return ""
+    try {
+      const body = JSON.parse(text) as {
+        type?: string
+        title?: string
+        detail?: string
+      }
+      const detail =
+        body.detail && body.detail.length <= 240 ? body.detail : undefined
+      return [body.type ?? body.title, detail].filter(Boolean).join(" — ")
+    } catch {
+      return text.slice(0, 240)
+    }
+  } catch {
+    return ""
+  }
+}
+
+/** Method names present in a serialized JMAP request body. */
+function methodNames(payload: unknown): string {
+  const calls = Array.isArray(payload)
+    ? payload.slice(1)
+    : ((payload as { methodCalls?: unknown[] } | null)?.methodCalls ?? [])
+  return calls
+    .map((call) => (Array.isArray(call) ? String(call[0]) : ""))
+    .filter(Boolean)
+    .join(", ")
+}
+
+/** Serialize for logging without throwing on cycles or huge bodies. */
+function safeJson(value: unknown): string {
+  try {
+    return JSON.stringify(value).slice(0, 2000)
+  } catch {
+    return "(unserializable)"
+  }
+}
 
 export const proxySession = createServerFn({ method: "GET" }).handler(
   async () => {
@@ -103,7 +155,7 @@ export const proxySession = createServerFn({ method: "GET" }).handler(
     let response: Response
     try {
       response = await fetch(sessionUrl, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: token },
         signal: AbortSignal.timeout(15_000),
       })
     } catch {
@@ -149,7 +201,7 @@ export const proxyUpload = createServerFn({ method: "POST" })
 
     const headers: Record<string, string> = {
       "Content-Type": data.contentType ?? "application/octet-stream",
-      Authorization: `Bearer ${token}`,
+      Authorization: token,
     }
     if (data.filename) {
       headers["Content-Disposition"] =
@@ -210,7 +262,7 @@ export const proxyDownload = createServerFn({ method: "POST" })
     let response: Response
     try {
       response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: token },
         signal: AbortSignal.timeout(60_000),
       })
     } catch {
@@ -239,7 +291,7 @@ export const persistAccountId = createServerFn({ method: "POST" })
     if (data.accountId) {
       const token = await requireAccessToken()
       const response = await fetch(`${WORKSPACE_CONFIG.stalwartOrigin}/.well-known/jmap`, {
-        headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000),
+        headers: { Authorization: token }, signal: AbortSignal.timeout(10_000),
       })
       if (!response.ok) throw new ProxyError("Could not verify mail account.", response.status)
       const session = await response.json() as { accounts?: Record<string, { accountCapabilities?: Record<string, unknown> }> }

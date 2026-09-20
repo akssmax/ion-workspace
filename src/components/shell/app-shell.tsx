@@ -14,7 +14,7 @@ import { MailView } from "../mail/mail-view"
 import { CalendarView } from "../calendar/calendar-view"
 import { ContactsView } from "../contacts/contacts-view"
 import { FilesView } from "../files/files-view"
-import { ComposeDialog } from "../mail/composer"
+import { ComposeDock } from "../mail/composer"
 import { SendStatusPill } from "../mail/send-status"
 
 export function AppShell() {
@@ -36,7 +36,7 @@ export function AppShell() {
         </div>
       </SidebarInset>
       <CommandPalette />
-      <ComposeDialog />
+      <ComposeDock />
       <SendStatusPill />
       <KeyboardShortcuts />
     </SidebarProvider>

@@ -5,6 +5,14 @@
 
 export type JmapMode = "mock" | "real"
 
+/**
+ * How real-mode credentials are obtained from Stalwart.
+ *  - `oauth` uses Stalwart's authorization-code/PKCE exchange (pre-1.0).
+ *  - `basic` validates the password against `/.well-known/jmap` and keeps
+ *    the HTTP Basic credentials server-side (Stalwart 1.0+).
+ */
+export type StalwartAuthMode = "oauth" | "basic"
+
 export interface WorkspaceConfig {
   /** Which JMAP provider the app should use. */
   jmapMode: JmapMode
@@ -13,6 +21,8 @@ export interface WorkspaceConfig {
    * endpoints and the legacy auth exchange.
    */
   stalwartOrigin: string
+  /** Credential scheme used for real-mode sign-in. */
+  stalwartAuthMode: StalwartAuthMode
   /** JMAP endpoint appended to stalwartOrigin. */
   jmapPath: string
   /** Where to POST username/password to obtain a session JWT. */
@@ -43,6 +53,10 @@ export function getConfig(): WorkspaceConfig {
   return {
     jmapMode: boolFromEnv("JMAP_MODE", false) ? "real" : "mock",
     stalwartOrigin,
+    stalwartAuthMode:
+      process.env.STALWART_AUTH_MODE?.toLowerCase() === "basic"
+        ? "basic"
+        : "oauth",
     jmapPath: `${stalwartOrigin}/jmap`,
     authPath: `${stalwartOrigin}/api/auth`,
     oauthTokenPath: `${stalwartOrigin}/auth/token`,

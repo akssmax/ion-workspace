@@ -13,7 +13,7 @@ export interface Recipient {
   email: string
 }
 
-export type SendState = "idle" | "sending" | "sent" | "failed"
+export type SendState = "idle" | "sending" | "sent" | "queued" | "failed"
 
 export interface ComposeState {
   open: boolean

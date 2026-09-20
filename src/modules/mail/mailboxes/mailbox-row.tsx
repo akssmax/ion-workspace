@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react"
-import { Folder, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Folder, MoreHorizontal, Palette, Pencil, Trash2 } from "lucide-react"
 import {
   SidebarMenuAction,
   SidebarMenuBadge,
@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input"
 import type { Mailbox } from "@/jmap/types/mail"
 import { useDeleteMailbox, useRenameMailbox } from "@/queries/mail"
+import { TagAppearanceDialog } from "@/modules/mail/labels"
 
 export function MailboxRow({
   mailbox,
@@ -35,6 +36,7 @@ export function MailboxRow({
   onPick: (id: string) => void
 }) {
   const [renaming, setRenaming] = useState(false)
+  const [customizing, setCustomizing] = useState(false)
   const [name, setName] = useState(mailbox.name)
   const rename = useRenameMailbox()
   const destroy = useDeleteMailbox()
@@ -107,6 +109,10 @@ export function MailboxRow({
               <Pencil className="size-3.5" />
               Rename
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setCustomizing(true)}>
+              <Palette className="size-3.5" />
+              Customize
+            </DropdownMenuItem>
             <DropdownMenuItem
               variant="destructive"
               onClick={() => void destroy.mutateAsync(mailbox.id)}
@@ -117,6 +123,12 @@ export function MailboxRow({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
+      <TagAppearanceDialog
+        id={mailbox.id}
+        name={mailbox.name}
+        open={customizing}
+        onOpenChange={setCustomizing}
+      />
     </SidebarMenuItem>
   )
 }

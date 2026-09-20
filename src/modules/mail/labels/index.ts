@@ -9,3 +9,11 @@ export { LabelMenu } from "./label-menu"
 export { LabelChips } from "./label-chips"
 export { LabelChip } from "./label-chip"
 export { isLabelMailbox, labelsOf, emailLabels } from "./labels"
+export {
+  useTagAppearance,
+  TagAppearancePicker,
+  TagAppearanceDialog,
+  TagAppearanceControl,
+  TagAppearanceBadge,
+  TagAppearanceDraftControl,
+} from "./tag-appearance"

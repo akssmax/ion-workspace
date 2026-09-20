@@ -13,9 +13,12 @@ export type { JmapId } from "./mail"
 export interface FileNode {
   id: JmapId
   size: number
-  contentType: string
+  /** Absent on some servers (e.g. Stalwart); the viewer routes by extension. */
+  contentType?: string
   name: string
   isFile: boolean
+  /** Stalwart/draft servers express the kind as `nodeType` instead of `isFile`. */
+  nodeType?: "file" | "directory" | string | null
   blobId?: string | null
   parentId?: JmapId | null
   childNodeIds?: JmapId[] | null

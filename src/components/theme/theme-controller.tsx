@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from "react"
 import { Check, RotateCcw } from "lucide-react"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
@@ -22,6 +23,7 @@ import {
 } from "@/theme/schema"
 import { useThemeStore } from "@/theme/store"
 import { ThemeGallery } from "./theme-gallery"
+import { SettingsGroup } from "@/components/settings/settings-group"
 
 const SWATCH_BG: Record<string, string> = {
   zinc: "bg-zinc-500",
@@ -69,213 +71,219 @@ export function ThemeController({
 
   return (
     <div className={gap}>
-      <ThemeField label="Appearance">
-        <div className="grid grid-cols-3 gap-2">
-          <AppearanceCard
-            mode="light"
-            label="Light"
-            selected={theme.mode === "light"}
-            onSelect={() => theme.setTheme({ mode: "light" })}
-          />
-          <AppearanceCard
-            mode="dark"
-            label="Dark"
-            selected={theme.mode === "dark"}
-            onSelect={() => theme.setTheme({ mode: "dark" })}
-          />
-          <AppearanceCard
-            mode="system"
-            label="Auto"
-            selected={theme.mode === "system"}
-            onSelect={() => theme.setTheme({ mode: "system" })}
-          />
-        </div>
-      </ThemeField>
+      <ThemeLayoutGroup grouped={!compact} title="Theme">
+        <ThemeField label="Appearance">
+          <div className="grid grid-cols-3 gap-2">
+            <AppearanceCard
+              mode="light"
+              label="Light"
+              selected={theme.mode === "light"}
+              onSelect={() => theme.setTheme({ mode: "light" })}
+            />
+            <AppearanceCard
+              mode="dark"
+              label="Dark"
+              selected={theme.mode === "dark"}
+              onSelect={() => theme.setTheme({ mode: "dark" })}
+            />
+            <AppearanceCard
+              mode="system"
+              label="Auto"
+              selected={theme.mode === "system"}
+              onSelect={() => theme.setTheme({ mode: "system" })}
+            />
+          </div>
+        </ThemeField>
 
-      <ThemeGallery />
+        <ThemeGallery />
+      </ThemeLayoutGroup>
 
-      {theme.preset === "default" ? (
-        <>
-          <ThemeField
-            label="Accent"
-            hint={
-              compact
-                ? undefined
-                : "Brand color for buttons, unread dots, and the sidebar mark."
-            }
-          >
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {ACCENT_OPTIONS.map((opt) => (
-                <SwatchButton
-                  key={opt.id}
-                  label={opt.label}
-                  selected={theme.accent === opt.id}
-                  swatch={opt.swatch}
-                  onSelect={() =>
-                    theme.setTheme({ accent: opt.id as AccentId })
-                  }
-                />
-              ))}
-            </div>
-          </ThemeField>
-
-          <ThemeField
-            label="Base gray"
-            hint={
-              compact
-                ? undefined
-                : "Neutral surfaces — zinc, stone, and the rest of Tailwind’s gray ramps."
-            }
-          >
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-              {GRAY_OPTIONS.map((opt) => (
-                <SwatchButton
-                  key={opt.id}
-                  label={opt.label}
-                  selected={theme.gray === opt.id}
-                  swatch={opt.id}
-                  onSelect={() => theme.setTheme({ gray: opt.id as GrayScale })}
-                />
-              ))}
-            </div>
-          </ThemeField>
-        </>
-      ) : null}
-
-      <ThemeField label="Radius">
-        <div className="flex flex-wrap gap-1.5">
-          {RADIUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-pressed={theme.radius === opt.id}
-              onClick={() => theme.setTheme({ radius: opt.id as RadiusId })}
-              className={cn(
-                "flex h-11 w-11 items-center justify-center border transition-colors",
-                theme.radius === opt.id
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-muted/60"
-              )}
-              style={{ borderRadius: opt.value }}
-              title={opt.label}
+      <ThemeLayoutGroup grouped={!compact} title="Colors and typography">
+        {theme.preset === "default" ? (
+          <>
+            <ThemeField
+              label="Accent"
+              hint={
+                compact
+                  ? undefined
+                  : "Brand color for buttons, unread dots, and the sidebar mark."
+              }
             >
-              <span
-                className="size-5 border border-foreground/40"
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {ACCENT_OPTIONS.map((opt) => (
+                  <SwatchButton
+                    key={opt.id}
+                    label={opt.label}
+                    selected={theme.accent === opt.id}
+                    swatch={opt.swatch}
+                    onSelect={() =>
+                      theme.setTheme({ accent: opt.id as AccentId })
+                    }
+                  />
+                ))}
+              </div>
+            </ThemeField>
+
+            <ThemeField
+              label="Base gray"
+              hint={
+                compact
+                  ? undefined
+                  : "Neutral surfaces — zinc, stone, and the rest of Tailwind’s gray ramps."
+              }
+            >
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {GRAY_OPTIONS.map((opt) => (
+                  <SwatchButton
+                    key={opt.id}
+                    label={opt.label}
+                    selected={theme.gray === opt.id}
+                    swatch={opt.id}
+                    onSelect={() =>
+                      theme.setTheme({ gray: opt.id as GrayScale })
+                    }
+                  />
+                ))}
+              </div>
+            </ThemeField>
+          </>
+        ) : null}
+
+        <ThemeField label="Radius">
+          <div className="flex flex-wrap gap-1.5">
+            {RADIUS_OPTIONS.map((opt) => (
+              <Tooltip key={opt.id}><TooltipTrigger render={<button
+                type="button"
+                aria-pressed={theme.radius === opt.id}
+                onClick={() => theme.setTheme({ radius: opt.id as RadiusId })}
+                className={cn(
+                  "flex h-11 w-11 items-center justify-center border transition-colors",
+                  theme.radius === opt.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:bg-muted/60"
+                )}
                 style={{ borderRadius: opt.value }}
-              />
-              <span className="sr-only">{opt.label}</span>
-            </button>
-          ))}
-        </div>
-      </ThemeField>
+              />}>
+                <span
+                  className="size-5 border border-foreground/40"
+                  style={{ borderRadius: opt.value }}
+                />
+                <span className="sr-only">{opt.label}</span>
+              </TooltipTrigger><TooltipContent>{opt.label}</TooltipContent></Tooltip>
+            ))}
+          </div>
+        </ThemeField>
 
-      <ThemeField label="Typeface">
-        <div className="grid gap-1.5">
-          {FONT_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-pressed={theme.font === opt.id}
-              onClick={() => theme.setTheme({ font: opt.id as FontId })}
-              className={cn(
-                "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition-colors",
-                theme.font === opt.id
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-muted/60"
-              )}
-              style={{ fontFamily: opt.stack }}
-            >
-              {opt.label}
-              {theme.font === opt.id ? <Check className="size-4" /> : null}
-            </button>
-          ))}
-        </div>
-      </ThemeField>
+        <ThemeField label="Typeface">
+          <div className="grid gap-1.5">
+            {FONT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={theme.font === opt.id}
+                onClick={() => theme.setTheme({ font: opt.id as FontId })}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border px-3 py-2 text-left text-sm transition-colors",
+                  theme.font === opt.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:bg-muted/60"
+                )}
+                style={{ fontFamily: opt.stack }}
+              >
+                {opt.label}
+                {theme.font === opt.id ? <Check className="size-4" /> : null}
+              </button>
+            ))}
+          </div>
+        </ThemeField>
 
-      <ThemeField
-        label="Scale"
-        hint={
-          compact ? undefined : "Root font size. Spacing and type both scale."
-        }
-      >
-        <div className="flex rounded-xl border p-0.5">
-          {SCALE_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-pressed={theme.scale === opt.id}
-              onClick={() => theme.setTheme({ scale: opt.id as ScaleId })}
-              className={cn(
-                "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
-                theme.scale === opt.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {opt.label}
-              <span className="mt-0.5 block text-[10px] opacity-70">
-                {opt.px}px
-              </span>
-            </button>
-          ))}
-        </div>
-      </ThemeField>
-
-      <ThemeField
-        label="Color vision"
-        hint={
-          compact
-            ? undefined
-            : "Remaps brand and status hues so they stay distinguishable. Achromatopsia uses grayscale plus extra contrast."
-        }
-      >
-        <div className="grid gap-1.5">
-          {CVD_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-pressed={theme.cvd === opt.id}
-              onClick={() => theme.setTheme({ cvd: opt.id as CvdId })}
-              className={cn(
-                "flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors",
-                theme.cvd === opt.id
-                  ? "border-primary bg-primary/10"
-                  : "border-border hover:bg-muted/60"
-              )}
-            >
-              <span>
-                <span className="block text-sm font-medium">{opt.label}</span>
-                <span className="text-xs text-muted-foreground">
-                  {opt.hint}
-                </span>
-              </span>
-              {theme.cvd === opt.id ? (
-                <Check className="size-4 shrink-0" />
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </ThemeField>
-
-      <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
-        <div>
-          <Label htmlFor={contrastId} className="text-sm">
-            High contrast
-          </Label>
-          <p className="text-xs text-muted-foreground">
-            Stronger borders and text against surfaces.
-          </p>
-        </div>
-        <Switch
-          id={contrastId}
-          checked={theme.highContrast}
-          onCheckedChange={(checked) =>
-            theme.setTheme({ highContrast: Boolean(checked) })
+        <ThemeField
+          label="Scale"
+          hint={
+            compact ? undefined : "Root font size. Spacing and type both scale."
           }
-        />
-      </div>
+        >
+          <div className="flex rounded-xl border p-0.5">
+            {SCALE_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={theme.scale === opt.id}
+                onClick={() => theme.setTheme({ scale: opt.id as ScaleId })}
+                className={cn(
+                  "flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors",
+                  theme.scale === opt.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+                <span className="mt-0.5 block text-[10px] opacity-70">
+                  {opt.px}px
+                </span>
+              </button>
+            ))}
+          </div>
+        </ThemeField>
+      </ThemeLayoutGroup>
 
-      <Separator />
+      <ThemeLayoutGroup grouped={!compact} title="Accessibility">
+        <ThemeField
+          label="Color vision"
+          hint={
+            compact
+              ? undefined
+              : "Remaps brand and status hues so they stay distinguishable. Achromatopsia uses grayscale plus extra contrast."
+          }
+        >
+          <div className="grid gap-1.5">
+            {CVD_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                aria-pressed={theme.cvd === opt.id}
+                onClick={() => theme.setTheme({ cvd: opt.id as CvdId })}
+                className={cn(
+                  "flex items-center justify-between rounded-xl border px-3 py-2 text-left transition-colors",
+                  theme.cvd === opt.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:bg-muted/60"
+                )}
+              >
+                <span>
+                  <span className="block text-sm font-medium">{opt.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {opt.hint}
+                  </span>
+                </span>
+                {theme.cvd === opt.id ? (
+                  <Check className="size-4 shrink-0" />
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </ThemeField>
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2">
+          <div>
+            <Label htmlFor={contrastId} className="text-sm">
+              High contrast
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Stronger borders and text against surfaces.
+            </p>
+          </div>
+          <Switch
+            id={contrastId}
+            checked={theme.highContrast}
+            onCheckedChange={(checked) =>
+              theme.setTheme({ highContrast: Boolean(checked) })
+            }
+          />
+        </div>
+      </ThemeLayoutGroup>
+
+      {compact ? <Separator /> : null}
 
       <Button
         type="button"
@@ -287,6 +295,24 @@ export function ThemeController({
         Reset to defaults
       </Button>
     </div>
+  )
+}
+
+function ThemeLayoutGroup({
+  grouped,
+  title,
+  children,
+}: {
+  grouped: boolean
+  title: string
+  children: React.ReactNode
+}) {
+  return grouped ? (
+    <SettingsGroup title={title} contentClassName="space-y-6 py-5">
+      {children}
+    </SettingsGroup>
+  ) : (
+    <>{children}</>
   )
 }
 

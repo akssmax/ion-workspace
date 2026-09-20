@@ -2,7 +2,7 @@
  * Reading pane: renders all emails in the focused thread plus actions.
  */
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   MailPlus,
   MessageSquareReply,
@@ -28,7 +28,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import type { EmailAddress, EmailBodyPart, EmailProperties } from "@/jmap/types/mail"
+import type { EmailAddress, EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
 import { useComposerStore } from "@/stores/composer.store"
 import type { ComposeMode } from "@/stores/composer.store"
@@ -54,7 +54,7 @@ import {
   senderName,
   senderEmail,
 } from "@/lib/html"
-import { blockRemoteImages, collapseQuotedSections, escapeHtml } from "@/lib/email-renderer"
+import { blockRemoteImages, collapseQuotedSections, escapeHtml, rewriteCidImages } from "@/lib/email-renderer"
 import { formatDateTime } from "@/lib/dates"
 import { useFeatureFlag } from "@/features/flags"
 import { usePreferences } from "@/queries/preferences"
@@ -65,8 +65,28 @@ import {
   trashIconButtonClassName,
 } from "./permanent-delete-dialog"
 import { InlineComposer } from "./composer"
-import { AttachmentViewer } from "./attachment-viewer"
+import { SnoozeDialog } from "./snooze-dialog"
+import {
+  AttachmentThumb,
+  DocumentViewer,
+  kindForMime,
+  mailAttachmentSource,
+  primeDocumentBlob,
+} from "@/components/viewer"
+import type { DocumentSource } from "@/components/viewer"
 import { useLanguage } from "@/lib/language"
+
+/** Minimal reader stylesheet for the standalone print window. */
+const PRINT_READER_CSS =
+  "body{font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#111;margin:2rem;max-width:56rem}" +
+  "h1,h2,h3,h4,h5,h6{line-height:1.3;margin:1.4em 0 .6em}h1{font-size:1.5em}h2{font-size:1.3em}h3{font-size:1.15em}" +
+  "p{margin:0 0 .85em}a{color:#0d6efd;text-decoration:underline}" +
+  "ul,ol{margin:0 0 .85em;padding-left:1.5em}li{margin:.25em 0}" +
+  "pre{background:#f5f5f5;border:1px solid #ddd;border-radius:6px;padding:12px;white-space:pre-wrap;overflow-x:auto;font-size:.85em;line-height:1.5}" +
+  "code,kbd,samp{font-family:ui-monospace,Menlo,Consolas,monospace;background:#f5f5f5;border-radius:4px;padding:.1em .35em}pre code{background:transparent;padding:0}" +
+  "blockquote{border-left:3px solid #ddd;margin:.85em 0;padding-left:.9em;color:#555}" +
+  "hr{margin:1.5em 0;border:0;border-top:1px solid #ddd}img{max-width:100%;height:auto}" +
+  "table{border-collapse:collapse;max-width:100%}th,td{border:1px solid #ddd;padding:.4em .6em;text-align:left;vertical-align:top}th{background:#f5f5f5}"
 
 export function ThreadViewPane({
   threadId,
@@ -258,6 +278,7 @@ function ThreadActions({
   const isTrash = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "trash") ?? false
   const isArchive = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "archive") ?? false
   const isJunk = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "junk") ?? false
+  const isInbox = mailboxes?.some((mailbox) => mailbox.id === activeMailboxId && mailbox.role === "inbox") ?? false
   const read = useMarkRead()
   const starred = useMarkStarred()
   const contributed = useContributions(threadActions)
@@ -349,6 +370,7 @@ function ThreadActions({
       {contributed.map((Action, i) => (
         <Action key={i} threadId={threadId} email={email} />
       ))}
+      {isInbox ? <SnoozeDialog threadIds={[threadId]} /> : null}
       {isTrash ? <PermanentDeleteDialog
         open={permanentDeleteOpen}
         onOpenChange={setPermanentDeleteOpen}
@@ -387,9 +409,13 @@ function ReplyAction({
         : [...(sentByMe ? [] : (email.replyTo?.length ? email.replyTo : email.from) ?? []), ...(email.to ?? []), ...(email.cc ?? [])]
   ) as EmailAddress[]
 
+  const parentMessageId = (email.messageId ?? [])[0] ?? email.id
   const references = [
-    ...(email.references ?? []),
-    ...(email.inReplyTo ?? []),
+    ...new Set([
+      ...(email.references ?? []),
+      ...(email.inReplyTo ?? []),
+      parentMessageId,
+    ]),
   ].filter(Boolean)
 
   return (
@@ -405,7 +431,7 @@ function ReplyAction({
               !ownAddresses.has(address.email.toLowerCase())
           ),
           subject: subjectFor(mode, email.subject),
-          inReplyTo: [email.messageId ?? email.id].filter(Boolean),
+          inReplyTo: [parentMessageId],
           references,
         })
       }
@@ -443,24 +469,79 @@ function EmailCard({ email, expanded, onToggle }: {
   expanded: boolean
   onToggle: () => void
 }) {
-  const [preview, setPreview] = useState<EmailBodyPart | null>(null)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [loadImages, setLoadImages] = useState(false)
   const { data: preferences } = usePreferences()
   const downloadOriginal = useDownloadAttachment()
   const subject = email.subject || "(no subject)"
   const time = email.receivedAt ?? email.sentAt
   const attachments = attachmentsOf(email)
-  const safeBody = renderEmailBody(email)
-  const blocked = blockRemoteImages(safeBody)
   const sender = email.from?.[0]?.email.toLowerCase() ?? ""
   const imagesAllowed = loadImages || preferences?.remoteImages === "always" || (preferences?.remoteImages === "trusted" && (preferences.trustedImageSenders ?? []).includes(sender))
+  const loadBlob = downloadOriginal.mutateAsync
+
+  const sources = useMemo(
+    () =>
+      attachments.map((att) =>
+        mailAttachmentSource(att, (blobId) => loadBlob(blobId))
+      ),
+    [attachments, loadBlob]
+  )
+
+  // Inline (CID) images referenced by the HTML body, keyed by Content-ID.
+  const cidSources = useMemo(() => {
+    const map: Record<string, DocumentSource> = {}
+    for (const att of attachments) {
+      if (att.cid && att.blobId) {
+        map[att.cid.replace(/[<>]/g, "")] = mailAttachmentSource(att, (blobId) =>
+          loadBlob(blobId)
+        )
+      }
+    }
+    return map
+  }, [attachments, loadBlob])
+
+  const [cidUrls, setCidUrls] = useState<Record<string, string>>({})
+  useEffect(() => {
+    const entries = Object.entries(cidSources)
+    if (!entries.length) {
+      setCidUrls({})
+      return
+    }
+    const cancelled = { current: false }
+    const created: string[] = []
+    void Promise.all(
+      entries.map(async ([cid, src]) => {
+        const blob = await primeDocumentBlob(src)
+        const url = URL.createObjectURL(blob)
+        created.push(url)
+        return [cid, url] as const
+      })
+    )
+      .then((pairs) => {
+        if (!cancelled.current) setCidUrls(Object.fromEntries(pairs))
+      })
+      .catch(() => {})
+    return () => {
+      cancelled.current = true
+      for (const url of created) URL.revokeObjectURL(url)
+    }
+  }, [cidSources])
+
+  const safeBody = useMemo(() => {
+    const raw = renderEmailBody(email)
+    return Object.keys(cidUrls).length
+      ? rewriteCidImages(raw, (cid) => cidUrls[cid.replace(/[<>]/g, "")])
+      : raw
+  }, [email, cidUrls])
+  const blocked = blockRemoteImages(safeBody)
 
   function printMessage() {
     const printable = window.open("", "_blank")
     if (!printable) return
     printable.opener = null
     const printSender = escapeHtml(email.from?.[0]?.email ?? "")
-    printable.document.write(`<!doctype html><html><head><title>${escapeHtml(subject)}</title><meta charset="utf-8"></head><body><h1>${escapeHtml(subject)}</h1><p>From: ${printSender}</p><p>To: ${escapeHtml(fmtAddresses(email.to))}</p><p>${escapeHtml(time ? formatDateTime(time) : "")}</p><hr>${blocked.html}</body></html>`)
+    printable.document.write(`<!doctype html><html><head><title>${escapeHtml(subject)}</title><meta charset="utf-8"><style>${PRINT_READER_CSS}</style></head><body><h1>${escapeHtml(subject)}</h1><p>From: ${printSender}</p><p>To: ${escapeHtml(fmtAddresses(email.to))}</p><p>${escapeHtml(time ? formatDateTime(time) : "")}</p><hr><div class="email-body">${blocked.html}</div></body></html>`)
     printable.document.close()
     printable.print()
   }
@@ -540,23 +621,34 @@ function EmailCard({ email, expanded, onToggle }: {
       ) : null}
       {expanded ? (
         <div
-          className="min-w-0 break-words px-4 py-3 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_img]:max-w-full [&_ol]:list-decimal [&_ol]:pl-5 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:whitespace-pre-wrap [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_ul]:list-disc [&_ul]:pl-5"
+          className="email-body min-w-0 px-4 py-3"
           dangerouslySetInnerHTML={{ __html: collapseQuotedSections(imagesAllowed ? safeBody : blocked.html) }}
         />
       ) : null}
 
       {expanded && attachments.length ? (
-        <div className="flex flex-wrap gap-2 px-4 pb-4">
-          {attachments.map((att, i) => {
-            const blobId = att.blobId ?? att.partId ?? undefined
-            return (
+        <div className="space-y-2 px-4 pb-4">
+          {attachments.some(
+            (att) => kindForMime(att.type ?? "", att.name ?? "") === "image"
+          ) ? (
+            <div className="flex flex-wrap gap-2">
+              {attachments.map((att, i) =>
+                kindForMime(att.type ?? "", att.name ?? "") === "image" ? (
+                  <AttachmentThumb
+                    key={sources[i].id}
+                    source={sources[i]}
+                    onOpen={() => setPreviewIndex(i)}
+                  />
+                ) : null
+              )}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap gap-2">
+            {attachments.map((att, i) => (
               <button
-                key={`${blobId ?? "att"}-${i}`}
-                disabled={!blobId}
-                onClick={() => {
-                  if (blobId) setPreview(att)
-                }}
-                className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs hover:bg-muted disabled:opacity-50"
+                key={sources[i].id}
+                onClick={() => setPreviewIndex(i)}
+                className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs hover:bg-muted"
               >
                 <Paperclip className="size-3.5 text-muted-foreground" />
                 <span className="max-w-[12rem] truncate">
@@ -564,11 +656,20 @@ function EmailCard({ email, expanded, onToggle }: {
                 </span>
                 <span className="text-muted-foreground">Preview</span>
               </button>
-            )
-          })}
+            ))}
+          </div>
         </div>
       ) : null}
-      <AttachmentViewer attachment={preview} onClose={() => setPreview(null)} subject={subject} sender={sender} />
+      <DocumentViewer
+        open={previewIndex !== null}
+        onOpenChange={(value) => {
+          if (!value) setPreviewIndex(null)
+        }}
+        items={sources}
+        index={previewIndex ?? 0}
+        onIndexChange={setPreviewIndex}
+        title={subject}
+      />
     </article>
   )
 }

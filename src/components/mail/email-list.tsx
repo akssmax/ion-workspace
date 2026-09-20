@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen } from "lucide-react"
+import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen, AlertCircle } from "lucide-react"
 import { cn } from "cn"
 import type { EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
@@ -26,17 +26,24 @@ import { senderName, emailHasAttachments } from "@/lib/html"
 import { formatRelative } from "@/lib/dates"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Button } from "@/components/ui/button"
+import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { parseSearch } from "@/lib/search"
 import type { ListDensity, RowStyle } from "@/lib/inbox-layout"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelChips } from "@/modules/mail/labels"
 import { useLanguage } from "@/lib/language"
 import type { Language } from "@/lib/language"
+import type { MailQuickFilter, MailSort } from "@/lib/mail-list"
 
 export function EmailList({
   mailboxId,
   query,
   page = 0,
+  sort = "newest",
+  sent = false,
+  quickFilters = [],
   featuredThreadId,
   density = "comfortable",
   showSnippets = true,
@@ -46,6 +53,9 @@ export function EmailList({
   mailboxId: string | null
   query: string
   page?: number
+  sort?: MailSort
+  sent?: boolean
+  quickFilters?: MailQuickFilter[]
   featuredThreadId: string | null
   density?: ListDensity
   showSnippets?: boolean
@@ -69,13 +79,16 @@ export function EmailList({
       ? undefined
       : (mailboxId ?? undefined),
     query: parsed.query || undefined,
+    sort,
+    sent,
+    quickFilters,
   }
   const emails = useEmails(scope, page)
 
   // Switching mailbox or editing the query drops stale selection.
   useEffect(() => {
     clearSelection()
-  }, [mailboxId, query, clearSelection])
+  }, [mailboxId, query, sort, quickFilters, clearSelection])
 
   const rows = emails.data?.emails ?? []
 
@@ -98,10 +111,29 @@ export function EmailList({
   }
 
   if (emails.isError) {
-    return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-sm text-muted-foreground">
-      <p>Couldn&apos;t load this page of messages.</p>
-      <button type="button" className="rounded-full border px-3 py-1.5 text-foreground hover:bg-muted" onClick={() => void emails.refetch()}>Try again</button>
-    </div>
+    return (
+      <div className="flex h-full items-center justify-center p-6">
+        <Alert variant="destructive" className="max-w-sm">
+          <AlertCircle />
+          <AlertTitle>Couldn&apos;t load messages</AlertTitle>
+          <AlertDescription>
+            {emails.error instanceof Error
+              ? emails.error.message
+              : "Couldn't load this page of messages."}
+          </AlertDescription>
+          <AlertAction>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => void emails.refetch()}
+            >
+              Try again
+            </Button>
+          </AlertAction>
+        </Alert>
+      </div>
+    )
   }
 
   if (rows.length === 0) {
@@ -109,7 +141,7 @@ export function EmailList({
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
         <MailPlus className="size-8 text-muted-foreground/40" />
         <p>
-          {parsed.query
+          {parsed.query || quickFilters.length
             ? t("No messages matched your search.")
             : t("This mailbox is empty.")}
         </p>
@@ -249,7 +281,7 @@ function ActionRow({ email, preferences, isArchive, children }: { email: EmailPr
       {(["archive", "trash", "read", "star"] as const).map(action => {
         const details = actionDetails(action)
         const Icon = details.icon
-        return <button key={action} type="button" title={details.label} aria-label={details.label} disabled={busy} onClick={event => { event.stopPropagation(); run(action) }} className={cn("flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50", action === "trash" ? "hover:bg-destructive/15 hover:text-destructive" : action === "archive" ? "hover:bg-success hover:text-success-foreground" : action === "read" ? "hover:bg-info hover:text-info-foreground" : "hover:bg-warning hover:text-warning-foreground")}><Icon className="size-4" /></button>
+        return <Tooltip key={action}><TooltipTrigger render={<button type="button" aria-label={details.label} disabled={busy} onClick={event => { event.stopPropagation(); run(action) }} className={cn("flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50", action === "trash" ? "hover:bg-destructive/15 hover:text-destructive" : action === "archive" ? "hover:bg-success hover:text-success-foreground" : action === "read" ? "hover:bg-info hover:text-info-foreground" : "hover:bg-warning hover:text-warning-foreground")} />}><Icon className="size-4" /></TooltipTrigger><TooltipContent>{details.label}</TooltipContent></Tooltip>
       })}
     </div>
   </div>

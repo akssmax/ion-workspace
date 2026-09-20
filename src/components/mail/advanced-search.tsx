@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { DatePicker } from "@/components/ui/date-picker"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import {
   Dialog,
   DialogContent,
@@ -72,17 +73,16 @@ export function AdvancedSearch({
 
   return (
     <>
-      <Button
+      <Tooltip><TooltipTrigger render={<Button
         type="button"
         variant="ghost"
         size="icon-sm"
         className="size-7 shrink-0"
         aria-label="Advanced mail search"
-        title="Advanced search"
         onClick={() => setOpen(true)}
-      >
+      />}>
         <SlidersHorizontal className="size-4" />
-      </Button>
+      </TooltipTrigger><TooltipContent>Advanced search</TooltipContent></Tooltip>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>

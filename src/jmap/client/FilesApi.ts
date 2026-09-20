@@ -44,23 +44,36 @@ export class FilesApi {
       ...(parentId ? { ids: [parentId] } : {}),
       properties: [
         "isFile",
+        "nodeType",
         "name",
         "size",
         "contentType",
+        "blobId",
         "parentId",
         "childNodeIds",
         "modifiedAt",
       ],
     })
-    return res.list
+    return res.list.map(normalizeFileNode)
   }
 
   async getByIds(ids: JmapId[], accountId?: string): Promise<FileNode[]> {
     const res = await this.client.call<FileNodeGetResponse>("FileNode/get", {
       accountId: this.acct(accountId),
       ids,
+      properties: [
+        "isFile",
+        "nodeType",
+        "name",
+        "size",
+        "contentType",
+        "blobId",
+        "parentId",
+        "childNodeIds",
+        "modifiedAt",
+      ],
     })
-    return res.list
+    return res.list.map(normalizeFileNode)
   }
 
   async createFolder(
@@ -148,6 +161,21 @@ export class FilesApi {
     }
     await this.client.call<FileNodeSetResponse>("FileNode/set", args, "fsd")
   }
+}
+
+/**
+ * Normalize a FileNode across servers: Stalwart's filenode draft reports
+ * `nodeType` ("file" | "directory") instead of `isFile`, and may omit
+ * `contentType` for files (the viewer then routes by extension).
+ */
+function normalizeFileNode(node: FileNode): FileNode {
+  const isFile =
+    typeof node.isFile === "boolean"
+      ? node.isFile
+      : node.nodeType != null
+        ? node.nodeType !== "directory"
+        : false
+  return { ...node, isFile, contentType: node.contentType ?? "" }
 }
 
 export type { FileNode as FileNodeDto } from "../types/files"

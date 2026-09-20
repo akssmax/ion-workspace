@@ -30,6 +30,13 @@ function labelsOf(mailboxes: Mailbox[]): Mailbox[] {
 }
 
 describe("bulk mail actions", () => {
+  it("keeps Email/query sort order after fetching the page", async () => {
+    const { mail, inbox } = await setup()
+    const sort = [{ property: "receivedAt" as const, isAscending: true }]
+    const result = await mail.getEmails(inbox.id, { sort, limit: 5, collapseThreads: false })
+    expect(result.emails.map(email => email.id)).toEqual(result.ids)
+    expect(result.emails.map(email => email.receivedAt)).toEqual([...result.emails.map(email => email.receivedAt)].sort())
+  })
   it("markRead clears $seen and zeroes the inbox unread counter", async () => {
     const { mail, inbox, ids } = await setup()
 

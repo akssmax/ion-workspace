@@ -3,7 +3,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CalendarPlus,
-  CalendarDays,
   Upload,
   RefreshCw,
   ListFilter,
@@ -16,8 +15,7 @@ import {
   startOfWeek,
 } from "date-fns"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import {
   useCalendarStore,
@@ -36,6 +34,8 @@ import type { CalendarEvent } from "@/jmap/types/calendar"
 import { CalendarImport } from "./calendar-import"
 import { useCalendarFeeds } from "@/queries/calendar-feeds"
 import { CalendarList } from "./calendar-list"
+import { CalendarMiniPicker } from "./calendar-mini-picker"
+import { calendarWeekStart } from "@/lib/calendar-week-start"
 
 const CalendarCanvas = lazy(() => import("./calendar-canvas"))
 const VIEW_NAMES: Record<View, string> = {
@@ -43,14 +43,6 @@ const VIEW_NAMES: Record<View, string> = {
   week: "Week",
   day: "Day",
   agenda: "Schedule",
-}
-
-function localeWeekStart(language: string): number {
-  try {
-    return (new Intl.Locale(language) as Intl.Locale & { weekInfo: { firstDay: number } }).weekInfo.firstDay % 7
-  } catch {
-    return 1
-  }
 }
 
 function windowFor(date: Date, view: View, weekStartsOn: number, scheduleDays: number) {
@@ -81,7 +73,6 @@ export function CalendarView() {
   const [editorEvent, setEditorEvent] = useState<CalendarEvent | null>(null)
   const [initialDraft, setInitialDraft] = useState<CalendarDraft | null>(null)
   const [showImport, setShowImport] = useState(false)
-  const [datePickerOpen, setDatePickerOpen] = useState(false)
   const [showCalendars, setShowCalendars] = useState(false)
   const hidden = useCalendarStore((state) => state.hiddenCalendarIds)
   const [selectedDay, setSelectedDay] = useState<Date>(new Date())
@@ -100,7 +91,7 @@ export function CalendarView() {
   const view = mobile ? mobileView : desktopView
   const prefs = usePreferences().data
   const language = prefs?.language ?? "en"
-  const weekStartsOn = prefs?.calendarWeekStart === "sunday" ? 0 : prefs?.calendarWeekStart === "monday" ? 1 : prefs?.calendarWeekStart === "saturday" ? 6 : localeWeekStart(language)
+  const weekStartsOn = calendarWeekStart(language, prefs?.calendarWeekStart)
   const timeZone =
     prefs?.timezone && prefs.timezone !== "auto"
       ? prefs.timezone
@@ -174,9 +165,10 @@ export function CalendarView() {
       : view === "day"
         ? format(cursor, "EEEE, MMMM d")
         : `${format(computed.start, "MMM d")} – ${format(addDays(computed.end, -1), "MMM d, yyyy")}`
+  useEffect(() => setVisibleRange(null), [cursor])
   return (
     <div className="flex h-full min-w-0 flex-col bg-background">
-      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4 md:h-14 md:py-0">
         <OpenSidebarTrigger />
         <Sheet open={showCalendars} onOpenChange={setShowCalendars}>
           <SheetTrigger render={<Button className="md:hidden" variant="outline" size="icon-sm" aria-label="Calendars" />}>
@@ -184,7 +176,7 @@ export function CalendarView() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[min(88vw,22rem)]">
             <SheetHeader><SheetTitle>Calendars</SheetTitle></SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-3"><CalendarList /></div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3"><CalendarMiniPicker /><CalendarList /></div>
           </SheetContent>
         </Sheet>
         <Button
@@ -215,46 +207,25 @@ export function CalendarView() {
             <ChevronRight className="size-4" />
           </Button>
         </div>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold sm:text-base">
+        <h1 className="min-w-max flex-1 text-sm font-semibold sm:text-base">
           {title}
         </h1>
-        <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
-          <PopoverTrigger render={<Button variant="outline" size="sm" aria-label="Jump to date" />}>
-            <CalendarDays className="size-4" />
-            <span className="hidden sm:inline">{format(cursor, "MMM d, yyyy")}</span>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-auto gap-0 p-0">
-            <Calendar
-              key={format(cursor, "yyyy-MM")}
-              mode="single"
-              selected={cursor}
-              defaultMonth={cursor}
-              weekStartsOn={weekStartsOn as 0 | 1 | 6}
-              onSelect={(day) => {
-                if (!day) return
-                setVisibleRange(null)
-                setCursor(new Date(day.getFullYear(), day.getMonth(), day.getDate(), 12))
-                setDatePickerOpen(false)
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <select
-          aria-label="Calendar view"
-          className="h-9 rounded-lg border bg-background px-2 text-sm"
+        <Tabs
           value={view}
-          onChange={(e) => {
+          onValueChange={(next) => {
             setVisibleRange(null)
-            if (mobile) setMobileView(e.target.value as View)
-            else setView(e.target.value as View)
+            if (mobile) setMobileView(next as View)
+            else setView(next as View)
           }}
         >
-          {(Object.keys(VIEW_NAMES) as View[]).map((key) => (
-            <option key={key} value={key}>
-              {VIEW_NAMES[key]}
-            </option>
-          ))}
-        </select>
+          <TabsList aria-label="Calendar view" className="border bg-muted/40">
+            {(Object.keys(VIEW_NAMES) as View[]).map((key) => (
+              <TabsTrigger key={key} value={key} className="px-2.5 text-xs sm:text-sm">
+                {VIEW_NAMES[key]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
           <Upload className="size-4" />
           <span className="hidden sm:inline">Import</span>

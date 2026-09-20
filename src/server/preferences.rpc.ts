@@ -15,6 +15,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { getSession, requireSession, updateSession } from "./session.server"
 import { mailMetadataPool } from "./mail-metadata.server"
 import type { InboxLayoutPrefs } from "../lib/inbox-layout"
+import type { MailSort } from "../lib/mail-list"
 
 export interface UserPreferences {
   swipeLeftAction?: "archive" | "trash" | "read" | "star" | "none"
@@ -29,6 +30,8 @@ export interface UserPreferences {
   readingPane?: InboxLayoutPrefs["readingPane"]
   listDensity?: InboxLayoutPrefs["listDensity"]
   showSnippets?: boolean
+  rowStyle?: InboxLayoutPrefs["rowStyle"]
+  mailSortByMailbox?: Record<string, MailSort>
   /** Feature-flag overrides: feature id -> enabled. Absent = registry default. */
   features?: Record<string, boolean>
   messageActionsPosition?: "top" | "bottom"
@@ -41,6 +44,8 @@ export interface UserPreferences {
   attachmentFilenameTemplate?: string
   zipFilenameTemplate?: string
   filenameSpaces?: "keep" | "dash" | "underscore"
+  /** Custom tag/folder presentation: mailbox id -> accent color + icon key. */
+  tagAppearance?: Record<string, { color?: string; icon?: string }>
 }
 
 function scope(session: { userId: string; accountId?: string }): [string, string] {
@@ -85,10 +90,10 @@ export const savePreferences = createServerFn({ method: "POST" })
          ON CONFLICT (user_id, account_id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`,
         [...scope(session), JSON.stringify(preferences)]
       )
-    } else if (session.mode === "mock") {
-      await updateSession({ prefs: preferences })
     } else {
-      throw new Error("DATABASE_URL is required to save account settings.")
+      // No metadata database configured: mirror the read path, which serves
+      // preferences from the encrypted session cookie.
+      await updateSession({ prefs: preferences })
     }
     return { ok: true }
   })

@@ -269,6 +269,26 @@ export async function permanentlyDeleteEmails(ids: JmapId[]): Promise<void> {
   await client.mail.destroyEmails(emailIds, accountId)
 }
 
+/** Destroy every message currently in Trash, in bounded JMAP batches. */
+export async function emptyTrash(): Promise<number> {
+  const client = await getJmapClient()
+  const accountId = await getPrimaryAccountId()
+  if (!accountId) throw new Error("No mail account available.")
+  client.mail.bindAccount(accountId)
+  const trash = await client.mail.findRoleMailbox("trash", accountId)
+  if (!trash) throw new Error("Trash mailbox is unavailable.")
+  let removed = 0
+  const seen = new Set<string>()
+  for (;;) {
+    const page = await client.mail.queryEmails(trash.id, { filter: { inMailbox: trash.id }, collapseThreads: false, limit: 100 }, accountId)
+    if (!page.ids.length) return removed
+    if (page.ids.some(id => seen.has(id))) throw new Error("Trash changed during deletion. Refresh and try again.")
+    page.ids.forEach(id => seen.add(id))
+    await client.mail.destroyEmails(page.ids, accountId)
+    removed += page.ids.length
+  }
+}
+
 /**
  * Apply or remove a label (a role-less mailbox) on the given threads/emails,
  * preserving all other mailbox memberships.

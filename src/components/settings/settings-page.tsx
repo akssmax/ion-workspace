@@ -117,7 +117,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="flex h-svh flex-col bg-background">
+    <div className="flex h-svh flex-col overflow-hidden bg-background">
       <header className="flex h-14 shrink-0 items-center gap-3 border-b px-4">
         <Button
           variant="ghost"
@@ -133,7 +133,7 @@ export function SettingsPage() {
       <div className="flex min-h-0 flex-1 flex-col sm:flex-row">
         <nav
           aria-label={t("Settings")}
-          className="flex w-full shrink-0 gap-1 overflow-x-auto border-b p-2 sm:block sm:w-60 sm:space-y-0.5 sm:overflow-y-auto sm:border-r sm:border-b-0 sm:p-3"
+          className="flex w-full shrink-0 gap-1 overflow-x-auto border-b p-2 sm:block sm:w-60 sm:min-h-0 sm:space-y-0.5 sm:overflow-x-hidden sm:overflow-y-auto sm:border-r sm:border-b-0 sm:p-3"
         >
           {ORDERED_SECTIONS.map((s, index) => (
             <div key={s.id} className="shrink-0">
@@ -156,7 +156,7 @@ export function SettingsPage() {
           ))}
         </nav>
 
-        <main className="min-w-0 flex-1 overflow-y-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto max-w-2xl px-4 py-5 sm:px-8 sm:py-8">
             <div className="mb-6">
               <h2 className="text-lg font-semibold">{t(active.title)}</h2>

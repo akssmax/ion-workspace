@@ -8,6 +8,7 @@ import { createWorkspaceQueryClient } from "@/queries/client"
 import { RouteErrorFallback } from "@/components/error-boundary"
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/theme/provider"
 import { LanguageSync } from "@/lib/language"
+import { TooltipProvider } from "@/components/ui/tooltip"
 import appCss from "../styles.css?url"
 
 export const Route = createRootRoute({
@@ -56,6 +57,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body suppressHydrationWarning>
         <ThemeProvider>
+          <TooltipProvider>
           <QueryClientProvider client={queryClient}>
             <LanguageSync />
             {children}
@@ -73,6 +75,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
               />
             )}
           </QueryClientProvider>
+          </TooltipProvider>
         </ThemeProvider>
         <Scripts />
       </body>

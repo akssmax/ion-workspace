@@ -17,10 +17,14 @@ export interface SessionData {
   username: string
   email: string
   mode: "mock" | "real"
-  /** Stalwart session JWT (real mode only). Never sent to the client. */
+  /** Stalwart session JWT (oauth real mode only). Never sent to the client. */
   accessToken?: string
   refreshToken?: string
   accessTokenExpiresAt?: number
+  /** HTTP authorization scheme used for the mail server. */
+  authScheme?: "Bearer" | "Basic"
+  /** Base64 `username:password` for basic-auth real mode. Never sent to the client. */
+  basicAuth?: string
   /** Primary JMAP account id (resolved lazily). */
   accountId?: string
   /** UI preferences. */

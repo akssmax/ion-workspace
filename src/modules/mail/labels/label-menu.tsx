@@ -12,7 +12,10 @@ import {
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useApplyLabel, useMailboxes, useThreadEmails } from "@/queries/mail"
-import { accentClasses, accentForKey } from "@/lib/accents"
+import { usePreferences } from "@/queries/preferences"
+import { cn } from "cn"
+import { accentClasses } from "@/lib/accents"
+import { resolveTagAppearance } from "@/lib/tag-appearance"
 import { labelsOf } from "./labels"
 
 export function LabelMenu({
@@ -24,6 +27,7 @@ export function LabelMenu({
 }) {
   const [open, setOpen] = useState(false)
   const { data: mailboxes } = useMailboxes()
+  const { data: prefs } = usePreferences()
   const labels = labelsOf(mailboxes ?? [])
   const emails = useThreadEmails(threadIds, open)
   const applyLabel = useApplyLabel()
@@ -56,6 +60,10 @@ export function LabelMenu({
         ) : (
           labels.map((label) => {
             const checked = total > 0 && appliedCount(label.id) === total
+            const appearance = resolveTagAppearance(
+              prefs?.tagAppearance?.[label.id],
+              label.id
+            )
             return (
               <DropdownMenuItem
                 key={label.id}
@@ -64,8 +72,11 @@ export function LabelMenu({
                 <span className="flex size-4 items-center justify-center">
                   {checked ? <Check className="size-3.5" /> : null}
                 </span>
-                <span
-                  className={`size-2 shrink-0 rounded-full ${accentClasses(accentForKey(label.id)).dot}`}
+                <appearance.Icon
+                  className={cn(
+                    "size-4 shrink-0",
+                    accentClasses(appearance.color).icon
+                  )}
                 />
                 {label.name}
               </DropdownMenuItem>

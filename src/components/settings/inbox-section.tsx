@@ -6,17 +6,28 @@
 
 import { EyeOff, PanelBottom, PanelRight } from "lucide-react"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { cn } from "cn"
-import { useInboxLayout, useSaveInboxLayout, usePreferences, useSavePreferences } from "@/queries/preferences"
+import {
+  useInboxLayout,
+  useSaveInboxLayout,
+  usePreferences,
+  useSavePreferences,
+} from "@/queries/preferences"
 import type {
   ListDensity,
   ReadingPanePosition,
   RowStyle,
 } from "@/lib/inbox-layout"
 import { SaveState } from "./settings-page"
+import { SettingsGroup } from "./settings-group"
 
 const SWIPE_OPTIONS = [
   { value: "archive", label: "Archive" },
@@ -115,140 +126,190 @@ export function InboxSection() {
   const savePreferences = useSavePreferences()
 
   return (
-    <div className="space-y-5">
-      <section className="space-y-2">
-        <Label>Reading pane</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {READING_PANE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={layout.readingPane === opt.value}
-              onClick={() => void save.mutateAsync({ readingPane: opt.value })}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
-                layout.readingPane === opt.value
-                  ? "border-primary/60 bg-accent"
-                  : "hover:bg-muted/60"
-              )}
-            >
-              {opt.icon}
-              <span className="text-sm font-medium">{opt.title}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground">
-                {opt.hint}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      <section className="space-y-2">
-        <Label>List density</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {DENSITY_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={layout.listDensity === opt.value}
-              onClick={() => void save.mutateAsync({ listDensity: opt.value })}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
-                layout.listDensity === opt.value
-                  ? "border-primary/60 bg-accent"
-                  : "hover:bg-muted/60"
-              )}
-            >
-              <span className="text-sm font-medium">{opt.title}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground">
-                {opt.hint}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      <section className="space-y-2">
-        <Label>Row style</Label>
-        <div className="grid grid-cols-3 gap-2">
-          {ROW_STYLE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              aria-pressed={layout.rowStyle === opt.value}
-              onClick={() => void save.mutateAsync({ rowStyle: opt.value })}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
-                layout.rowStyle === opt.value
-                  ? "border-primary/60 bg-accent"
-                  : "hover:bg-muted/60"
-              )}
-            >
-              <span className="flex h-6 w-full items-center text-foreground/70">
-                {opt.preview}
-              </span>
-              <span className="text-sm font-medium">{opt.title}</span>
-              <span className="text-[11px] leading-tight text-muted-foreground">
-                {opt.hint}
-              </span>
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <Separator />
-
-      <section className="flex items-center justify-between gap-4">
-        <div className="space-y-0.5">
-          <Label htmlFor="inbox-snippets">Preview text</Label>
-          <p className="text-xs text-muted-foreground">
-            Show the first line of each message under its subject.
-          </p>
-        </div>
-        <Switch
-          id="inbox-snippets"
-          checked={layout.showSnippets}
-          onCheckedChange={(checked) =>
-            void save.mutateAsync({ showSnippets: checked })
-          }
-        />
-      </section>
-
-      <SaveState isSaving={save.isPending} isError={save.isError} />
-      <Separator />
-      <section className="space-y-2">
-        <Label htmlFor="message-actions-position">Message actions</Label>
-        <p className="text-xs text-muted-foreground">Place archive, spam and reply actions above or below the email.</p>
-        <Select value={preferences?.messageActionsPosition ?? "top"} onValueChange={value => { if (value === "top" || value === "bottom") void savePreferences.mutateAsync({ messageActionsPosition: value }) }}>
-          <SelectTrigger id="message-actions-position" className="w-full"><SelectValue>{preferences?.messageActionsPosition === "bottom" ? "Below messages" : "Above messages"}</SelectValue></SelectTrigger>
-          <SelectContent><SelectItem value="top">Above messages</SelectItem><SelectItem value="bottom">Below messages</SelectItem></SelectContent>
-        </Select>
-      </section>
-      <SaveState isSaving={savePreferences.isPending} isError={savePreferences.isError} />
-      <Separator />
-      <section className="space-y-3">
-        <div>
-          <Label>Mobile swipe actions</Label>
-          <p className="text-xs text-muted-foreground">Choose what swiping a conversation in either direction does.</p>
-        </div>
-        {(["right", "left"] as const).map((direction) => {
-          const key = direction === "right" ? "swipeRightAction" : "swipeLeftAction"
-          const value = preferences?.[key] ?? "archive"
-          return <div key={direction} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-            <Label htmlFor={`swipe-${direction}`}>Swipe {direction}</Label>
-            <Select value={value} onValueChange={next => {
-              if (SWIPE_OPTIONS.some(option => option.value === next)) void savePreferences.mutateAsync({ [key]: next })
-            }}>
-              <SelectTrigger id={`swipe-${direction}`} className="w-full sm:w-56"><SelectValue>{SWIPE_OPTIONS.find(option => option.value === value)?.label}</SelectValue></SelectTrigger>
-              <SelectContent>{SWIPE_OPTIONS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-            </Select>
+    <div className="space-y-8">
+      <SettingsGroup title="Message list" contentClassName="divide-y">
+        <section className="space-y-2 py-4">
+          <Label>Reading pane</Label>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {READING_PANE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={layout.readingPane === opt.value}
+                onClick={() =>
+                  void save.mutateAsync({ readingPane: opt.value })
+                }
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
+                  layout.readingPane === opt.value
+                    ? "border-primary/60 bg-accent"
+                    : "hover:bg-muted/60"
+                )}
+              >
+                {opt.icon}
+                <span className="text-sm font-medium">{opt.title}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {opt.hint}
+                </span>
+              </button>
+            ))}
           </div>
-        })}
-        <SaveState isSaving={savePreferences.isPending} isError={savePreferences.isError} />
-      </section>
+        </section>
+
+        <section className="space-y-2 py-4">
+          <Label>List density</Label>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {DENSITY_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={layout.listDensity === opt.value}
+                onClick={() =>
+                  void save.mutateAsync({ listDensity: opt.value })
+                }
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
+                  layout.listDensity === opt.value
+                    ? "border-primary/60 bg-accent"
+                    : "hover:bg-muted/60"
+                )}
+              >
+                <span className="text-sm font-medium">{opt.title}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {opt.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="space-y-2 py-4">
+          <Label>Row style</Label>
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            {ROW_STYLE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                aria-pressed={layout.rowStyle === opt.value}
+                onClick={() => void save.mutateAsync({ rowStyle: opt.value })}
+                className={cn(
+                  "flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-center transition-colors",
+                  layout.rowStyle === opt.value
+                    ? "border-primary/60 bg-accent"
+                    : "hover:bg-muted/60"
+                )}
+              >
+                <span className="flex h-6 w-full items-center text-foreground/70">
+                  {opt.preview}
+                </span>
+                <span className="text-sm font-medium">{opt.title}</span>
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {opt.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="flex items-center justify-between gap-4 py-4">
+          <div className="space-y-0.5">
+            <Label htmlFor="inbox-snippets">Preview text</Label>
+            <p className="text-xs text-muted-foreground">
+              Show the first line of each message under its subject.
+            </p>
+          </div>
+          <Switch
+            id="inbox-snippets"
+            checked={layout.showSnippets}
+            onCheckedChange={(checked) =>
+              void save.mutateAsync({ showSnippets: checked })
+            }
+          />
+        </section>
+
+        <SaveState isSaving={save.isPending} isError={save.isError} />
+      </SettingsGroup>
+
+      <SettingsGroup title="Message actions" contentClassName="divide-y">
+        <section className="space-y-2 py-4">
+          <Label htmlFor="message-actions-position">Message actions</Label>
+          <p className="text-xs text-muted-foreground">
+            Place archive, spam and reply actions above or below the email.
+          </p>
+          <Select
+            value={preferences?.messageActionsPosition ?? "top"}
+            onValueChange={(value) => {
+              if (value === "top" || value === "bottom")
+                void savePreferences.mutateAsync({
+                  messageActionsPosition: value,
+                })
+            }}
+          >
+            <SelectTrigger id="message-actions-position" className="w-full">
+              <SelectValue>
+                {preferences?.messageActionsPosition === "bottom"
+                  ? "Below messages"
+                  : "Above messages"}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="top">Above messages</SelectItem>
+              <SelectItem value="bottom">Below messages</SelectItem>
+            </SelectContent>
+          </Select>
+        </section>
+        <section className="space-y-3 py-4">
+          <div>
+            <Label>Mobile swipe actions</Label>
+            <p className="text-xs text-muted-foreground">
+              Choose what swiping a conversation in either direction does.
+            </p>
+          </div>
+          {(["right", "left"] as const).map((direction) => {
+            const key =
+              direction === "right" ? "swipeRightAction" : "swipeLeftAction"
+            const value = preferences?.[key] ?? "archive"
+            return (
+              <div
+                key={direction}
+                className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <Label htmlFor={`swipe-${direction}`}>Swipe {direction}</Label>
+                <Select
+                  value={value}
+                  onValueChange={(next) => {
+                    if (SWIPE_OPTIONS.some((option) => option.value === next))
+                      void savePreferences.mutateAsync({ [key]: next })
+                  }}
+                >
+                  <SelectTrigger
+                    id={`swipe-${direction}`}
+                    className="w-full sm:w-56"
+                  >
+                    <SelectValue>
+                      {
+                        SWIPE_OPTIONS.find((option) => option.value === value)
+                          ?.label
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SWIPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )
+          })}
+          <SaveState
+            isSaving={savePreferences.isPending}
+            isError={savePreferences.isError}
+          />
+        </section>
+      </SettingsGroup>
     </div>
   )
 }

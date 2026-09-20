@@ -166,7 +166,7 @@ export class MockServer {
         this.blobs.set(fn.id, {
           blobId: fn.id,
           name: fn.name,
-          type: fn.contentType,
+          type: fn.contentType ?? "application/octet-stream",
           size: fn.size,
           content: fn.content,
         })

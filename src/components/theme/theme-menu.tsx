@@ -8,23 +8,23 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { ThemeController } from "./theme-controller"
 
 export function ThemeMenu() {
   return (
     <Popover>
-      <PopoverTrigger
+      <Tooltip><TooltipTrigger render={<PopoverTrigger
         render={
           <Button
             variant="ghost"
             size="icon-sm"
             aria-label="Theme"
-            title="Theme"
           />
         }
-      >
+      />}>
         <Palette className="size-4" />
-      </PopoverTrigger>
+      </TooltipTrigger><TooltipContent>Theme</TooltipContent></Tooltip>
       <PopoverContent
         align="end"
         className="w-[22.5rem] gap-0 p-0 sm:w-[24rem]"

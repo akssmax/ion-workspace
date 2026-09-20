@@ -18,7 +18,10 @@ import {
   type SessionData,
 } from "./session.server"
 import { WORKSPACE_CONFIG } from "./config.server"
-import { authenticateStalwart } from "./stalwart-auth.server"
+import {
+  authenticateStalwart,
+  authenticateStalwartBasic,
+} from "./stalwart-auth.server"
 
 export interface SessionInfo {
   userId: string
@@ -64,7 +67,23 @@ export const login = createServerFn({ method: "POST" })
         return sdToPublic(session)
       }
 
-      // Real mode: exchange the Stalwart authorization code for OAuth tokens.
+      // Real mode: validate credentials and obtain a server-side auth token.
+      if (WORKSPACE_CONFIG.stalwartAuthMode === "basic") {
+        const basic = await authenticateStalwartBasic(username, password)
+        const session: SessionData = {
+          userId: `real-${WORKSPACE_CONFIG.stalwartOrigin}:${basic.accountId}`,
+          username: basic.username,
+          email: basic.username.includes("@") ? basic.username : username,
+          mode: "real",
+          accountId: basic.accountId,
+          authScheme: "Basic",
+          basicAuth: basic.basicAuth,
+        }
+        await setSession(session)
+        return sdToPublic(session)
+      }
+
+      // OAuth mode: exchange the Stalwart authorization code for OAuth tokens.
       let tokens: Awaited<ReturnType<typeof authenticateStalwart>>
       try {
         tokens = await authenticateStalwart(username, password, data?.mfaToken)
@@ -92,6 +111,7 @@ export const login = createServerFn({ method: "POST" })
         email,
         mode: "real",
         accountId,
+        authScheme: "Bearer",
         ...tokens,
       }
       await setSession(session)

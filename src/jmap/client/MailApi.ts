@@ -303,13 +303,15 @@ export class MailApi {
 
     const query = res.get<EmailQueryResponse>(qid)
     const get = res.get<EmailGetResponse>(gid)
+    // Email/get does not promise query order; render in Email/query order.
+    const byId = new Map(get.list.map(email => [email.id, email]))
     return {
       mailboxes: [],
       queryState: query.queryState,
       position: query.position,
       ids: query.ids,
       total: query.total,
-      emails: get.list,
+      emails: query.ids.map(id => byId.get(id)).filter((email): email is EmailProperties => !!email),
       notFound: get.notFound,
       state: get.state,
     }
@@ -336,7 +338,6 @@ export class MailApi {
         properties: options.properties ?? DEFAULT_EMAIL_PROPERTIES,
         fetchTextBodyValues: options.fetchTextBodyValues,
         fetchHTMLBodyValues: options.fetchHTMLBodyValues,
-        bodyProperties: ["value"],
         maxBodyValueBytes: options.maxBodyValueBytes ?? 1_000_000,
       },
       "email"
@@ -389,7 +390,6 @@ export class MailApi {
             properties: DEFAULT_EMAIL_PROPERTIES,
             fetchTextBodyValues: options.fetchTextBodyValues,
             fetchHTMLBodyValues: options.fetchHTMLBodyValues,
-            bodyProperties: ["value"],
             maxBodyValueBytes: 1_000_000,
           },
           resultOf: {
@@ -518,8 +518,6 @@ export class MailApi {
   async sendEmail(input: SendEmailInput, accountId?: string): Promise<string> {
     this.checkAccount()
     const acc = this.acct(accountId)
-    const setId = "sendEmail"
-    const subId = "sendSub"
 
     const emailCreate: Record<string, unknown> = {
       mailboxIds: await this.resolveMailboxIds(input.mailboxIds, {
@@ -555,50 +553,64 @@ export class MailApi {
       }))
     }
 
-    const res = await this.client.invoke(
-      [
-        {
-          id: setId,
-          method: "Email/set",
-          args: { accountId: acc, create: { send: emailCreate } },
-        },
-        {
-          id: subId,
-          method: "EmailSubmission/set",
-          args: {
-            accountId: acc,
-            create: {
-              send: {
-                identityId: input.identityId,
-                emailId: `#${setId}`,
-                envelope: {
-                  mailFrom: input.from[0]
-                    ? { email: input.from[0].email }
-                    : { email: "" },
-                  rcptTo: [
-                    ...(input.to ?? []),
-                    ...(input.cc ?? []),
-                    ...(input.bcc ?? []),
-                  ].map((a) => ({
-                    email: a.email,
-                  })),
-                },
-              },
+    // Create the message first, then submit by its concrete id. Stalwart (and
+    // some other servers) reject a result reference (`#emailId`) for the
+    // single-value `emailId` property of EmailSubmission/set, so a single
+    // batched request fails with `invalidProperties: ["#emailId"]`.
+    const setRes = await this.client.call<EmailSetResponse>(
+      "Email/set",
+      { accountId: acc, create: { send: emailCreate } },
+      "sendEmail"
+    )
+    if (setRes.notCreated?.send) {
+      const failure = setRes.notCreated.send
+      throw new Error(
+        `Could not create the message: ${failure.description ?? failure.type}`
+      )
+    }
+    const emailId = setRes.created?.send?.id
+    if (!emailId) throw new Error("Email creation failed.")
+
+    const subRes = await this.client.call<EmailSubmissionSetResponse>(
+      "EmailSubmission/set",
+      {
+        accountId: acc,
+        create: {
+          send: {
+            identityId: input.identityId,
+            emailId,
+            envelope: {
+              mailFrom: input.from[0]
+                ? { email: input.from[0].email }
+                : { email: "" },
+              rcptTo: [
+                ...(input.to ?? []),
+                ...(input.cc ?? []),
+                ...(input.bcc ?? []),
+              ].map((a) => ({
+                email: a.email,
+              })),
             },
-            onSuccessUpdateEmail: { send: { keywords: { $sent: true } } },
-          },
-          resultOf: {
-            callId: setId,
-            name: "Email/set",
-            path: "/created/send/id",
           },
         },
-      ],
-      { accountId: acc }
+        onSuccessUpdateEmail: { send: { "keywords/$sent": true } },
+      },
+      "sendSub"
     )
 
-    const submission = res.get<EmailSubmissionSetResponse>(subId)
-    const created = submission.created?.send
+    if (subRes.notCreated?.send) {
+      // Submission failed: don't leave the unsent copy behind.
+      try {
+        await this.destroyEmails([emailId], acc)
+      } catch {
+        // best effort
+      }
+      const failure = subRes.notCreated.send
+      throw new Error(
+        `Email submission failed: ${failure.description ?? failure.type}`
+      )
+    }
+    const created = subRes.created?.send
     if (!created?.id) throw new Error("Email submission failed.")
     return created.id
   }
