@@ -8,9 +8,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
-    --font-heading: var(--font-sans);
+/*
+ * Fonts must live in a non-inline @theme block so the generated `font-sans`
+ * utility references `var(--font-sans)`. With `@theme inline` the value is
+ * baked into the utility and the runtime font switch (applyTheme) is ignored.
+ */
+@theme {
     --font-sans: 'Inter Variable', sans-serif;
+    --font-heading: var(--font-sans);
+}
+
+@theme inline {
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

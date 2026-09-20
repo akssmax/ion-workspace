@@ -46,7 +46,9 @@ export function DocumentViewer({
   title,
 }: DocumentViewerProps) {
   const source = items[index] ?? null
-  const { url, blob, loading, error, reload } = useDocumentBlob(source)
+  const { url, blob, loading, error, reload } = useDocumentBlob(
+    open ? source : null
+  )
   const [zoom, setZoom] = useState(1)
   const [rotate, setRotate] = useState(0)
   const [page, setPage] = useState(1)

@@ -2,7 +2,7 @@
  * Reading pane: renders all emails in the focused thread plus actions.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   MailPlus,
   MessageSquareReply,
@@ -47,6 +47,7 @@ import {
   useMarkNotJunk,
   useDownloadAttachment,
 } from "@/queries/mail"
+import { downloadAttachment } from "@/services/mail/mail.service"
 import { threadActions, useContributions } from "@/features/contributions"
 import {
   renderEmailBody,
@@ -478,7 +479,10 @@ function EmailCard({ email, expanded, onToggle }: {
   const attachments = attachmentsOf(email)
   const sender = email.from?.[0]?.email.toLowerCase() ?? ""
   const imagesAllowed = loadImages || preferences?.remoteImages === "always" || (preferences?.remoteImages === "trusted" && (preferences.trustedImageSenders ?? []).includes(sender))
-  const loadBlob = downloadOriginal.mutateAsync
+  const loadBlob = useCallback(
+    (blobId: string) => downloadAttachment(blobId),
+    []
+  )
 
   const sources = useMemo(
     () =>

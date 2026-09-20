@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/dialog"
 import { formatDate } from "@/lib/dates"
 import type { FileNode } from "@/jmap/types/files"
+import { loadFileBlob } from "@/services/files/files.service"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
 import {
   AttachmentThumb,
