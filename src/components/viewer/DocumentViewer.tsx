@@ -312,7 +312,9 @@ function ViewerBody({
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
         <p role="alert" className="text-sm text-destructive">
-          Could not load this file.
+          {error instanceof Error && error.message
+            ? `Could not load this file: ${error.message}`
+            : "Could not load this file."}
         </p>
         <Button variant="outline" size="sm" onClick={onRetry}>
           Try again

@@ -75,9 +75,9 @@ export function FilesView() {
   const sources = useMemo(
     () =>
       fileNodes.map((node) =>
-        fileNodeSource(node, (target) => download.mutateAsync(target))
+        fileNodeSource(node, (target) => loadFileBlob(target))
       ),
-    [fileNodes, download.mutateAsync]
+    [fileNodes]
   )
 
   function fmtSize(bytes: number): string {
