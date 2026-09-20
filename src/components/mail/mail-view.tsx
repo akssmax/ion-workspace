@@ -15,10 +15,12 @@ import {
   Send,
   Star,
   Trash2,
+  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -36,6 +38,8 @@ import { useInboxLayout } from "@/queries/preferences"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
 import { useFeatureFlag } from "@/features/flags"
 import { UpcomingIsland } from "@/modules/calendar/upcoming-island"
+import { ThemeMenu } from "@/components/theme/theme-menu"
+import { MailLayoutMenu } from "./mail-layout-menu"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import { AdvancedSearch } from "./advanced-search"
 import { useLanguage } from "@/lib/language"
@@ -64,6 +68,7 @@ export function MailView() {
   const [bottomSplit, setBottomSplit] = useState(0.46)
   const [mailPage, setMailPage] = useState(0)
   const [quickFilters, setQuickFilters] = useState<MailQuickFilter[]>([])
+  const [searchFocused, setSearchFocused] = useState(false)
   const { data: preferences } = usePreferences()
   const savePreferences = useSavePreferences()
   const layout = useInboxLayout()
@@ -82,6 +87,11 @@ export function MailView() {
   const mailboxLabel = (item: typeof mailbox) => item?.role ? t(mailboxRoleLabels[item.role] ?? item.name) : item?.name
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const compact = isMobile || (paneWidth !== null && paneWidth < 620)
+  // Search starts compact and grows to full width when focused or filled.
+  const hasSearch = searchQuery.length > 0
+  const searchExpanded = searchFocused || hasSearch
+  // Shortcuts only make sense on an empty field; once searching, show a clear.
+  const showSearchHints = !hasSearch && (compact || searchExpanded)
   const showMailboxMenu = sidebarState === "collapsed" || compact
 
   useEffect(() => { setMailPage(0) }, [activeMailboxId, searchQuery, sort, quickFilters])
@@ -221,43 +231,85 @@ export function MailView() {
           )}
         </div>
 
-        <div className={cn("relative z-10 min-w-0 flex-1", compact ? "order-last ml-0 basis-full" : "ml-2 sm:absolute sm:left-1/2 sm:ml-0 sm:w-[min(34rem,calc(100%-20rem))] sm:-translate-x-1/2")}>
+        <div
+          className={cn(
+            "relative z-10 min-w-0 flex-1",
+            compact
+              ? "order-last ml-0 basis-full"
+              : cn(
+                  "ml-2 sm:absolute sm:left-1/2 sm:ml-0 sm:-translate-x-1/2",
+                  "sm:transition-[width] sm:duration-300 sm:ease-out",
+                  searchExpanded
+                    ? "sm:w-[min(34rem,calc(100%-20rem))]"
+                    : "sm:w-56"
+                )
+          )}
+        >
           <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
             aria-label={t("Search mail")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder={
-              mailbox?.role === "trash"
-                ? t("Search trash…")
-                : compact ? t("Search mail") : t("Search mail (try: from:X, has:attachment)")
+              mailbox?.role === "trash" ? t("Search trash…") : t("Search mail")
             }
-            className="w-full pe-32 ps-9"
+            className={cn(
+              "w-full ps-9",
+              showSearchHints ? "pe-32" : hasSearch ? "pe-20" : "pe-10"
+            )}
           />
           <div className="absolute inset-y-0 end-2 flex items-center gap-1 whitespace-nowrap">
             <AdvancedSearch onSearch={setSearchQuery} />
-            <kbd
-              aria-label="Press slash to search"
-              className="hidden h-6 min-w-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs sm:inline-flex"
-            >
-              /
-            </kbd>
-            <Tooltip><TooltipTrigger render={<button
-              type="button"
-              aria-label="Open command palette (Command K)"
-              onClick={() => setPaletteOpen(true)}
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
-            />}>
-              <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
-                ⌘ K
-              </kbd>
-            </TooltipTrigger><TooltipContent>Open command palette</TooltipContent></Tooltip>
+            {hasSearch ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchQuery("")
+                  searchRef.current?.focus()
+                }}
+                className="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                <X className="size-4" />
+              </button>
+            ) : showSearchHints ? (
+              <>
+                <kbd
+                  aria-label="Press slash to search"
+                  className="hidden h-6 min-w-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs sm:inline-flex"
+                >
+                  /
+                </kbd>
+                <Tooltip><TooltipTrigger render={<button
+                  type="button"
+                  aria-label="Open command palette (Command K)"
+                  onClick={() => setPaletteOpen(true)}
+                  className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
+                />}>
+                  <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
+                    ⌘ K
+                  </kbd>
+                </TooltipTrigger><TooltipContent>Open command palette</TooltipContent></Tooltip>
+              </>
+            ) : null}
           </div>
         </div>
-        {upcomingIsland ? (
-          <div className="ms-auto"><UpcomingIsland /></div>
-        ) : null}
+        <div className="ms-auto flex items-center gap-1.5">
+          <ThemeMenu />
+          <MailLayoutMenu />
+          {upcomingIsland ? (
+            <>
+              <Separator
+                orientation="vertical"
+                className="mx-1 h-6 self-center!"
+              />
+              <UpcomingIsland />
+            </>
+          ) : null}
+        </div>
       </header>
 
       <div ref={panesRef} className={cn("flex min-h-0 min-w-0 flex-1 overflow-hidden", verticalSplit && "flex-col")}>

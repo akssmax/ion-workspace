@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react"
+import { Spinner } from "@/components/ui/spinner"
 import { useViewerControls } from "../controls"
 import { languageFor } from "../document-kind"
 import type { DocumentSource } from "../types"
@@ -44,7 +45,11 @@ export function TextRenderer({
   }, [blob, source.name])
 
   if (text === null) {
-    return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+    return (
+      <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+        <Spinner /> Loading…
+      </div>
+    )
   }
 
   return (

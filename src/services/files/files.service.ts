@@ -6,14 +6,19 @@ import type { FileNode, JmapId } from "../../jmap/types/files"
 import { JMAP_CAPS } from "../../jmap/types"
 import { getJmapClient, getPrimaryAccountId } from "../jmap.service"
 
-export async function listFiles(
-  parentId: JmapId | null = null
-): Promise<FileNode[]> {
+export async function listAllFiles(): Promise<FileNode[]> {
   const client = await getJmapClient()
   const accountId = await getPrimaryAccountId(JMAP_CAPS.FILES)
   if (!accountId) return []
   client.files.bindAccount(accountId)
-  return client.files.listChildren(parentId, accountId)
+  return client.files.listAll(accountId)
+}
+
+export async function listFiles(
+  parentId: JmapId | null = null
+): Promise<FileNode[]> {
+  const all = await listAllFiles()
+  return all.filter((node) => (node.parentId ?? null) === parentId)
 }
 
 export async function createFolder(

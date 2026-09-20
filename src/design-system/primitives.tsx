@@ -1,4 +1,13 @@
-import { Inbox, Mail, Star } from "lucide-react"
+import {
+  CheckCircle2,
+  CircleX,
+  Inbox,
+  Info,
+  Mail,
+  SearchX,
+  Star,
+  TriangleAlert,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -58,6 +67,8 @@ import {
   AvatarGroup,
 } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
+import type { EmptyStateTone } from "@/components/ui/empty-state"
 import { Separator } from "@/components/ui/separator"
 import {
   Breadcrumb,
@@ -593,6 +604,139 @@ export const PRIMITIVES: PrimitiveDoc[] = [
           )}
           code={() => `<Skeleton className="h-12 w-full" />`}
         />
+      )
+    },
+  },
+  {
+    slug: "empty-state",
+    title: "Empty state",
+    description:
+      "Zero-data placeholder. Reuses the sign-in backdrop and frames the icon in a glow-ringed glass container.",
+    file: "src/components/ui/empty-state.tsx",
+    Page: function EmptyStateDocsPage() {
+      return (
+        <div className="space-y-10">
+          <Playground
+            title="Inbox empty"
+            canvasClassName="w-full"
+            controls={[
+              {
+                type: "select",
+                name: "size",
+                label: "Size",
+                options: ["sm", "md", "lg"],
+                defaultValue: "md",
+              },
+              {
+                type: "select",
+                name: "tone",
+                label: "Tone",
+                options: [
+                  "neutral",
+                  "noResults",
+                  "info",
+                  "success",
+                  "warning",
+                  "danger",
+                ],
+                defaultValue: "neutral",
+              },
+              {
+                type: "boolean",
+                name: "background",
+                label: "Sign-in backdrop",
+                defaultValue: true,
+              },
+              {
+                type: "text",
+                name: "title",
+                label: "Title",
+                defaultValue: "No messages yet",
+              },
+              {
+                type: "text",
+                name: "description",
+                label: "Description",
+                defaultValue: "Messages you receive will show up here.",
+              },
+            ]}
+            render={(values) => (
+              <EmptyState
+                size={str(values, "size") as "sm" | "md" | "lg"}
+                tone={str(values, "tone") as EmptyStateTone}
+                background={bool(values, "background")}
+                icon={<Mail />}
+                title={str(values, "title") || undefined}
+                description={str(values, "description") || undefined}
+                action={<Button size="sm">Compose</Button>}
+                className="max-w-2xl"
+              />
+            )}
+            code={(values) =>
+              `<EmptyState\n  icon={<Mail />}\n  title="${str(values, "title")}"\n  description="${str(
+                values,
+                "description"
+              )}"\n  size="${str(values, "size")}"\n  tone="${str(
+                values,
+                "tone"
+              )}"\n  background={${bool(
+                values,
+                "background"
+              )}}\n  action={<Button size="sm">Compose</Button>}\n/>`
+            }
+          />
+
+          <DocsSection
+            title="Semantic tones"
+            description="Use noResults for empty searches, warning for partial results, and danger for failures."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <EmptyState
+                size="sm"
+                tone="neutral"
+                icon={<Inbox />}
+                title="No messages yet"
+                description="Your inbox is empty."
+              />
+              <EmptyState
+                size="sm"
+                tone="noResults"
+                icon={<SearchX />}
+                title="No results found"
+                description="Try a different search."
+              />
+              <EmptyState
+                size="sm"
+                tone="info"
+                icon={<Info />}
+                title="Nothing here yet"
+              />
+              <EmptyState
+                size="sm"
+                tone="success"
+                icon={<CheckCircle2 />}
+                title="All caught up"
+                description="No drafts waiting."
+              />
+              <EmptyState
+                size="sm"
+                tone="warning"
+                icon={<TriangleAlert />}
+                title="Some items failed"
+                description="Loaded 42 of 50 items."
+                action={<Button size="sm" variant="outline">Retry</Button>}
+              />
+              <EmptyState
+                size="sm"
+                tone="danger"
+                icon={<CircleX />}
+                title="Couldn't load"
+                description="Something went wrong."
+                action={<Button size="sm" variant="outline">Retry</Button>}
+              />
+            </div>
+          </DocsSection>
+        </div>
       )
     },
   },

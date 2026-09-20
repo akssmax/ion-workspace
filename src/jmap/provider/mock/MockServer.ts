@@ -1551,11 +1551,16 @@ export class MockServer {
         {}
     )) {
       const id = newId()
+      const isFile =
+        patch.isFile ??
+        (patch.nodeType != null ? patch.nodeType !== "directory" : true)
       const node: FileNode & { content?: string } = {
         id,
         name: patch.name ?? "untitled",
-        isFile: patch.isFile ?? true,
-        contentType: patch.contentType ?? "application/octet-stream",
+        isFile,
+        nodeType: patch.nodeType ?? (isFile ? "file" : "directory"),
+        contentType:
+          patch.contentType ?? patch.type ?? "application/octet-stream",
         size: patch.size ?? 0,
         parentId: (patch.parentId as JmapId | null) ?? null,
         childNodeIds: [],

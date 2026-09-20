@@ -7,6 +7,7 @@ import { DatePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import { Spinner } from "@/components/ui/spinner"
 import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { useCreateMailbox, useDeleteMailbox, useIdentities, useMailboxes, useRenameMailbox, useUpdateIdentity } from "@/queries/mail"
 import { useDeleteMailTemplate, useMailTemplates, useSaveMailTemplate } from "@/queries/mail-templates"
@@ -121,7 +122,7 @@ export function IdentitiesSection() {
   const update = useUpdateIdentity()
   const connection = useMailPermissions()
   const canEdit = connection.data?.mode === "mock" || connection.data?.permissions.includes("jmap-identity-set")
-  return <div className="space-y-3">{identities.isLoading ? <p>Loading identities…</p> : identities.isError ? <p className="text-destructive">Could not load identities from the mail server.</p> : (identities.data ?? []).map(identity => <div key={identity.id} className="rounded-xl border p-3"><p className="font-medium">{identity.name || identity.email}</p><p className="text-sm text-muted-foreground">{identity.email}</p>{canEdit ? <Button variant="outline" size="sm" className="mt-2" onClick={() => { const name = window.prompt("Display name", identity.name); if (name?.trim() && name !== identity.name) void update.mutateAsync({ id: identity.id, name: name.trim() }) }}>Edit display name</Button> : null}</div>)}{!canEdit ? <p className="text-xs text-muted-foreground">Identity editing is not permitted for this Stalwart account.</p> : null}{update.isError ? <p role="alert" className="text-sm text-destructive">The server rejected the identity change.</p> : null}<p className="text-xs text-muted-foreground">These addresses come from your mail server. Choose the default in Composing.</p></div>
+  return <div className="space-y-3">{identities.isLoading ? <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Loading identities…</div> : identities.isError ? <p className="text-destructive">Could not load identities from the mail server.</p> : (identities.data ?? []).map(identity => <div key={identity.id} className="rounded-xl border p-3"><p className="font-medium">{identity.name || identity.email}</p><p className="text-sm text-muted-foreground">{identity.email}</p>{canEdit ? <Button variant="outline" size="sm" className="mt-2" onClick={() => { const name = window.prompt("Display name", identity.name); if (name?.trim() && name !== identity.name) void update.mutateAsync({ id: identity.id, name: name.trim() }) }}>Edit display name</Button> : null}</div>)}{!canEdit ? <p className="text-xs text-muted-foreground">Identity editing is not permitted for this Stalwart account.</p> : null}{update.isError ? <p role="alert" className="text-sm text-destructive">The server rejected the identity change.</p> : null}<p className="text-xs text-muted-foreground">These addresses come from your mail server. Choose the default in Composing.</p></div>
 }
 
 export function FoldersSection({ tags }: { tags: boolean }) {
@@ -181,7 +182,7 @@ export function VacationSection() {
   const connection = useMailPermissions()
   const [draft, setDraft] = useState<Omit<VacationResponse, "id">>({ isEnabled: false, fromDate: null, toDate: null, subject: null, textBody: null })
   useEffect(() => { if (query.data?.response) setDraft(query.data.response) }, [query.data?.response])
-  if (query.isLoading) return <p className="text-sm text-muted-foreground">Loading vacation settings…</p>
+  if (query.isLoading) return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Loading vacation settings…</div>
   if (query.isError) return <p role="alert" className="text-sm text-destructive">Could not read vacation settings from Stalwart. Check account permissions.</p>
   if (!query.data?.available) return <ServerFeatureNotice name="Vacation responder" />
   if (connection.data?.mode === "real" && !connection.data.permissions.includes("jmap-vacation-response-set")) return <ServerFeatureNotice name="Vacation responder editing" />
@@ -199,7 +200,7 @@ export function FiltersSection() {
   const connection = useMailPermissions()
   const { data: mailboxes } = useMailboxes()
   const [from, setFrom] = useState(""), [mailbox, setMailbox] = useState("")
-  if (query.isLoading) return <p className="text-sm text-muted-foreground">Loading filters…</p>
+  if (query.isLoading) return <div className="flex items-center gap-2 text-sm text-muted-foreground"><Spinner /> Loading filters…</div>
   if (query.isError) return <p role="alert" className="text-sm text-destructive">Could not read Sieve filters. Check account permissions.</p>
   if (!query.data?.available) return <ServerFeatureNotice name="Sieve filters" />
   if (connection.data?.mode === "real" && !connection.data.permissions.includes("jmap-sieve-script-set")) return <ServerFeatureNotice name="Sieve filter editing" />

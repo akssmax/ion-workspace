@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react"
 import { sanitizeEmailHtml } from "@/lib/email-renderer"
 import { cn } from "cn"
+import { Spinner } from "@/components/ui/spinner"
 import { useViewerControls } from "../controls"
 import type { DocumentSource } from "../types"
 
@@ -56,7 +57,11 @@ export function SheetRenderer({
     )
   }
   if (!sheets) {
-    return <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+    return (
+      <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+        <Spinner /> Loading…
+      </div>
+    )
   }
 
   return (

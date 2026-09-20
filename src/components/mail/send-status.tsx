@@ -4,8 +4,9 @@
  */
 
 import { useEffect } from "react"
-import { CheckCircle2, Loader2, XCircle } from "lucide-react"
+import { CheckCircle2, XCircle } from "lucide-react"
 import { cn } from "cn"
+import { Spinner } from "@/components/ui/spinner"
 import { useComposerStore } from "@/stores/composer.store"
 import { useCancelMailJob, useMailJobs } from "@/queries/mail-jobs"
 import { Button } from "@/components/ui/button"
@@ -69,7 +70,7 @@ export function SendStatusBanner({
     >
       {state === "sending" ? (
         <>
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          <Spinner className="size-4" />
           Sending…
         </>
       ) : state === "sent" || state === "queued" ? (

@@ -187,14 +187,14 @@ export const proxyUpload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const token = await requireAccessToken()
-    const baseUrl = trustedEndpoint(
-      data.uploadUrl,
-      `${WORKSPACE_CONFIG.stalwartOrigin}/jmap/upload/{accountId}/`,
-      "/jmap/upload/"
-    )
+    const origin = WORKSPACE_CONFIG.stalwartOrigin
+    // Expand placeholders on the raw template string: parsing the template
+    // with `new URL()` first would percent-encode `{...}` and break expansion.
+    const uploadTemplate =
+      data.uploadUrl ?? `${origin}/jmap/upload/{accountId}/`
     const url = trustedEndpoint(
-      expandTemplate(baseUrl, { accountId: data.accountId }),
-      baseUrl,
+      expandTemplate(uploadTemplate, { accountId: data.accountId }),
+      `${origin}/jmap/upload/`,
       "/jmap/upload/"
     )
     const bytes = Uint8Array.from(atob(data.content), (c) => c.charCodeAt(0))
@@ -244,19 +244,19 @@ export const proxyDownload = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const token = await requireAccessToken()
-    const baseUrl = trustedEndpoint(
-      data.downloadUrl,
-      `${WORKSPACE_CONFIG.stalwartOrigin}/jmap/download/{accountId}/{blobId}/download`,
-      "/jmap/download/"
-    )
+    const origin = WORKSPACE_CONFIG.stalwartOrigin
+    // Expand placeholders on the raw template string (see proxyUpload).
+    const downloadTemplate =
+      data.downloadUrl ??
+      `${origin}/jmap/download/{accountId}/{blobId}/download`
     const url = trustedEndpoint(
-      expandTemplate(baseUrl, {
+      expandTemplate(downloadTemplate, {
         accountId: data.accountId,
         blobId: data.blobId,
         name: "download",
         type: "*/*",
       }),
-      baseUrl,
+      `${origin}/jmap/download/`,
       "/jmap/download/"
     )
     let response: Response

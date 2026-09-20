@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react"
-import { addHours } from "date-fns"
-import { Trash2 } from "lucide-react"
+import { addHours, format } from "date-fns"
+import {
+  AlignLeft,
+  Bell,
+  CalendarDays,
+  Clock,
+  ExternalLink,
+  MapPin,
+  Repeat,
+  Trash2,
+  Users,
+  Video,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -26,6 +38,21 @@ import {
   useUpdateEvent,
 } from "@/queries/calendar"
 import { getEventById } from "@/services/calendar/calendar.service"
+
+const RECURRENCE_LABELS: Record<string, string> = {
+  DAILY: "Daily",
+  WEEKLY: "Weekly",
+  MONTHLY: "Monthly",
+  YEARLY: "Yearly",
+}
+
+const REMINDER_LABELS: Record<number, string> = {
+  5: "5 minutes before",
+  15: "15 minutes before",
+  30: "30 minutes before",
+  60: "1 hour before",
+  1440: "1 day before",
+}
 
 export function emptyDraft(
   start: Date,
@@ -163,6 +190,21 @@ export function EventEditor({
     }
   }
   const pending = create.isPending || update.isPending || remove.isPending
+  const startDate = new Date(draft.start)
+  const endDate = new Date(draft.end)
+  const validStart = Number.isFinite(startDate.getTime())
+  const validEnd = Number.isFinite(endDate.getTime())
+  const viewWhen = draft.allDay
+    ? validStart
+      ? `${format(startDate, "EEEE, d MMMM")} · All day`
+      : "All day"
+    : validStart && validEnd
+      ? `${format(startDate, "EEEE, d MMMM")} · ${format(startDate, "p")} – ${format(endDate, "p")}`
+      : `${draft.start} – ${draft.end}`
+  const repeatLabel =
+    draft.recurrence === "none"
+      ? ""
+      : `${RECURRENCE_LABELS[draft.recurrence]}${draft.interval > 1 ? ` every ${draft.interval}` : ""}${draft.repeatUntil ? `, until ${format(new Date(draft.repeatUntil), "d MMM yyyy")}` : ""}`
   return (
     <Sheet
       open={open}
@@ -175,18 +217,30 @@ export function EventEditor({
         className="w-full max-w-none sm:max-w-[480px] data-[side=right]:sm:max-w-[480px]"
       >
         <SheetHeader>
-          <SheetTitle>
-            {event
-              ? editing
-                ? "Edit event"
-                : event.title || "Event"
-              : "Create event"}
-          </SheetTitle>
-          <SheetDescription>
-            {editing
-              ? "Set the details for your calendar."
-              : (currentCalendar?.name ?? "Calendar")}
-          </SheetDescription>
+          {editing ? (
+            <>
+              <SheetTitle>{event ? "Edit event" : "Create event"}</SheetTitle>
+              <SheetDescription>
+                Set the details for your calendar.
+              </SheetDescription>
+            </>
+          ) : (
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden
+                className="mt-1.5 size-3 shrink-0 rounded-sm"
+                style={{
+                  backgroundColor: currentCalendar?.color ?? "var(--primary)",
+                }}
+              />
+              <div className="min-w-0">
+                <SheetTitle className="text-lg leading-snug break-words">
+                  {draft.title || event?.title || "Event"}
+                </SheetTitle>
+                <SheetDescription>{viewWhen}</SheetDescription>
+              </div>
+            </div>
+          )}
         </SheetHeader>
         {confirmDiscard && <div role="alert" className="mx-6 mb-3 rounded-lg border border-destructive/40 p-3 text-sm"><p className="mb-2">Discard unsaved changes?</p><div className="flex gap-2"><Button size="sm" variant="destructive" onClick={onClose}>Discard</Button><Button size="sm" variant="outline" onClick={() => setConfirmDiscard(false)}>Keep editing</Button></div></div>}
         {event?.baseEventId && (
@@ -382,21 +436,87 @@ export function EventEditor({
             )}
           </div>
         ) : (
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 text-sm">
-            <p>
-              {new Date(draft.start).toLocaleString()} –{" "}
-              {new Date(draft.end).toLocaleString()}
-            </p>
-            {draft.location && <p>{draft.location}</p>}
-            {draft.description && (
-              <p className="whitespace-pre-wrap">{draft.description}</p>
-            )}
-            {draft.guests.length > 0 && <p>{draft.guests.join(", ")}</p>}
-            {error && (
-              <p role="alert" className="text-destructive">
-                {error}
-              </p>
-            )}
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+            <div className="space-y-5">
+              <DetailRow icon={<Clock className="size-4" />}>
+                <p className="font-medium">{viewWhen}</p>
+                <p className="text-xs text-muted-foreground">
+                  {draft.timeZone}
+                </p>
+              </DetailRow>
+
+              {draft.location ? (
+                <DetailRow icon={<MapPin className="size-4" />}>
+                  <p>{draft.location}</p>
+                </DetailRow>
+              ) : null}
+
+              {draft.meetingUrl ? (
+                <DetailRow icon={<Video className="size-4" />}>
+                  <a
+                    href={draft.meetingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 break-all text-primary hover:underline"
+                  >
+                    {draft.meetingUrl}
+                    <ExternalLink className="size-3.5 shrink-0" />
+                  </a>
+                </DetailRow>
+              ) : null}
+
+              {draft.guests.length > 0 ? (
+                <DetailRow icon={<Users className="size-4" />}>
+                  <p className="font-medium">
+                    {draft.guests.length} guest
+                    {draft.guests.length > 1 ? "s" : ""}
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {draft.guests.map((guest) => (
+                      <li key={guest} className="flex items-center gap-2">
+                        <Avatar className="size-6">
+                          <AvatarFallback className="text-[10px] font-semibold">
+                            {guest.slice(0, 1).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="min-w-0 truncate">{guest}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </DetailRow>
+              ) : null}
+
+              {draft.reminderMinutes != null ? (
+                <DetailRow icon={<Bell className="size-4" />}>
+                  <p>
+                    {REMINDER_LABELS[draft.reminderMinutes] ??
+                      `${draft.reminderMinutes} minutes before`}
+                  </p>
+                </DetailRow>
+              ) : null}
+
+              {repeatLabel ? (
+                <DetailRow icon={<Repeat className="size-4" />}>
+                  <p>{repeatLabel}</p>
+                </DetailRow>
+              ) : null}
+
+              <DetailRow icon={<CalendarDays className="size-4" />}>
+                <p>{currentCalendar?.name ?? "Calendar"}</p>
+              </DetailRow>
+
+              {draft.description ? (
+                <DetailRow icon={<AlignLeft className="size-4" />}>
+                  <p className="whitespace-pre-wrap">{draft.description}</p>
+                </DetailRow>
+              ) : null}
+
+              {error && (
+                <p role="alert" className="text-destructive">
+                  {error}
+                </p>
+              )}
+            </div>
           </div>
         )}
         <SheetFooter className="flex-row border-t pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -465,5 +585,20 @@ function Field({
       <span>{label}</span>
       {children}
     </Label>
+  )
+}
+
+function DetailRow({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-3 text-sm">
+      <span className="mt-0.5 shrink-0 text-muted-foreground">{icon}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
   )
 }

@@ -20,8 +20,18 @@ import {
   ShieldX,
   Printer,
   Download,
+  MoreHorizontal,
 } from "lucide-react"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { EmptyState } from "@/components/ui/empty-state"
+import { useLanguage } from "@/lib/language"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -75,7 +85,6 @@ import {
   primeDocumentBlob,
 } from "@/components/viewer"
 import type { DocumentSource } from "@/components/viewer"
-import { useLanguage } from "@/lib/language"
 
 /** Minimal reader stylesheet for the standalone print window. */
 const PRINT_READER_CSS =
@@ -129,24 +138,17 @@ export function ThreadViewPane({
 
   if (!threadId) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-sm text-muted-foreground">
-        <MailPlus className="size-10 text-muted-foreground/40" />
-        <p>{t("Select a conversation to read it.")}</p>
-      </div>
+      <EmptyState
+        icon={<MailPlus />}
+        title={t("Select a conversation to read it.")}
+        description="Pick a message from the list to open it here."
+        className="h-full rounded-none border-0"
+      />
     )
   }
 
   if (isLoading || !data) {
-    return (
-      <div className="space-y-6 p-6">
-        <Skeleton className="h-6 w-2/3" />
-        <Skeleton className="h-4 w-1/3" />
-        <div className="space-y-3 pt-4">
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-24 w-full" />
-        </div>
-      </div>
-    )
+    return <ReadingPaneSkeleton />
   }
 
   async function exportThread() {
@@ -172,14 +174,46 @@ export function ThreadViewPane({
     finally { setExporting(false) }
   }
 
+  const latest = latestEmail(data.emails)
+  const canExport = data.emails.filter(email => email.blobId).length > 1
   const actionBar = (
     <div className="flex flex-wrap items-center gap-2">
-      <ThreadActions threadId={threadId} email={latestEmail(data.emails)} />
+      <ThreadActions threadId={threadId} email={latest} />
       <div className="ml-auto" />
-      <ReplyAction email={latestEmail(data.emails)} mode={preferences?.replyDefault === "reply-all" ? "reply-all" : "reply"} />
-      <ReplyAction email={latestEmail(data.emails)} mode={preferences?.replyDefault === "reply-all" ? "reply" : "reply-all"} />
-      <ReplyAction email={latestEmail(data.emails)} mode="forward" />
-      {data.emails.filter(email => email.blobId).length > 1 ? <Button variant="ghost" size="sm" disabled={exporting} onClick={() => void exportThread()}><Download className="size-4" /> Export ZIP</Button> : null}
+      <ReplyAction email={latest} mode="reply" />
+      <ReplyAction email={latest} mode="forward" />
+      <DropdownMenu>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="More actions"
+                  />
+                }
+              />
+            }
+          >
+            <MoreHorizontal className="size-4" />
+          </TooltipTrigger>
+          <TooltipContent>More actions</TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="end" className="min-w-48">
+          <ReplyMenuItem email={latest} mode="reply-all" />
+          {canExport ? (
+            <DropdownMenuItem
+              disabled={exporting}
+              onClick={() => void exportThread()}
+            >
+              <Download className="size-4" />
+              Export ZIP
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 
@@ -381,25 +415,16 @@ function ThreadActions({
   )
 }
 
-function ReplyAction({
-  email,
-  mode,
-}: {
-  email: EmailProperties
-  mode: ComposeMode
-}) {
+const REPLY_META: Record<string, { label: string; icon: React.ReactNode }> = {
+  reply: { label: "Reply", icon: <MessageSquareReply className="size-4" /> },
+  "reply-all": { label: "Reply all", icon: <ReplyAll className="size-4" /> },
+  forward: { label: "Forward", icon: <Forward className="size-4" /> },
+}
+
+function useReplyAction(email: EmailProperties, mode: ComposeMode) {
   const openCompose = useComposerStore((s) => s.openCompose)
   const identities = useIdentities()
-
-  if (!email.id && !email.subject) return null
-
-  const labels: Record<string, { label: string; icon: React.ReactNode }> = {
-    reply: { label: "Reply", icon: <MessageSquareReply className="size-4" /> },
-    "reply-all": { label: "Reply all", icon: <ReplyAll className="size-4" /> },
-    forward: { label: "Forward", icon: <Forward className="size-4" /> },
-  }
-  const { label, icon } = labels[mode] ?? labels.reply
-
+  const { label, icon } = REPLY_META[mode] ?? REPLY_META.reply
   const ownAddresses = new Set((identities.data ?? []).map((identity) => identity.email.toLowerCase()))
   const sentByMe = email.from?.some((address) => ownAddresses.has(address.email.toLowerCase())) ?? false
   const to = (
@@ -409,7 +434,6 @@ function ReplyAction({
         ? sentByMe ? email.to : email.replyTo?.length ? email.replyTo : email.from
         : [...(sentByMe ? [] : (email.replyTo?.length ? email.replyTo : email.from) ?? []), ...(email.to ?? []), ...(email.cc ?? [])]
   ) as EmailAddress[]
-
   const parentMessageId = (email.messageId ?? [])[0] ?? email.id
   const references = [
     ...new Set([
@@ -419,27 +443,74 @@ function ReplyAction({
     ]),
   ].filter(Boolean)
 
+  return {
+    label,
+    icon,
+    open: () =>
+      openCompose({
+        open: true,
+        mode,
+        to: dedupe(to).filter(
+          (address) => !ownAddresses.has(address.email.toLowerCase())
+        ),
+        subject: subjectFor(mode, email.subject),
+        inReplyTo: [parentMessageId],
+        references,
+      }),
+  }
+}
+
+function ReplyAction({
+  email,
+  mode,
+}: {
+  email: EmailProperties
+  mode: ComposeMode
+}) {
+  const { label, icon, open } = useReplyAction(email, mode)
+  if (!email.id && !email.subject) return null
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={() =>
-        openCompose({
-          open: true,
-          mode,
-          to: dedupe(to).filter(
-            (address) =>
-              !ownAddresses.has(address.email.toLowerCase())
-          ),
-          subject: subjectFor(mode, email.subject),
-          inReplyTo: [parentMessageId],
-          references,
-        })
-      }
-    >
+    <Button variant="ghost" size="sm" onClick={open}>
       {icon}
       {label}
     </Button>
+  )
+}
+
+function ReplyMenuItem({
+  email,
+  mode,
+}: {
+  email: EmailProperties
+  mode: ComposeMode
+}) {
+  const { label, icon, open } = useReplyAction(email, mode)
+  if (!email.id && !email.subject) return null
+  return (
+    <DropdownMenuItem onClick={open}>
+      {icon}
+      {label}
+    </DropdownMenuItem>
+  )
+}
+
+/** Reading-pane placeholder: shown before a thread is picked or while it loads. */
+function ReadingPaneSkeleton() {
+  return (
+    <div className="flex h-full flex-col gap-6 p-6" aria-hidden>
+      <div className="flex items-center gap-3">
+        <Skeleton className="size-9 shrink-0 rounded-full" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+      </div>
+      <Skeleton className="h-5 w-2/3" />
+      <div className="space-y-3">
+        <Skeleton className="h-28 w-full" />
+        <Skeleton className="h-28 w-full" />
+      </div>
+    </div>
   )
 }
 
@@ -472,6 +543,7 @@ function EmailCard({ email, expanded, onToggle }: {
 }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [loadImages, setLoadImages] = useState(false)
+  const reduceMotion = useReducedMotion()
   const { data: preferences } = usePreferences()
   const downloadOriginal = useDownloadAttachment()
   const subject = email.subject || "(no subject)"
@@ -562,8 +634,14 @@ function EmailCard({ email, expanded, onToggle }: {
   }
 
   return (
-    <article dir="auto" className="min-w-0 overflow-hidden rounded-xl border bg-card">
-      <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+    <article dir="auto" className="min-w-0 overflow-hidden rounded-xl border bg-card transition-colors hover:border-ring/40">
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-label={expanded ? "Collapse message" : "Expand message"}
+        onClick={onToggle}
+        className="flex w-full flex-wrap items-center gap-3 border-b px-4 py-3 text-start transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+      >
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
           {initials(senderName(email))}
         </div>
@@ -584,86 +662,94 @@ function EmailCard({ email, expanded, onToggle }: {
         <time className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {time ? formatDateTime(time) : ""}
         </time>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={expanded ? "Collapse message" : "Expand message"}
-          aria-expanded={expanded}
-          onClick={onToggle}
-        >
-          <ChevronDown className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`} />
-        </Button>
-      </header>
-      {expanded ? <p className="px-4 pt-3 text-sm font-medium">{subject}</p> : null}
-      {expanded && email.keywords?.$phishing ? (
-        <p role="alert" className="mx-4 mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
-          This message was reported as phishing. Check links and attachments before opening them.
-        </p>
-      ) : null}
-      {expanded ? (
-        <details className="mx-4 mt-2 text-xs text-muted-foreground">
-          <summary className="cursor-pointer">Message details</summary>
-          <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 break-all">
-            <dt>From</dt><dd>{fmtAddresses(email.from)}</dd>
-            <dt>To</dt><dd>{fmtAddresses(email.to)}</dd>
-            <dt>Cc</dt><dd>{fmtAddresses(email.cc)}</dd>
-            <dt>Reply-To</dt><dd>{fmtAddresses(email.replyTo)}</dd>
-            <dt>Message ID</dt><dd>{email.messageId ?? "—"}</dd>
-          </dl>
-          {email.headers ? <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap">{JSON.stringify(email.headers, null, 2)}</pre> : null}
-          <div className="mt-2 flex gap-2">
-            <Button size="sm" variant="outline" onClick={printMessage}><Printer className="size-3.5" /> Print</Button>
-            {email.blobId ? <Button size="sm" variant="outline" onClick={() => void saveOriginal()}><Download className="size-3.5" /> Download .eml</Button> : null}
-          </div>
-        </details>
-      ) : null}
-
-      {expanded && blocked.blocked.length > 0 && !imagesAllowed ? (
-        <Button variant="ghost" size="sm" className="ml-3" onClick={() => setLoadImages(true)}>
-          External images blocked · Load images
-        </Button>
-      ) : null}
-      {expanded ? (
-        <div
-          className="email-body min-w-0 px-4 py-3"
-          dangerouslySetInnerHTML={{ __html: collapseQuotedSections(imagesAllowed ? safeBody : blocked.html) }}
+        <ChevronDown
+          aria-hidden
+          className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
         />
-      ) : null}
+      </button>
+      <AnimatePresence initial={false}>
+        {expanded ? (
+          <motion.div
+            key="message-content"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] }
+            }
+            className="min-w-0 overflow-hidden"
+          >
+            <p className="px-4 pt-3 text-sm font-medium">{subject}</p>
+            {email.keywords?.$phishing ? (
+              <p role="alert" className="mx-4 mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
+                This message was reported as phishing. Check links and attachments before opening them.
+              </p>
+            ) : null}
+            <details className="mx-4 mt-2 text-xs text-muted-foreground">
+              <summary className="cursor-pointer">Message details</summary>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 break-all">
+                <dt>From</dt><dd>{fmtAddresses(email.from)}</dd>
+                <dt>To</dt><dd>{fmtAddresses(email.to)}</dd>
+                <dt>Cc</dt><dd>{fmtAddresses(email.cc)}</dd>
+                <dt>Reply-To</dt><dd>{fmtAddresses(email.replyTo)}</dd>
+                <dt>Message ID</dt><dd>{email.messageId ?? "—"}</dd>
+              </dl>
+              {email.headers ? <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap">{JSON.stringify(email.headers, null, 2)}</pre> : null}
+              <div className="mt-2 flex gap-2">
+                <Button size="sm" variant="outline" onClick={printMessage}><Printer className="size-3.5" /> Print</Button>
+                {email.blobId ? <Button size="sm" variant="outline" onClick={() => void saveOriginal()}><Download className="size-3.5" /> Download .eml</Button> : null}
+              </div>
+            </details>
 
-      {expanded && attachments.length ? (
-        <div className="space-y-2 px-4 pb-4">
-          {attachments.some(
-            (att) => kindForMime(att.type ?? "", att.name ?? "") === "image"
-          ) ? (
-            <div className="flex flex-wrap gap-2">
-              {attachments.map((att, i) =>
-                kindForMime(att.type ?? "", att.name ?? "") === "image" ? (
-                  <AttachmentThumb
-                    key={sources[i].id}
-                    source={sources[i]}
-                    onOpen={() => setPreviewIndex(i)}
-                  />
-                ) : null
-              )}
-            </div>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            {attachments.map((att, i) => (
-              <button
-                key={sources[i].id}
-                onClick={() => setPreviewIndex(i)}
-                className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs hover:bg-muted"
-              >
-                <Paperclip className="size-3.5 text-muted-foreground" />
-                <span className="max-w-[12rem] truncate">
-                  {att.name || "attachment"}
-                </span>
-                <span className="text-muted-foreground">Preview</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
+            {blocked.blocked.length > 0 && !imagesAllowed ? (
+              <Button variant="ghost" size="sm" className="ml-3" onClick={() => setLoadImages(true)}>
+                External images blocked · Load images
+              </Button>
+            ) : null}
+            <div
+              className="email-body min-w-0 px-4 py-3"
+              dangerouslySetInnerHTML={{ __html: collapseQuotedSections(imagesAllowed ? safeBody : blocked.html) }}
+            />
+
+            {attachments.length ? (
+              <div className="space-y-2 px-4 pb-4">
+                {attachments.some(
+                  (att) => kindForMime(att.type ?? "", att.name ?? "") === "image"
+                ) ? (
+                  <div className="flex flex-wrap gap-2">
+                    {attachments.map((att, i) =>
+                      kindForMime(att.type ?? "", att.name ?? "") === "image" ? (
+                        <AttachmentThumb
+                          key={sources[i].id}
+                          source={sources[i]}
+                          onOpen={() => setPreviewIndex(i)}
+                        />
+                      ) : null
+                    )}
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {attachments.map((att, i) => (
+                    <button
+                      key={sources[i].id}
+                      onClick={() => setPreviewIndex(i)}
+                      className="flex items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs hover:bg-muted"
+                    >
+                      <Paperclip className="size-3.5 text-muted-foreground" />
+                      <span className="max-w-[12rem] truncate">
+                        {att.name || "attachment"}
+                      </span>
+                      <span className="text-muted-foreground">Preview</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       <DocumentViewer
         open={previewIndex !== null}
         onOpenChange={(value) => {

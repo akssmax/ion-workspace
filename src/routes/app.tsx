@@ -1,6 +1,7 @@
 import { useEffect } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import { AppShell } from "@/components/shell/app-shell"
+import { Spinner } from "@/components/ui/spinner"
 import { useSession } from "@/hooks/use-session"
 
 export const Route = createFileRoute("/app")({
@@ -17,8 +18,8 @@ function AppRoute() {
 
   if (isLoading || !session) {
     return (
-      <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
-        Loading…
+      <div className="flex min-h-svh items-center justify-center">
+        <Spinner className="size-6" />
       </div>
     )
   }

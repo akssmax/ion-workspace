@@ -7,21 +7,25 @@ import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, Video } from "lucide-react"
 import { format, formatDistanceToNowStrict, isToday } from "date-fns"
 import { useUpcomingEvents } from "@/queries/calendar"
+import { useCalendarFeeds } from "@/queries/calendar-feeds"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import { useCalendarStore } from "@/stores/calendar.store"
 import { useSidebar } from "@/components/ui/sidebar"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
 import type { CalendarEvent } from "@/jmap/types/calendar"
-import { eventEnd, eventKind, eventPhase, eventStart } from "./island-style"
+import { eventKind, eventPhase } from "./island-style"
+import { eventEnd, eventStart } from "@/lib/calendar-event"
 
 const SOON_LIMIT = 5
 
 export function UpcomingIsland() {
   const eventsQuery = useUpcomingEvents()
+  const feeds = useCalendarFeeds()
   const setApp = useWorkspaceStore((s) => s.setApp)
   const setCursor = useCalendarStore((s) => s.setCursor)
   const setView = useCalendarStore((s) => s.setView)
@@ -36,17 +40,30 @@ export function UpcomingIsland() {
   }, [])
 
   const upcoming = useMemo(() => {
-    const rows = eventsQuery.data ?? []
+    const feedEvents = (feeds.data ?? []).flatMap((feed) =>
+      feed.events.map(
+        (event, index) =>
+          ({
+            ...event,
+            id: `feed:${feed.id}:${index}`,
+            uid: event.uid ?? `feed-${index}`,
+            calendarId: `feed:${feed.id}`,
+            title: event.title ?? "(untitled)",
+            start: event.start ?? "",
+            duration: event.duration ?? "PT1H",
+          })
+      )
+    )
+    const rows = [...(eventsQuery.data ?? []), ...feedEvents]
     return rows
       .filter((event) => eventEnd(event).getTime() > now.getTime())
       .sort((a, b) => eventStart(a).getTime() - eventStart(b).getTime())
       .slice(0, SOON_LIMIT)
-  }, [eventsQuery.data, now])
+  }, [eventsQuery.data, feeds.data, now])
 
-  const next = upcoming[0]
-  if (!next && !eventsQuery.isLoading) return null
-
+  const next = upcoming.at(0)
   const phase = next ? eventPhase(next, now) : "later"
+  const loading = (eventsQuery.isLoading || feeds.isLoading) && !next
 
   function openCalendar(event: CalendarEvent) {
     setSelectedEvent(event.id)
@@ -64,42 +81,55 @@ export function UpcomingIsland() {
           <button
             type="button"
             aria-label={
-              next
-                ? `${phaseLabel(phase)}: ${next.title ?? "Event"}`
-                : "Upcoming events"
+              loading
+                ? "Loading upcoming events"
+                : next
+                  ? `${phaseLabel(phase)}: ${next.title ?? "Event"}`
+                  : "No upcoming events"
             }
-            className="ml-auto flex h-8 max-w-56 shrink-0 items-center gap-2 rounded-full border bg-muted px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            className="flex h-8 max-w-56 shrink-0 items-center gap-2 rounded-full border bg-muted px-2.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
           />
         }
       >
         {next && eventKind(next) === "meeting" ? (
           <Video className="size-3.5 shrink-0" />
         ) : (
-          <CalendarDays className="size-3.5 shrink-0" />
+          <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" />
         )}
-        {eventsQuery.isLoading && !next ? (
-          <span className="opacity-70">Loading…</span>
-        ) : (
+        {loading ? (
+          <Spinner className="size-3.5" />
+        ) : next ? (
           <>
-            <span className="min-w-0 truncate">
-              {next?.title ?? "Upcoming"}
-            </span>
+            <span className="min-w-0 truncate">{next.title ?? "Upcoming"}</span>
             <span className="shrink-0 opacity-80">
-              {next ? compactWhen(next, phase) : ""}
+              {compactWhen(next, phase)}
             </span>
           </>
+        ) : (
+          <span className="min-w-0 truncate text-muted-foreground">
+            No upcoming events
+          </span>
         )}
       </PopoverTrigger>
-      {next ? (
-        <PopoverContent
-          align="end"
-          side="bottom"
-          sideOffset={8}
-          className="w-72 gap-1 rounded-xl bg-popover p-2 text-popover-foreground shadow-lg"
-        >
-          <p className="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wide uppercase opacity-70">
-            Upcoming
-          </p>
+      <PopoverContent
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        className="w-72 gap-1 rounded-xl bg-popover p-2 text-popover-foreground shadow-lg"
+      >
+        <p className="px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wide uppercase opacity-70">
+          Upcoming
+        </p>
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 px-2 py-4 text-xs text-muted-foreground">
+            <Spinner /> Loading…
+          </div>
+        ) : upcoming.length === 0 ? (
+          <div className="flex flex-col items-center gap-1.5 px-2 py-4 text-center">
+            <CalendarDays className="size-5 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground">No upcoming events</p>
+          </div>
+        ) : (
           <ul className="flex flex-col gap-0.5">
             {upcoming.map((event) => {
               const rowPhase = eventPhase(event, now)
@@ -142,8 +172,8 @@ export function UpcomingIsland() {
               )
             })}
           </ul>
-        </PopoverContent>
-      ) : null}
+        )}
+      </PopoverContent>
     </Popover>
   )
 }

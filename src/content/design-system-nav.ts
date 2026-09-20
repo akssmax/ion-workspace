@@ -26,6 +26,7 @@ export const PRIMITIVE_NAV: DesignSystemNavItem[] = [
   { title: "Tooltip", href: "/design-system/components/tooltip", description: "Hover hints" },
   { title: "Avatar", href: "/design-system/components/avatar", description: "Identity marks" },
   { title: "Skeleton", href: "/design-system/components/skeleton", description: "Loading placeholders" },
+  { title: "Empty state", href: "/design-system/components/empty-state", description: "Zero-data placeholder" },
   { title: "Separator", href: "/design-system/components/separator", description: "Visual dividers" },
   { title: "Breadcrumb", href: "/design-system/components/breadcrumb", description: "Path navigation" },
   { title: "Calendar", href: "/design-system/components/calendar", description: "Date picker" },

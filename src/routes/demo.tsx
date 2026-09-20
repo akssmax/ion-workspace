@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query"
 import { createWorkspaceQueryClient } from "@/queries/client"
 import { isDemoSurface } from "@/lib/demo/preview-messages"
 import { isDemoRuntime } from "@/lib/demo/runtime"
+import { Spinner } from "@/components/ui/spinner"
 import "@/components/marketing/demo.css"
 
 const DemoApp = lazy(() =>
@@ -79,10 +80,11 @@ function DemoRoute() {
 function Loading() {
   return (
     <div
-      className="flex h-full items-center justify-center p-12 text-sm text-muted-foreground"
+      className="flex h-full items-center justify-center gap-2 p-12 text-sm text-muted-foreground"
       role="status"
     >
-      Opening your sample workspace…
+      <Spinner />
+      <span>Opening your sample workspace…</span>
     </div>
   )
 }

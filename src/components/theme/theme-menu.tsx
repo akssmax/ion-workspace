@@ -13,7 +13,7 @@ import { ThemeController } from "./theme-controller"
 
 export function ThemeMenu() {
   return (
-    <Popover>
+    <Popover modal>
       <Tooltip><TooltipTrigger render={<PopoverTrigger
         render={
           <Button

@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
 import type { Contact } from "@/jmap/types/contacts"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -142,16 +143,17 @@ export function ContactsView() {
               )
             })
           ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
-              <UserPlus className="size-8 text-muted-foreground/40" />
-              <p>
-                No contacts yet
-                {session.data?.email
-                  ? ` — using account ${session.data.email}`
-                  : ""}
-                .
-              </p>
-            </div>
+            <EmptyState
+              icon={<UserPlus />}
+              title="No contacts yet"
+              description={
+                session.data?.email
+                  ? `Using account ${session.data.email}.`
+                  : "Add your first contact to get started."
+              }
+              action={<Button size="sm">New contact</Button>}
+              className="h-full rounded-none border-0"
+            />
           )}
         </div>
       </div>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
+import { Spinner } from "@/components/ui/spinner"
 import { accentClasses, isHexColor, resolveAccent } from "@/lib/accents"
 import { useCalendarStore } from "@/stores/calendar.store"
 import {
@@ -63,7 +64,7 @@ export function CalendarList() {
           </TooltipTrigger><TooltipContent>Add calendar</TooltipContent></Tooltip>
         )}
       </div>
-      {calendars.isLoading && <p className="px-2 text-xs text-muted-foreground">Loading calendars…</p>}
+      {calendars.isLoading && <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground"><Spinner className="size-3.5" /> Loading calendars…</div>}
       {calendars.data?.map((calendar) => (
         <label key={calendar.id} className="flex min-h-10 min-w-0 cursor-pointer items-center gap-2 overflow-hidden rounded-lg px-2 text-sm hover:bg-sidebar-accent sm:min-h-9">
           <Checkbox

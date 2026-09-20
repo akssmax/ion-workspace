@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Spinner } from "@/components/ui/spinner"
 import {
   useCalendarStore,
   type CalendarView as View,
@@ -236,8 +237,8 @@ export function CalendarView() {
         </Button>
       </header>
       {calendars.isLoading || capabilities.isLoading ? (
-        <div className="p-6 text-sm text-muted-foreground">
-          Loading calendars…
+        <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+          <Spinner /> Loading calendars…
         </div>
       ) : calendars.isError || capabilities.isError ? (
         <div role="alert" className="p-6 text-sm text-destructive">
@@ -280,8 +281,8 @@ export function CalendarView() {
           <div className="min-h-0 flex-1 overflow-auto">
             <Suspense
               fallback={
-                <div className="p-6 text-sm text-muted-foreground">
-                  Loading calendar…
+                <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+                  <Spinner /> Loading calendar…
                 </div>
               }
             >

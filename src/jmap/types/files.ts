@@ -13,7 +13,7 @@ export type { JmapId } from "./mail"
 export interface FileNode {
   id: JmapId
   size: number
-  /** Absent on some servers (e.g. Stalwart); the viewer routes by extension. */
+  /** Normalized MIME type (Stalwart returns it as `type`). */
   contentType?: string
   name: string
   isFile: boolean
@@ -22,7 +22,14 @@ export interface FileNode {
   blobId?: string | null
   parentId?: JmapId | null
   childNodeIds?: JmapId[] | null
+  /** Normalized modified timestamp (Stalwart returns `modified`/`changed`). */
   modifiedAt?: string | null
+  /** Raw server fields, normalized into the properties above. */
+  type?: string | null
+  modified?: string | null
+  changed?: string | null
+  created?: string | null
+  role?: string | null
 }
 
 export interface FileTree {

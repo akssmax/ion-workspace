@@ -5,6 +5,7 @@ import {
   SETTINGS_SECTION_IDS,
 } from "@/components/settings/settings-page"
 import type { SettingsSectionId } from "@/components/settings/settings-page"
+import { Spinner } from "@/components/ui/spinner"
 import { useSession } from "@/hooks/use-session"
 
 export const Route = createFileRoute("/settings")({
@@ -27,8 +28,8 @@ function SettingsRoute() {
 
   if (isLoading || !session) {
     return (
-      <div className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
-        Loading…
+      <div className="flex min-h-svh items-center justify-center">
+        <Spinner className="size-6" />
       </div>
     )
   }

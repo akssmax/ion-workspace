@@ -8,7 +8,6 @@ import {
   Check,
   ChevronDown,
   HardDrive,
-  Loader2,
   LogOut,
   RefreshCw,
   Server,
@@ -24,6 +23,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { Separator } from "@/components/ui/separator"
+import { Spinner } from "@/components/ui/spinner"
 import { useSession } from "@/hooks/use-session"
 import { signOut } from "@/services/auth/auth.service"
 import { qk } from "@/queries/keys"
@@ -287,7 +287,7 @@ export function AccountSection() {
               variant="secondary"
               className="gap-1.5 font-normal text-muted-foreground"
             >
-              <Loader2 className="size-3 animate-spin" />
+              <Spinner className="size-3" />
               Checking
             </Badge>
           ) : connected ? (

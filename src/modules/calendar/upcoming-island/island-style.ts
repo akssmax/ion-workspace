@@ -6,15 +6,14 @@
  * calendar's stored accent.
  */
 
-import { addMinutes, endOfDay } from "date-fns"
 import type { CalendarEvent } from "@/jmap/types/calendar"
-import { durationToMinutes, toDate } from "@/lib/dates"
+import { eventEnd, eventStart } from "@/lib/calendar-event"
 import {
   accentClasses,
   accentForKey,
   parseAccent,
-  type AccentName,
 } from "@/lib/accents"
+import type { AccentName } from "@/lib/accents"
 
 export type EventPhase = "live" | "soon" | "later"
 
@@ -32,17 +31,6 @@ const PHASE_ACCENT: Record<EventPhase, AccentName> = {
   live: "emerald",
   soon: "amber",
   later: "blue",
-}
-
-export function eventStart(event: CalendarEvent): Date {
-  return toDate(event.start)
-}
-
-export function eventEnd(event: CalendarEvent): Date {
-  const start = eventStart(event)
-  if (event.allDay || event.showWithoutTime) return endOfDay(start)
-  const minutes = durationToMinutes(event.duration)
-  return addMinutes(start, minutes > 0 ? minutes : 60)
 }
 
 export function eventPhase(event: CalendarEvent, now = new Date()): EventPhase {
@@ -80,7 +68,12 @@ export function islandAccent(
   if (phase === "live" || phase === "soon") return PHASE_ACCENT[phase]
   const fromCalendar = parseAccent(calendarColor)
   if (fromCalendar) return fromCalendar
-  return KIND_ACCENT[eventKind(event)] ?? accentForKey(event.calendarId ?? Object.keys(event.calendarIds ?? {})[0] ?? event.id)
+  return (
+    KIND_ACCENT[eventKind(event)] ??
+    accentForKey(
+      event.calendarId ?? Object.keys(event.calendarIds ?? {})[0] ?? event.id
+    )
+  )
 }
 
 export function islandTone(accent: AccentName) {

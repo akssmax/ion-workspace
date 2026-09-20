@@ -14,7 +14,7 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen, AlertCircle } from "lucide-react"
+import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen, AlertCircle, SearchX } from "lucide-react"
 import { cn } from "cn"
 import type { EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
@@ -25,6 +25,7 @@ import type { UserPreferences } from "@/server/preferences.rpc"
 import { senderName, emailHasAttachments } from "@/lib/html"
 import { formatRelative } from "@/lib/dates"
 import { Skeleton } from "@/components/ui/skeleton"
+import { EmptyState } from "@/components/ui/empty-state"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert"
@@ -68,6 +69,7 @@ export function EmailList({
   const toggleThreadSelection = useMailStore((s) => s.toggleThreadSelection)
   const selectRange = useMailStore((s) => s.selectRange)
   const clearSelection = useMailStore((s) => s.clearSelection)
+  const clearSearch = useMailStore((s) => s.setSearchQuery)
   const openCompose = useComposerStore((s) => s.openCompose)
   const { data: preferences } = usePreferences()
   const { data: mailboxes } = useMailboxes()
@@ -98,7 +100,9 @@ export function EmailList({
     setVisibleThreadIds(rows.map((r) => r.threadId))
   }, [rows, setVisibleThreadIds])
 
-  if (emails.isLoading) {
+  // `isPending` also covers a not-yet-enabled query (e.g. while mailboxes
+  // resolve), so we show skeletons instead of briefly flashing the empty state.
+  if (emails.isPending) {
     const skeletonHeight =
       density === "compact" ? "h-9" : density === "cozy" ? "h-14" : "h-16"
     return (
@@ -137,14 +141,37 @@ export function EmailList({
   }
 
   if (rows.length === 0) {
+    const noResults = !!(parsed.query || quickFilters.length)
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
-        <MailPlus className="size-8 text-muted-foreground/40" />
-        <p>
-          {parsed.query || quickFilters.length
-            ? t("No messages matched your search.")
-            : t("This mailbox is empty.")}
-        </p>
+      <div className="flex h-full w-full items-center justify-center p-4">
+        <EmptyState
+          size="sm"
+          tone={noResults ? "noResults" : "neutral"}
+          icon={noResults ? <SearchX /> : <MailPlus />}
+          title={
+            noResults
+              ? t("No messages matched your search.")
+              : t("This mailbox is empty.")
+          }
+          description={
+            noResults
+              ? "Try a different keyword or filter."
+              : "Messages you receive will show up here."
+          }
+          action={
+            noResults ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => clearSearch("")}
+              >
+                Clear search
+              </Button>
+            ) : undefined
+          }
+          className="h-auto w-full max-w-md"
+        />
       </div>
     )
   }
@@ -277,7 +304,7 @@ function ActionRow({ email, preferences, isArchive, children }: { email: EmailPr
   >
     {offset !== 0 ? <div aria-hidden className={cn("absolute inset-0 flex items-center px-5", offset > 0 ? "justify-start" : "justify-end", swipe.color)}><SwipeIcon className="size-5" /><span className="ms-2 text-xs font-medium">{swipe.label}</span></div> : null}
     <div className="relative transition-transform duration-150" style={{ transform: `translateX(${offset}px)` }}>{children}</div>
-    <div className="pointer-events-none absolute inset-y-0 end-2 hidden items-center gap-0.5 bg-background/95 ps-2 shadow-[-8px_0_12px_var(--background)] group-hover/action:pointer-events-auto group-hover/action:flex group-focus-within/action:pointer-events-auto group-focus-within/action:flex max-md:!hidden">
+    <div className="pointer-events-none absolute inset-y-0 end-2 hidden items-center gap-0.5 bg-background/95 ps-2 shadow-[-8px_0_12px_var(--background)] group-hover/action:pointer-events-auto group-hover/action:flex group-has-[:focus-visible]/action:pointer-events-auto group-has-[:focus-visible]/action:flex max-md:!hidden">
       {(["archive", "trash", "read", "star"] as const).map(action => {
         const details = actionDetails(action)
         const Icon = details.icon

@@ -24,6 +24,7 @@ export function AppShell() {
   return (
     <SidebarProvider
       defaultOpen
+      className="h-svh overflow-hidden"
       style={{ "--sidebar-width": "300px" } as CSSProperties}
     >
       <SidebarShell />

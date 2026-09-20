@@ -18,6 +18,7 @@ import {
   ZoomOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import { downloadBlob } from "@/lib/attachments"
 import { ViewerControlsContext } from "./controls"
 import { kindForMime } from "./document-kind"
@@ -305,7 +306,9 @@ function ViewerBody({
 }) {
   if (loading) {
     return (
-      <p className="p-6 text-sm text-muted-foreground">Loading preview…</p>
+      <div className="flex items-center gap-2 p-6 text-sm text-muted-foreground">
+        <Spinner /> Loading preview…
+      </div>
     )
   }
   if (error) {
