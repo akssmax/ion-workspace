@@ -11,12 +11,8 @@
  */
 
 import { createServerFn } from "@tanstack/react-start"
-import {
-  destroySession,
-  getSession,
-  setSession,
-  type SessionData,
-} from "./session.server"
+import { destroySession, getSession, setSession } from "./session.server"
+import type { SessionData } from "./session.server"
 import { WORKSPACE_CONFIG } from "./config.server"
 import {
   authenticateStalwart,
@@ -39,10 +35,15 @@ async function readPublicSession(): Promise<SessionInfo | null> {
 
 export const login = createServerFn({ method: "POST" })
   .validator(
-    (input: unknown) => input as { username?: string; password?: string; mfaToken?: string }
+    (input: unknown) =>
+      input as { username?: string; password?: string; mfaToken?: string }
   )
   .handler(
-    async ({ data }: { data?: { username?: string; password?: string; mfaToken?: string } }) => {
+    async ({
+      data,
+    }: {
+      data?: { username?: string; password?: string; mfaToken?: string }
+    }) => {
       const username = data?.username?.trim()
       const password = data?.password ?? ""
       if (!username || !password) {
@@ -50,10 +51,10 @@ export const login = createServerFn({ method: "POST" })
       }
 
       if (WORKSPACE_CONFIG.jmapMode === "mock") {
-        if (
-          username !== WORKSPACE_CONFIG.mockUsername &&
-          username !== WORKSPACE_CONFIG.mockEmail
-        ) {
+        const validUsername =
+          username === WORKSPACE_CONFIG.mockUsername ||
+          username === WORKSPACE_CONFIG.mockEmail
+        if (!validUsername || password !== WORKSPACE_CONFIG.mockPassword) {
           throw new Error("Invalid username or password.")
         }
         const session: SessionData = {
@@ -88,21 +89,34 @@ export const login = createServerFn({ method: "POST" })
       try {
         tokens = await authenticateStalwart(username, password, data?.mfaToken)
       } catch (error) {
-        if (error instanceof Error && /Stalwart|second factor|expired/.test(error.message))
+        if (
+          error instanceof Error &&
+          /Stalwart|second factor|expired/.test(error.message)
+        )
           throw error
         throw new Error(
           "Could not reach the mail server. Please try again later."
         )
       }
 
-      const discovery = await fetch(`${WORKSPACE_CONFIG.stalwartOrigin}/.well-known/jmap`, {
-        headers: { Authorization: `Bearer ${tokens.accessToken}` },
-        signal: AbortSignal.timeout(15_000),
-      })
-      if (!discovery.ok) throw new Error(`Stalwart JMAP discovery failed (${discovery.status}).`)
-      const jmap = await discovery.json() as { username?: string; primaryAccounts?: Record<string, string> }
+      const discovery = await fetch(
+        `${WORKSPACE_CONFIG.stalwartOrigin}/.well-known/jmap`,
+        {
+          headers: { Authorization: `Bearer ${tokens.accessToken}` },
+          signal: AbortSignal.timeout(15_000),
+        }
+      )
+      if (!discovery.ok)
+        throw new Error(`Stalwart JMAP discovery failed (${discovery.status}).`)
+      const jmap = (await discovery.json()) as {
+        username?: string
+        primaryAccounts?: Record<string, string>
+      }
       const accountId = jmap.primaryAccounts?.["urn:ietf:params:jmap:mail"]
-      if (!accountId) throw new Error("This Stalwart account does not provide JMAP mail access.")
+      if (!accountId)
+        throw new Error(
+          "This Stalwart account does not provide JMAP mail access."
+        )
       const canonicalName = jmap.username || username
       const email = canonicalName.includes("@") ? canonicalName : username
       const session: SessionData = {
@@ -132,10 +146,12 @@ export const getAuthSession = createServerFn({ method: "GET" }).handler(
 
 export const getAppConfig = createServerFn({ method: "GET" }).handler(
   async () => {
+    const isMock = WORKSPACE_CONFIG.jmapMode === "mock"
     return {
       jmapMode: WORKSPACE_CONFIG.jmapMode,
-      mockUsername: WORKSPACE_CONFIG.mockUsername,
-      mockPassword: WORKSPACE_CONFIG.mockPassword,
+      // Demo credentials are only advertised while the server runs mock mode.
+      mockUsername: isMock ? WORKSPACE_CONFIG.mockUsername : null,
+      mockPassword: isMock ? WORKSPACE_CONFIG.mockPassword : null,
       publicEventSourceUrl: WORKSPACE_CONFIG.publicEventSourceUrl,
     }
   }

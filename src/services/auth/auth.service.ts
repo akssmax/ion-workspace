@@ -17,8 +17,8 @@ export async function fetchSession(): Promise<SessionInfo | null> {
 
 export async function fetchAppConfig(): Promise<{
   jmapMode: "mock" | "real"
-  mockUsername: string
-  mockPassword: string
+  mockUsername: string | null
+  mockPassword: string | null
 }> {
   return getAppConfig()
 }

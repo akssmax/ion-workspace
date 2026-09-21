@@ -71,6 +71,7 @@ import { formatDateTime } from "@/lib/dates"
 import { useFeatureFlag } from "@/features/flags"
 import { usePreferences } from "@/queries/preferences"
 import { filenameDefaults, formatMailFilename } from "@/lib/mail-filenames"
+import { formatBytes } from "@/lib/attachments"
 import { zipStoredFiles } from "@/lib/zip-store"
 import {
   PermanentDeleteDialog,
@@ -639,6 +640,7 @@ function EmailCard({
 }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const [loadImages, setLoadImages] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const reduceMotion = useReducedMotion()
   const { data: preferences } = usePreferences()
   const downloadOriginal = useDownloadAttachment()
@@ -758,38 +760,149 @@ function EmailCard({
       dir="auto"
       className="min-w-0 overflow-hidden rounded-xl border bg-card transition-colors hover:border-ring/40"
     >
-      <button
-        type="button"
-        aria-expanded={expanded}
-        aria-label={expanded ? "Collapse message" : "Expand message"}
-        onClick={onToggle}
-        className="flex w-full flex-wrap items-center gap-3 border-b px-4 py-3 text-start transition-colors hover:bg-muted/50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-      >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+      <div className="flex w-full items-start gap-3 border-b px-4 py-3">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse message" : "Expand message"}
+          onClick={onToggle}
+          className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+        >
           {initials(senderName(email))}
-        </div>
+        </button>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">
-            {senderName(email)}
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse message" : "Expand message"}
+            onClick={onToggle}
+            className="block w-full rounded-md text-start focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          >
+            <p className="truncate text-sm font-medium">{senderName(email)}</p>
             {senderEmail(email) ? (
-              <span className="ml-1 text-xs font-normal text-muted-foreground">
-                &lt;{senderEmail(email)}&gt;
-              </span>
+              <p className="truncate text-sm text-muted-foreground">
+                {senderEmail(email)}
+              </p>
             ) : null}
-          </p>
-          <p className="truncate text-xs text-muted-foreground">
-            To: {fmtAddresses(email.to)}
-            {email.cc?.length ? ` · Cc: ${fmtAddresses(email.cc)}` : ""}
-          </p>
+          </button>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span className="min-w-0 truncate">
+              To: {fmtAddresses(email.to)}
+              {email.cc?.length ? ` · Cc: ${fmtAddresses(email.cc)}` : ""}
+            </span>
+            <button
+              type="button"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="flex shrink-0 items-center gap-1 rounded-md font-medium transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            >
+              <ChevronDown
+                aria-hidden
+                className={`size-3.5 shrink-0 transition-transform ${detailsOpen ? "rotate-180" : ""}`}
+              />
+              {detailsOpen ? "Hide details" : "Show details"}
+            </button>
+          </div>
         </div>
-        <time className="shrink-0 text-xs text-muted-foreground tabular-nums">
-          {time ? formatDateTime(time) : ""}
-        </time>
-        <ChevronDown
-          aria-hidden
-          className={`size-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
-        />
-      </button>
+        <div className="flex shrink-0 items-center gap-2 self-center">
+          <time className="text-xs text-muted-foreground tabular-nums">
+            {time ? formatDateTime(time) : ""}
+          </time>
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-label={expanded ? "Collapse message" : "Expand message"}
+            onClick={onToggle}
+            className="flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          >
+            <ChevronDown
+              aria-hidden
+              className={`size-4 transition-transform ${expanded ? "rotate-180" : ""}`}
+            />
+          </button>
+        </div>
+      </div>
+      <AnimatePresence initial={false}>
+        {detailsOpen ? (
+          <motion.div
+            key="message-details"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : { duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }
+            }
+            className="min-w-0 overflow-hidden border-b bg-muted/20"
+          >
+            <div className="px-4 py-3 text-xs">
+              <p className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Recipients &amp; routing
+              </p>
+              <dl className="mt-2 grid grid-cols-[7rem_1fr] gap-y-1.5">
+                <dt className="text-muted-foreground">From</dt>
+                <dd className="break-all">{fmtAddresses(email.from)}</dd>
+                <dt className="text-muted-foreground">To</dt>
+                <dd className="break-all">{fmtAddresses(email.to)}</dd>
+                {email.cc?.length ? (
+                  <>
+                    <dt className="text-muted-foreground">Cc</dt>
+                    <dd className="break-all">{fmtAddresses(email.cc)}</dd>
+                  </>
+                ) : null}
+                {email.replyTo?.length ? (
+                  <>
+                    <dt className="text-muted-foreground">Reply-To</dt>
+                    <dd className="break-all">{fmtAddresses(email.replyTo)}</dd>
+                  </>
+                ) : null}
+                <dt className="text-muted-foreground">Received</dt>
+                <dd>{time ? formatDateTime(time) : "—"}</dd>
+              </dl>
+              <p className="mt-4 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Message properties
+              </p>
+              <dl className="mt-2 grid grid-cols-[7rem_1fr] gap-y-1.5">
+                <dt className="text-muted-foreground">Subject</dt>
+                <dd className="break-all">{email.subject || "(no subject)"}</dd>
+                {email.size != null ? (
+                  <>
+                    <dt className="text-muted-foreground">Size</dt>
+                    <dd>{formatBytes(email.size)}</dd>
+                  </>
+                ) : null}
+                <dt className="text-muted-foreground">Message ID</dt>
+                <dd className="break-all">{email.messageId ?? "—"}</dd>
+              </dl>
+              {email.headers ? (
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    Raw headers
+                  </summary>
+                  <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-muted-foreground">
+                    {JSON.stringify(email.headers, null, 2)}
+                  </pre>
+                </details>
+              ) : null}
+              <div className="mt-3 flex gap-2">
+                <Button size="sm" variant="outline" onClick={printMessage}>
+                  <Printer className="size-3.5" /> Print
+                </Button>
+                {email.blobId ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void saveOriginal()}
+                  >
+                    <Download className="size-3.5" /> Download .eml
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
       <AnimatePresence initial={false}>
         {expanded ? (
           <motion.div
@@ -814,40 +927,6 @@ function EmailCard({
                 attachments before opening them.
               </p>
             ) : null}
-            <details className="mx-4 mt-2 text-xs text-muted-foreground">
-              <summary className="cursor-pointer">Message details</summary>
-              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 break-all">
-                <dt>From</dt>
-                <dd>{fmtAddresses(email.from)}</dd>
-                <dt>To</dt>
-                <dd>{fmtAddresses(email.to)}</dd>
-                <dt>Cc</dt>
-                <dd>{fmtAddresses(email.cc)}</dd>
-                <dt>Reply-To</dt>
-                <dd>{fmtAddresses(email.replyTo)}</dd>
-                <dt>Message ID</dt>
-                <dd>{email.messageId ?? "—"}</dd>
-              </dl>
-              {email.headers ? (
-                <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap">
-                  {JSON.stringify(email.headers, null, 2)}
-                </pre>
-              ) : null}
-              <div className="mt-2 flex gap-2">
-                <Button size="sm" variant="outline" onClick={printMessage}>
-                  <Printer className="size-3.5" /> Print
-                </Button>
-                {email.blobId ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void saveOriginal()}
-                  >
-                    <Download className="size-3.5" /> Download .eml
-                  </Button>
-                ) : null}
-              </div>
-            </details>
 
             {blocked.blocked.length > 0 && !imagesAllowed ? (
               <Button

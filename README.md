@@ -2,7 +2,9 @@
 
 ## Stalwart mail server
 
-The app starts in mock mode. For a Stalwart 0.16+ server, configure `JMAP_MODE=real`, `JMAP_STALWART_ORIGIN=https://mail.example.com`, `STALWART_OAUTH_CLIENT_ID=workspace-tool`, `SESSION_SECRET` (a long random value), and `DATABASE_URL`. Register the OAuth client ID in Stalwart with authorization-code and refresh-token grants. The app uses Stalwart's `/api/auth`, `/auth/token`, and `/.well-known/jmap` endpoints; mail data remains in Stalwart. Run `pnpm db:migrate` before starting the app to create the app-owned settings and template tables.
+The app starts in mock mode. For a Stalwart server, configure `JMAP_MODE=real`, `JMAP_STALWART_ORIGIN=https://mail.example.com`, `STALWART_AUTH_MODE=basic`, and `SESSION_SECRET` (a long random value) to sign in with real Stalwart credentials. Basic mode validates the password against `/.well-known/jmap` and keeps the HTTP credentials server-side, so it needs no OAuth client registration. OAuth mode (`STALWART_AUTH_MODE=oauth`, the default) requires `STALWART_OAUTH_CLIENT_ID` registered in Stalwart with authorization-code and refresh-token grants and uses the `/api/auth` and `/auth/token` endpoints. Mail data remains in Stalwart. `DATABASE_URL` (plus `pnpm db:migrate`) is only required for the DB-backed features below.
+
+The `/demo` route always runs a self-contained mock provider and synthetic session regardless of the server's `JMAP_MODE`, so a production deployment can serve real authentication at `/app` while keeping the sample workspace available.
 
 Use a test account first. In **Settings → Account**, check JMAP reachability, account binding, capabilities, and permissions. The Vacation responder and Filters sections only become editable when the account advertises the relevant JMAP extension and has permission to use it. The app never activates its managed filter script while an unrelated Sieve script is active.
 
@@ -23,7 +25,7 @@ This will place the ui components in the `components` directory.
 To use the components in your app, import them as follows:
 
 ```tsx
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button"
 ```
 
 ### Calendar feeds

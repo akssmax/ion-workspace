@@ -26,8 +26,8 @@ function LoginPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const session = useSession()
-  const [username, setUsername] = useState("demo")
-  const [password, setPassword] = useState("demo")
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
   const [mfaToken, setMfaToken] = useState("")
   const [needsMfa, setNeedsMfa] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -38,7 +38,10 @@ function LoginPage() {
   useEffect(() => {
     void fetchAppConfig()
       .then((config) => {
-        if (config.jmapMode === "mock") {
+        if (config.jmapMode !== "mock") return
+        if (config.mockUsername) setUsername(config.mockUsername)
+        if (config.mockPassword) setPassword(config.mockPassword)
+        if (config.mockUsername && config.mockPassword) {
           setHint(
             `Mock mode — use ${config.mockUsername} / ${config.mockPassword}`
           )
