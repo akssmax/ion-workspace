@@ -33,13 +33,18 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import { NavUser } from "./nav-user"
 import { IonLogo } from "@/components/brand/logo"
+import { LandingMotion } from "@/components/landing/landing-motion"
 import { useReducedMotion } from "framer-motion"
 import * as m from "framer-motion/m"
-import { useWorkspaceStore  } from "@/stores/workspace.store"
-import type {WorkspaceApp} from "@/stores/workspace.store";
+import { useWorkspaceStore } from "@/stores/workspace.store"
+import type { WorkspaceApp } from "@/stores/workspace.store"
 import { useMailStore } from "@/stores/mail.store"
 import { useFilesStore } from "@/stores/files.store"
 import { useComposerStore } from "@/stores/composer.store"
@@ -55,6 +60,7 @@ import { Link } from "@tanstack/react-router"
 import { useLanguage } from "@/lib/language"
 import { CalendarList } from "@/components/calendar/calendar-list"
 import { CalendarMiniPicker } from "@/components/calendar/calendar-mini-picker"
+import { Skeleton } from "@/components/ui/skeleton"
 import { APPS } from "./apps"
 import type { TranslationKey } from "@/lib/language"
 
@@ -105,18 +111,25 @@ export function SidebarShell() {
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
-              <m.div initial="rest" animate="rest" whileHover={reduceMotion ? undefined : "hover"} className="w-full">
-                <SidebarMenuButton
-                  size="lg"
-                  tooltip={{ children: t("Toggle sidebar"), hidden: false }}
-                  onClick={toggleSidebar}
-                  className="md:h-8 md:p-0"
+              <LandingMotion>
+                <m.div
+                  initial="rest"
+                  animate="rest"
+                  whileHover={reduceMotion ? undefined : "hover"}
+                  className="w-full"
                 >
-                  <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <IonLogo wordmark={false} size={16} hoverFromParent />
-                  </span>
-                </SidebarMenuButton>
-              </m.div>
+                  <SidebarMenuButton
+                    size="lg"
+                    tooltip={{ children: t("Toggle sidebar"), hidden: false }}
+                    onClick={toggleSidebar}
+                    className="md:h-8 md:p-0"
+                  >
+                    <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                      <IonLogo wordmark={false} size={16} hoverFromParent />
+                    </span>
+                  </SidebarMenuButton>
+                </m.div>
+              </LandingMotion>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarHeader>
@@ -137,7 +150,10 @@ export function SidebarShell() {
                 {APPS.map((item) => (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton
-                      tooltip={{ children: t(item.label as TranslationKey), hidden: false }}
+                      tooltip={{
+                        children: t(item.label as TranslationKey),
+                        hidden: false,
+                      }}
                       onClick={() => pickApp(item.id)}
                       isActive={app === item.id}
                       className="px-2.5 md:px-2"
@@ -150,33 +166,49 @@ export function SidebarShell() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
-          {!isDemoRuntime && <SidebarGroup className="mt-auto">
-            <SidebarGroupContent className="px-1.5 md:px-0">
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    tooltip={{ children: t("Settings"), hidden: false }}
-                    render={
-                      <Link to="/settings" search={{ section: "general" }} />
-                    }
-                    className="px-2.5 md:px-2"
-                  >
-                    <Settings />
-                    <span>{t("Settings")}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>}
+          {!isDemoRuntime && (
+            <SidebarGroup className="mt-auto">
+              <SidebarGroupContent className="px-1.5 md:px-0">
+                <SidebarMenu>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      tooltip={{ children: t("Settings"), hidden: false }}
+                      render={
+                        <Link to="/settings" search={{ section: "general" }} />
+                      }
+                      className="px-2.5 md:px-2"
+                    >
+                      <Settings />
+                      <span>{t("Settings")}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
         <SidebarFooter>
           {isDemoRuntime ? (
-            <Tooltip><TooltipTrigger render={<div className="flex flex-col items-center gap-1 py-2" role="img" tabIndex={0} aria-label="Alex Morgan, sample account" />}>
-              <Avatar>
-                <AvatarFallback>AM</AvatarFallback>
-              </Avatar>
-            </TooltipTrigger><TooltipContent>Alex Morgan · Sample account</TooltipContent></Tooltip>
-          ) : <NavUser />}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <div
+                    className="flex flex-col items-center gap-1 py-2"
+                    role="img"
+                    tabIndex={0}
+                    aria-label="Alex Morgan, sample account"
+                  />
+                }
+              >
+                <Avatar>
+                  <AvatarFallback>AM</AvatarFallback>
+                </Avatar>
+              </TooltipTrigger>
+              <TooltipContent>Alex Morgan · Sample account</TooltipContent>
+            </Tooltip>
+          ) : (
+            <NavUser />
+          )}
         </SidebarFooter>
       </Sidebar>
 
@@ -224,13 +256,26 @@ function PanelTitle({ app }: { app: WorkspaceApp }) {
   )
 }
 
+/** Placeholder rows for a panel whose contents are still loading. */
+function SidebarPanelSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <SidebarMenu aria-hidden="true">
+      {Array.from({ length: rows }).map((_, index) => (
+        <SidebarMenuItem key={index}>
+          <Skeleton className="h-9 w-full rounded-2xl" />
+        </SidebarMenuItem>
+      ))}
+    </SidebarMenu>
+  )
+}
+
 function MailboxPanel() {
   const { t } = useLanguage()
   const setApp = useWorkspaceStore((s) => s.setApp)
   const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const setSearchQuery = useMailStore((s) => s.setSearchQuery)
-  const { data: rawMailboxes } = useMailboxes()
+  const { data: rawMailboxes, isPending } = useMailboxes()
   const { data: prefs } = usePreferences()
   const mailboxes = rawMailboxes ?? []
   const folderManagement = useFeatureFlag("mail.mailboxes")
@@ -244,55 +289,62 @@ function MailboxPanel() {
   return (
     <SidebarGroup>
       <SidebarGroupContent>
-        <SidebarMenu>
-          {mailboxes.map((mb) => {
-            const label = mb.role
-              ? (FOLDER_LABELS[mb.role] ? t(FOLDER_LABELS[mb.role] as TranslationKey) : mb.name)
-              : mb.name
-            const icon = mb.role ? (
-              (FOLDER_ICONS[mb.role] ?? <Inbox className="size-4" />)
-            ) : (
-              (() => {
-                const appearance = resolveTagAppearance(
-                  prefs?.tagAppearance?.[mb.id],
-                  mb.id
-                )
+        {isPending ? (
+          <SidebarPanelSkeleton rows={7} />
+        ) : (
+          <SidebarMenu>
+            {mailboxes.map((mb) => {
+              const label = mb.role
+                ? FOLDER_LABELS[mb.role]
+                  ? t(FOLDER_LABELS[mb.role] as TranslationKey)
+                  : mb.name
+                : mb.name
+              const icon = mb.role
+                ? (FOLDER_ICONS[mb.role] ?? <Inbox className="size-4" />)
+                : (() => {
+                    const appearance = resolveTagAppearance(
+                      prefs?.tagAppearance?.[mb.id],
+                      mb.id
+                    )
+                    return (
+                      <appearance.Icon
+                        className={cn(
+                          "size-4",
+                          accentClasses(appearance.color).icon
+                        )}
+                      />
+                    )
+                  })()
+              if (folderManagement) {
                 return (
-                  <appearance.Icon
-                    className={cn("size-4", accentClasses(appearance.color).icon)}
+                  <MailboxRow
+                    key={mb.id}
+                    mailbox={mb}
+                    label={label}
+                    icon={icon}
+                    active={activeMailboxId === mb.id}
+                    onPick={pickMailbox}
                   />
                 )
-              })()
-            )
-            if (folderManagement) {
+              }
               return (
-                <MailboxRow
-                  key={mb.id}
-                  mailbox={mb}
-                  label={label}
-                  icon={icon}
-                  active={activeMailboxId === mb.id}
-                  onPick={pickMailbox}
-                />
+                <SidebarMenuItem key={mb.id}>
+                  <SidebarMenuButton
+                    onClick={() => pickMailbox(mb.id)}
+                    isActive={activeMailboxId === mb.id}
+                  >
+                    {icon}
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                  {(mb.unreadEmails ?? 0) > 0 ? (
+                    <SidebarMenuBadge>{mb.unreadEmails}</SidebarMenuBadge>
+                  ) : null}
+                </SidebarMenuItem>
               )
-            }
-            return (
-              <SidebarMenuItem key={mb.id}>
-                <SidebarMenuButton
-                  onClick={() => pickMailbox(mb.id)}
-                  isActive={activeMailboxId === mb.id}
-                >
-                  {icon}
-                  <span>{label}</span>
-                </SidebarMenuButton>
-                {(mb.unreadEmails ?? 0) > 0 ? (
-                  <SidebarMenuBadge>{mb.unreadEmails}</SidebarMenuBadge>
-                ) : null}
-              </SidebarMenuItem>
-            )
-          })}
-          {folderManagement ? <NewFolderRow /> : null}
-        </SidebarMenu>
+            })}
+            {folderManagement ? <NewFolderRow /> : null}
+          </SidebarMenu>
+        )}
       </SidebarGroupContent>
     </SidebarGroup>
   )
@@ -335,7 +387,7 @@ function FilesPanel() {
 function ContactsPanel() {
   const { t } = useLanguage()
   const setApp = useWorkspaceStore((s) => s.setApp)
-  const { data: books } = useAddressBooks()
+  const { data: books, isPending } = useAddressBooks()
   const { data: contacts } = useContacts()
   return (
     <SidebarGroup>
@@ -344,16 +396,20 @@ function ContactsPanel() {
         {(contacts?.length ?? 0) > 0 ? ` · ${contacts?.length}` : ""}
       </SidebarGroupLabel>
       <SidebarGroupContent>
-        <SidebarMenu>
-          {(books ?? []).map((book) => (
-            <SidebarMenuItem key={book.id}>
-              <SidebarMenuButton onClick={() => setApp("contacts")}>
-                <Users className="size-4" />
-                <span className="truncate">{book.name}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
+        {isPending ? (
+          <SidebarPanelSkeleton rows={4} />
+        ) : (
+          <SidebarMenu>
+            {(books ?? []).map((book) => (
+              <SidebarMenuItem key={book.id}>
+                <SidebarMenuButton onClick={() => setApp("contacts")}>
+                  <Users className="size-4" />
+                  <span className="truncate">{book.name}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        )}
       </SidebarGroupContent>
     </SidebarGroup>
   )

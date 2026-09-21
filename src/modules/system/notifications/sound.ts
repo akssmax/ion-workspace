@@ -4,16 +4,30 @@
  * No binary assets: each preset is a short oscillator envelope, so the tones
  * work offline and can be previewed instantly. Playback is best-effort — a
  * blocked/suspended AudioContext never breaks a notification.
+ *
+ * Browsers block audio until a user gesture unlocks the AudioContext, so the
+ * first gesture anywhere in the app should call `unlockNotificationAudio()`.
+ * Otherwise the context is created already-suspended and `resume()` is
+ * rejected, which is why notifications can arrive silently.
  */
 
 import type { NotificationSoundId } from "@/lib/notifications"
 
+type AudioContextCtor = new () => AudioContext
+
 let context: AudioContext | null = null
 
-function audioContext(): AudioContext | null {
+function audioContextCtor(): AudioContextCtor | null {
   if (typeof window === "undefined") return null
-  const Ctor = (window as unknown as { AudioContext?: typeof AudioContext })
-    .AudioContext
+  const candidate = window as unknown as {
+    AudioContext?: AudioContextCtor
+    webkitAudioContext?: AudioContextCtor
+  }
+  return candidate.AudioContext ?? candidate.webkitAudioContext ?? null
+}
+
+function audioContext(): AudioContext | null {
+  const Ctor = audioContextCtor()
   if (!Ctor) return null
   try {
     if (!context) context = new Ctor()
@@ -21,6 +35,28 @@ function audioContext(): AudioContext | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Create/resume the shared AudioContext from within a user gesture so later
+ * notification sounds can play. Safe to call repeatedly.
+ */
+export function unlockNotificationAudio(): void {
+  const ctx = audioContext()
+  if (!ctx) return
+  const resume = ctx.state === "suspended" ? ctx.resume().catch(() => {}) : null
+  void (resume ?? Promise.resolve()).then(() => {
+    if (ctx.state !== "running") return
+    // Play a zero-length buffer to fully unlock iOS/Safari.
+    try {
+      const source = ctx.createBufferSource()
+      source.buffer = ctx.createBuffer(1, 1, 22050)
+      source.connect(ctx.destination)
+      source.start(0)
+    } catch {
+      // best-effort unlock
+    }
+  })
 }
 
 function blip(
@@ -48,6 +84,7 @@ export function playNotificationSound(sound: NotificationSoundId): void {
   const ctx = audioContext()
   if (!ctx) return
   const run = () => {
+    if (ctx.state !== "running") return
     const now = ctx.currentTime + 0.01
     if (sound === "beep") {
       blip(ctx, 880, now, 0.14, 0.18)
@@ -69,6 +106,7 @@ export function playNotificationSound(sound: NotificationSoundId): void {
     }
   }
   if (ctx.state === "suspended") {
+    // Only succeeds inside a user gesture; otherwise stay silent.
     void ctx
       .resume()
       .then(run)
@@ -80,5 +118,6 @@ export function playNotificationSound(sound: NotificationSoundId): void {
 
 /** Preview a tone from settings (called on a user gesture). */
 export function previewNotificationSound(sound: NotificationSoundId): void {
+  unlockNotificationAudio()
   playNotificationSound(sound)
 }

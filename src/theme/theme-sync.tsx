@@ -38,10 +38,10 @@ function sameTheme(a: ThemeConfig, b: ThemeConfig): boolean {
 /**
  * Keeps the local theme store and the per-user server preference in sync.
  *
- * - The server preference is the source of truth once a user is signed in.
- * - A signed-in user with no stored theme adopts their local choice (or the
- *   default when the local cache belonged to a different account).
- * - Local theme changes are pushed back to the server (debounced).
+ * - On sign-in the server preference is applied once to seed the browser.
+ * - After that the store is authoritative for this session; local changes are
+ *   saved immediately. Stale preference refetches never overwrite the local
+ *   theme, which previously caused a pick made near sign-out to revert.
  */
 export function ThemeSync() {
   const session = useSession()
@@ -52,6 +52,8 @@ export function ThemeSync() {
   // The theme last known to be persisted server-side, used to ignore the echo
   // of our own writes and avoid a save loop.
   const serverThemeRef = useRef<ThemeConfig | null>(null)
+  // The account whose initial server theme has already been applied.
+  const initializedForRef = useRef<string | null>(null)
   // Users for whom we've already seeded a first theme, so a failing save does
   // not retry in a loop.
   const seededForRef = useRef<string | null>(null)
@@ -65,18 +67,29 @@ export function ThemeSync() {
       // Signed out: keep the cache (and its owner marker) for first paint.
       // The marker lets the next, different account start from defaults.
       serverThemeRef.current = null
+      initializedForRef.current = null
+      seededForRef.current = null
       return
     }
 
     const stored = prefs.theme
     const current = pickThemeConfig(useThemeStore.getState())
+    const isInitial = initializedForRef.current !== userId
+    initializedForRef.current = userId
 
     if (stored) {
-      serverThemeRef.current = pickThemeConfig(stored)
-      writeOwner(userId)
-      if (!sameTheme(stored, current)) {
-        useThemeStore.getState().setTheme(stored)
+      if (isInitial) {
+        serverThemeRef.current = pickThemeConfig(stored)
+        writeOwner(userId)
+        if (!sameTheme(stored, current)) {
+          useThemeStore.getState().setTheme(stored)
+        }
+      } else if (sameTheme(stored, current)) {
+        // Our own write echoing back; keep the guard reference current.
+        serverThemeRef.current = pickThemeConfig(stored)
       }
+      // A different value after init is a stale refetch — ignore it so it
+      // cannot revert a selection the user just made.
       return
     }
 
@@ -99,22 +112,17 @@ export function ThemeSync() {
 
   useEffect(() => {
     if (isDemoRuntime || !userId) return
-    let timer: ReturnType<typeof setTimeout> | undefined
     const unsubscribe = useThemeStore.subscribe((state) => {
       const next = pickThemeConfig(state)
       if (serverThemeRef.current && sameTheme(next, serverThemeRef.current)) {
         return
       }
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        serverThemeRef.current = next
-        saveRef.current.mutate({ theme: next })
-      }, 600)
+      // Save immediately: a debounced write could be lost if the user signs
+      // out before it fires, reverting the theme on their next sign-in.
+      serverThemeRef.current = next
+      saveRef.current.mutate({ theme: next })
     })
-    return () => {
-      clearTimeout(timer)
-      unsubscribe()
-    }
+    return unsubscribe
   }, [userId])
 
   return null
