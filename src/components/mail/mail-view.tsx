@@ -252,7 +252,7 @@ function MailViewInner() {
                 render={
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="sm-touch"
                     className="min-w-0 gap-1.5 px-2"
                     aria-label={`${t("Choose mailbox")}: ${mailboxLabel(mailbox) ?? t("Inbox")}`}
                   />
@@ -338,7 +338,7 @@ function MailViewInner() {
                   setSearchQuery("")
                   searchRef.current?.focus()
                 }}
-                className="inline-flex size-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring md:size-7"
               >
                 <X className="size-4" />
               </button>
@@ -540,7 +540,7 @@ function MailViewInner() {
             <div className="flex h-12 shrink-0 items-center gap-2 border-b px-2">
               <Button
                 variant="ghost"
-                size="sm"
+                size="sm-touch"
                 onClick={() => setFocusedThread(null)}
               >
                 <ArrowLeft className="size-4 rtl:rotate-180" />

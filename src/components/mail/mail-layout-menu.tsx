@@ -292,7 +292,7 @@ export function MailLayoutMenu() {
               render={
                 <Button
                   variant="ghost"
-                  size="icon-sm"
+                  size="icon-touch"
                   aria-label="Mail layout"
                 />
               }

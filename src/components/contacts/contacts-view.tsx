@@ -74,7 +74,7 @@ export function ContactsView() {
               orientation="vertical"
               className="mx-1 h-6 self-center!"
             />
-            <Button size="sm" onClick={() => setAdding(true)}>
+            <Button size="sm-touch" onClick={() => setAdding(true)}>
               <UserPlus className="size-4" />
               Add contact
             </Button>
@@ -128,7 +128,7 @@ export function ContactsView() {
                   : "Add your first contact to get started."
               }
               action={
-                <Button size="sm" onClick={() => setAdding(true)}>
+                <Button size="sm-touch" onClick={() => setAdding(true)}>
                   New contact
                 </Button>
               }
@@ -148,7 +148,7 @@ export function ContactsView() {
           {isMobile ? (
             <Button
               variant="ghost"
-              size="sm"
+              size="sm-touch"
               className="m-3"
               onClick={() => {
                 setSelectedId(null)
@@ -245,12 +245,12 @@ function ContactDetail({
       </div>
 
       <div className="mt-6 flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <Button variant="outline" size="sm-touch" onClick={onEdit}>
           Edit
         </Button>
         <Button
           variant="destructive"
-          size="sm"
+          size="sm-touch"
           className="ml-auto"
           onClick={onDelete}
         >

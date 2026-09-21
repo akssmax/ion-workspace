@@ -7,6 +7,7 @@ import { useEffect, useState } from "react"
 import { createWorkspaceQueryClient } from "@/queries/client"
 import { RouteErrorFallback } from "@/components/error-boundary"
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/theme/provider"
+import { ThemeSync } from "@/theme/theme-sync"
 import { LanguageSync } from "@/lib/language"
 import { reloadForStaleChunk } from "@/lib/lazy-with-retry"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -57,8 +58,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       reloadForStaleChunk()
     }
     window.addEventListener("vite:preloadError", onPreloadError)
-    return () =>
-      window.removeEventListener("vite:preloadError", onPreloadError)
+    return () => window.removeEventListener("vite:preloadError", onPreloadError)
   }, [])
 
   return (
@@ -70,23 +70,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body suppressHydrationWarning>
         <ThemeProvider>
           <TooltipProvider>
-          <QueryClientProvider client={queryClient}>
-            <LanguageSync />
-            {children}
-            {import.meta.env.DEV && (
-              <TanStackDevtools
-                config={{
-                  position: "bottom-right",
-                }}
-                plugins={[
-                  {
-                    name: "Tanstack Router",
-                    render: <TanStackRouterDevtoolsPanel />,
-                  },
-                ]}
-              />
-            )}
-          </QueryClientProvider>
+            <QueryClientProvider client={queryClient}>
+              <LanguageSync />
+              <ThemeSync />
+              {children}
+              {import.meta.env.DEV && (
+                <TanStackDevtools
+                  config={{
+                    position: "bottom-right",
+                  }}
+                  plugins={[
+                    {
+                      name: "Tanstack Router",
+                      render: <TanStackRouterDevtoolsPanel />,
+                    },
+                  ]}
+                />
+              )}
+            </QueryClientProvider>
           </TooltipProvider>
         </ThemeProvider>
         <Scripts />

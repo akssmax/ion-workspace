@@ -248,7 +248,7 @@ export function FilesView() {
           render={
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-touch"
               aria-label={`Actions for ${node.name}`}
             />
           }
@@ -339,7 +339,11 @@ export function FilesView() {
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="outline" size="sm" aria-label="Filter files" />
+                <Button
+                  variant="outline"
+                  size="sm-touch"
+                  aria-label="Filter files"
+                />
               }
             >
               <SlidersHorizontal className="size-4" />{" "}
@@ -358,7 +362,11 @@ export function FilesView() {
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="outline" size="sm" aria-label="Sort files" />
+                <Button
+                  variant="outline"
+                  size="sm-touch"
+                  aria-label="Sort files"
+                />
               }
             >
               <ArrowUpDown className="size-4" />
@@ -389,7 +397,7 @@ export function FilesView() {
 
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             aria-label={
               view === "grid" ? "Switch to list view" : "Switch to grid view"
             }
@@ -399,7 +407,7 @@ export function FilesView() {
           </Button>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             aria-label="Refresh"
             onClick={() => void allNodes.refetch()}
           >
@@ -408,7 +416,7 @@ export function FilesView() {
 
           <Button
             variant="outline"
-            size="sm"
+            size="sm-touch"
             onClick={() => setFolderDialog(true)}
           >
             <FolderPlus className="size-4" />
@@ -455,7 +463,7 @@ export function FilesView() {
             <p className="text-destructive">Could not load this folder.</p>
             <Button
               variant="outline"
-              size="sm"
+              size="sm-touch"
               onClick={() => void query.refetch()}
             >
               Try again
@@ -477,7 +485,7 @@ export function FilesView() {
             }
             action={
               !search && filter === "all" ? (
-                <Button size="sm" onClick={() => setFolderDialog(true)}>
+                <Button size="sm-touch" onClick={() => setFolderDialog(true)}>
                   <FolderPlus className="size-4" /> New folder
                 </Button>
               ) : undefined
@@ -629,7 +637,11 @@ export function FilesView() {
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="ghost" size="sm" aria-label="Rows per page" />
+              <Button
+                variant="ghost"
+                size="sm-touch"
+                aria-label="Rows per page"
+              />
             }
           >
             {pageSize} / page
@@ -645,7 +657,7 @@ export function FilesView() {
         </DropdownMenu>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon-touch"
           aria-label="Previous page"
           disabled={safePage <= 0}
           onClick={() => setPage((p) => Math.max(0, p - 1))}
@@ -657,7 +669,7 @@ export function FilesView() {
         </span>
         <Button
           variant="ghost"
-          size="icon-sm"
+          size="icon-touch"
           aria-label="Next page"
           disabled={safePage >= pageCount - 1}
           onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}

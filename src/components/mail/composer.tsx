@@ -697,15 +697,13 @@ function ComposerForm({ variant }: { variant: "dock" | "inline" }) {
 
       <div className="mx-4 flex min-w-0 items-center gap-2 rounded-lg bg-muted/50 p-1">
         <FormattingToolbar editor={editor}>
-          <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-            {saveState === "saving" ? (
-              <span>Saving draft…</span>
-            ) : saveState === "saved" ? (
-              <span>Draft saved</span>
-            ) : saveState === "error" ? (
-              <span className="text-destructive">Couldn&apos;t save draft</span>
-            ) : null}
-          </span>
+          {saveState === "saving" ? (
+            <span>Saving draft…</span>
+          ) : saveState === "saved" ? (
+            <span>Draft saved</span>
+          ) : saveState === "error" ? (
+            <span className="text-destructive">Couldn&apos;t save draft</span>
+          ) : null}
         </FormattingToolbar>
       </div>
       {identity?.htmlSignature || identity?.textSignature ? (
@@ -1321,10 +1319,10 @@ function FormattingToolbar({
           </Tooltip>
         ))}
       </div>
-      {children}
-      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-        {wordCount} words
-      </span>
+      <div className="ml-auto flex shrink-0 items-center gap-2 text-xs whitespace-nowrap text-muted-foreground">
+        {children}
+        <span className="tabular-nums">{wordCount} words</span>
+      </div>
     </>
   )
 }

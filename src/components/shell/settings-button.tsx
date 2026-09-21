@@ -15,7 +15,7 @@ export function SettingsButton({ className }: { className?: string }) {
   return (
     <Button
       variant="ghost"
-      size="icon"
+      size="icon-touch"
       aria-label="Settings"
       render={<Link to="/settings" search={{ section: "general" }} />}
       className={cn("md:hidden", className)}

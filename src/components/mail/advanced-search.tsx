@@ -77,7 +77,7 @@ export function AdvancedSearch({
         type="button"
         variant="ghost"
         size="icon-sm"
-        className="size-7 shrink-0"
+        className="size-9 shrink-0 md:size-7"
         aria-label="Advanced mail search"
         onClick={() => setOpen(true)}
       />}>

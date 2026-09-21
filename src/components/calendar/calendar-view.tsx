@@ -16,8 +16,20 @@ import {
 } from "date-fns"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { Spinner } from "@/components/ui/spinner"
 import {
   useCalendarStore,
@@ -51,10 +63,25 @@ const VIEW_NAMES: Record<View, string> = {
   agenda: "Schedule",
 }
 
-function windowFor(date: Date, view: View, weekStartsOn: number, scheduleDays: number) {
+function windowFor(
+  date: Date,
+  view: View,
+  weekStartsOn: number,
+  scheduleDays: number
+) {
   if (view === "month") {
-    const start = startOfWeek(startOfMonth(date), { weekStartsOn: weekStartsOn as 0 | 1 | 6 })
-    return { start, end: addDays(startOfWeek(endOfMonth(date), { weekStartsOn: weekStartsOn as 0 | 1 | 6 }), 7) }
+    const start = startOfWeek(startOfMonth(date), {
+      weekStartsOn: weekStartsOn as 0 | 1 | 6,
+    })
+    return {
+      start,
+      end: addDays(
+        startOfWeek(endOfMonth(date), {
+          weekStartsOn: weekStartsOn as 0 | 1 | 6,
+        }),
+        7
+      ),
+    }
   }
   if (view === "week") {
     const start = startOfWeek(date, { weekStartsOn: weekStartsOn as 0 | 1 | 6 })
@@ -102,7 +129,10 @@ export function CalendarView() {
     prefs?.timezone && prefs.timezone !== "auto"
       ? prefs.timezone
       : Intl.DateTimeFormat().resolvedOptions().timeZone
-  const computed = useMemo(() => windowFor(cursor, view, weekStartsOn, scheduleDays), [cursor, view, weekStartsOn, scheduleDays])
+  const computed = useMemo(
+    () => windowFor(cursor, view, weekStartsOn, scheduleDays),
+    [cursor, view, weekStartsOn, scheduleDays]
+  )
   const range = visibleRange ?? computed
   const calendars = useCalendars()
   const capabilities = useCalendarCapabilities()
@@ -177,17 +207,31 @@ export function CalendarView() {
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4 md:h-14 md:py-0">
         <OpenSidebarTrigger />
         <Sheet open={showCalendars} onOpenChange={setShowCalendars}>
-          <SheetTrigger render={<Button className="md:hidden" variant="outline" size="icon-sm" aria-label="Calendars" />}>
+          <SheetTrigger
+            render={
+              <Button
+                className="md:hidden"
+                variant="outline"
+                size="icon-touch"
+                aria-label="Calendars"
+              />
+            }
+          >
             <ListFilter className="size-4" />
           </SheetTrigger>
           <SheetContent side="left" className="w-[min(88vw,22rem)]">
-            <SheetHeader><SheetTitle>Calendars</SheetTitle></SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-3"><CalendarMiniPicker /><CalendarList /></div>
+            <SheetHeader>
+              <SheetTitle>Calendars</SheetTitle>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto px-3">
+              <CalendarMiniPicker />
+              <CalendarList />
+            </div>
           </SheetContent>
         </Sheet>
         <Button
           variant="outline"
-          size="sm"
+          size="sm-touch"
           onClick={() => {
             setVisibleRange(null)
             goToday()
@@ -198,7 +242,7 @@ export function CalendarView() {
         <div className="flex">
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             aria-label="Previous period"
             onClick={() => navigate(-1)}
           >
@@ -206,7 +250,7 @@ export function CalendarView() {
           </Button>
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             aria-label="Next period"
             onClick={() => navigate(1)}
           >
@@ -218,11 +262,8 @@ export function CalendarView() {
         </h1>
         <SettingsButton />
         <ThemeMenu />
-        <Separator
-          orientation="vertical"
-          className="mx-1 h-6 self-center!"
-        />
-        <Tabs
+        <Separator orientation="vertical" className="mx-1 h-6 self-center!" />
+        <Select
           value={view}
           onValueChange={(next) => {
             setVisibleRange(null)
@@ -230,19 +271,24 @@ export function CalendarView() {
             else setView(next as View)
           }}
         >
-          <TabsList aria-label="Calendar view" className="border bg-muted/40">
+          <SelectTrigger aria-label="Calendar view" size="sm" className="h-10 w-32 md:h-8">
+            <SelectValue>
+              {(value: string) => VIEW_NAMES[value as View]}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
             {(Object.keys(VIEW_NAMES) as View[]).map((key) => (
-              <TabsTrigger key={key} value={key} className="px-2.5 text-xs sm:text-sm">
+              <SelectItem key={key} value={key}>
                 {VIEW_NAMES[key]}
-              </TabsTrigger>
+              </SelectItem>
             ))}
-          </TabsList>
-        </Tabs>
-        <Button variant="outline" size="sm" onClick={() => setShowImport(true)}>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm-touch" onClick={() => setShowImport(true)}>
           <Upload className="size-4" />
           <span className="hidden sm:inline">Import</span>
         </Button>
-        <Button size="sm" disabled={!writable} onClick={() => openNew()}>
+        <Button size="sm-touch" disabled={!writable} onClick={() => openNew()}>
           <CalendarPlus className="size-4" />
           <span className="hidden sm:inline">Create event</span>
         </Button>
@@ -282,7 +328,7 @@ export function CalendarView() {
               Could not load events.{" "}
               <Button
                 variant="outline"
-                size="sm"
+                size="sm-touch"
                 onClick={() => void events.refetch()}
               >
                 <RefreshCw className="size-3" /> Retry
@@ -323,7 +369,19 @@ export function CalendarView() {
                 }}
               />
             </Suspense>
-            {view === "agenda" && <div className="flex justify-center border-t p-2"><Button variant="outline" onClick={() => { setVisibleRange(null); setScheduleDays((days) => days + 30) }}>Load 30 more days</Button></div>}
+            {view === "agenda" && (
+              <div className="flex justify-center border-t p-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setVisibleRange(null)
+                    setScheduleDays((days) => days + 30)
+                  }}
+                >
+                  Load 30 more days
+                </Button>
+              </div>
+            )}
             {mobile && view === "month" && (
               <div className="border-t p-3">
                 <div className="mb-2 flex items-center justify-between">
@@ -331,7 +389,7 @@ export function CalendarView() {
                     {format(selectedDay, "EEEE, MMMM d")}
                   </h2>
                   <Button
-                    size="sm"
+                    size="sm-touch"
                     variant="outline"
                     onClick={() => openNew(selectedDay)}
                   >

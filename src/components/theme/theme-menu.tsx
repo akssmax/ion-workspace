@@ -18,7 +18,7 @@ export function ThemeMenu() {
         render={
           <Button
             variant="ghost"
-            size="icon-sm"
+            size="icon-touch"
             aria-label="Theme"
           />
         }

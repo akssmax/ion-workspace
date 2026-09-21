@@ -17,6 +17,7 @@ import { mailMetadataPool } from "./mail-metadata.server"
 import type { InboxLayoutPrefs } from "../lib/inbox-layout"
 import type { NotificationPreferences } from "../lib/notifications"
 import type { MailSort } from "../lib/mail-list"
+import type { ThemeConfig } from "../theme/schema"
 
 export interface UserPreferences {
   swipeLeftAction?: "archive" | "trash" | "read" | "star" | "none"
@@ -49,6 +50,8 @@ export interface UserPreferences {
   filenameSpaces?: "keep" | "dash" | "underscore"
   /** Custom tag/folder presentation: mailbox id -> accent color + icon key. */
   tagAppearance?: Record<string, { color?: string; icon?: string }>
+  /** Last theme the user selected, synced across sessions and devices. */
+  theme?: ThemeConfig
 }
 
 function scope(session: {
