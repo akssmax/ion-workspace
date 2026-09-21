@@ -1,6 +1,9 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
+import { lazyWithRetry } from "@/lib/lazy-with-retry"
 
-const FaultyTerminal = lazy(() => import("@/components/effects/FaultyTerminal"))
+const FaultyTerminal = lazyWithRetry(
+  () => import("@/components/effects/FaultyTerminal")
+)
 
 /** Deferred section-local canvas; each instance pauses when offscreen. */
 export function LandingBackground({

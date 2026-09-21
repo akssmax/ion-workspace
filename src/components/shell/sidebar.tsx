@@ -8,11 +8,8 @@ import { isDemoRuntime } from "@/lib/demo/runtime"
 
 import {
   Archive,
-  CalendarDays,
   FileEdit,
-  FileText,
   Inbox,
-  Mail,
   Plus,
   Send,
   Star,
@@ -58,22 +55,8 @@ import { Link } from "@tanstack/react-router"
 import { useLanguage } from "@/lib/language"
 import { CalendarList } from "@/components/calendar/calendar-list"
 import { CalendarMiniPicker } from "@/components/calendar/calendar-mini-picker"
+import { APPS } from "./apps"
 import type { TranslationKey } from "@/lib/language"
-
-const APPS: {
-  id: WorkspaceApp
-  label: string
-  icon: React.ReactNode
-}[] = [
-  { id: "mail", label: "Mail", icon: <Mail className="size-4" /> },
-  {
-    id: "calendar",
-    label: "Calendar",
-    icon: <CalendarDays className="size-4" />,
-  },
-  { id: "contacts", label: "Contacts", icon: <Users className="size-4" /> },
-  { id: "files", label: "Files", icon: <FileText className="size-4" /> },
-]
 
 const FOLDER_LABELS: Record<string, string> = {
   inbox: "Inbox",
@@ -159,7 +142,7 @@ export function SidebarShell() {
                       isActive={app === item.id}
                       className="px-2.5 md:px-2"
                     >
-                      {item.icon}
+                      <item.icon className="size-4" />
                       <span>{t(item.label as TranslationKey)}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

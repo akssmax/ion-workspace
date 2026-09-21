@@ -60,6 +60,10 @@ export function EnterprisePage() {
             not currently publish enterprise certifications, standard SLAs, or
             enterprise pricing.
           </p>
+          <div className="ion-enterprise-links">
+            <TextLink href="/security">Security &amp; trust overview</TextLink>
+            <TextLink href="/migration">Migration approach</TextLink>
+          </div>
         </Cell>
       </LandingRow>
       <LandingRow id="architecture" tone="ion-inverse">
@@ -78,6 +82,9 @@ export function EnterprisePage() {
             server. The managed pilot’s hosting, operational responsibilities,
             and available capabilities are confirmed during evaluation.
           </p>
+          <TextLink href="/product#protocol">
+            The protocol, explained in the product
+          </TextLink>
         </Cell>
         <Cell md={6} className="ion-pad">
           <ProtocolDiagram />

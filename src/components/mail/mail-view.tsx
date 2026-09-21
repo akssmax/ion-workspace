@@ -13,6 +13,7 @@ import {
   Inbox,
   Search,
   Send,
+  SquarePen,
   Star,
   Trash2,
   X,
@@ -41,6 +42,9 @@ import { MailboxHeader } from "./mailbox-header"
 import { ThreadViewPane } from "./thread-view"
 import { useInboxLayout } from "@/queries/preferences"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { SettingsButton } from "@/components/shell/settings-button"
+import { MobileFab } from "@/components/shell/mobile-fab"
+import { useComposerStore } from "@/stores/composer.store"
 import { useFeatureFlag } from "@/features/flags"
 import { UpcomingIsland } from "@/modules/calendar/upcoming-island"
 import { ThemeMenu } from "@/components/theme/theme-menu"
@@ -91,6 +95,7 @@ function MailViewInner() {
   const setFocusedThread = useMailStore((s) => s.setFocusedThread)
   const setPaneView = useMailStore((s) => s.setPaneView)
   const setPaletteOpen = useWorkspaceStore((s) => s.setPaletteOpen)
+  const openCompose = useComposerStore((s) => s.openCompose)
   const { state: sidebarState, isMobile } = useSidebar()
   const searchRef = useRef<HTMLInputElement>(null)
   const panesRef = useRef<HTMLDivElement>(null)
@@ -228,6 +233,8 @@ function MailViewInner() {
   const showList = hiddenPane ? !focusedThreadId : paneView !== "reading"
   const showReading = hiddenPane ? !!focusedThreadId : paneView !== "list"
   const upcomingIsland = useFeatureFlag("calendar.upcomingIsland")
+  // On phones the reading view is full-screen; a compose FAB would cover it.
+  const readingThread = hiddenPane && !!focusedThreadId
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -365,6 +372,7 @@ function MailViewInner() {
           </div>
         </div>
         <div className="ms-auto flex items-center gap-1.5">
+          <SettingsButton />
           <ThemeMenu />
           <MailLayoutMenu />
           {upcomingIsland ? (
@@ -545,6 +553,13 @@ function MailViewInner() {
           </div>
         </div>
       </div>
+      {readingThread ? null : (
+        <MobileFab
+          icon={SquarePen}
+          label={t("Compose")}
+          onClick={() => openCompose({ open: true, mode: "new" })}
+        />
+      )}
     </div>
   )
 }

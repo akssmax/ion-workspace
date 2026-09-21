@@ -8,7 +8,7 @@
  * - Files open in the shared DocumentViewer (same preview as mail).
  */
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   ArrowDown,
   ArrowUp,
@@ -32,6 +32,7 @@ import {
   List,
   MoreVertical,
   Pencil,
+  Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -54,6 +55,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
 import { EmptyState } from "@/components/ui/empty-state"
 import {
   Dialog,
@@ -70,13 +72,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { formatDate } from "@/lib/dates"
 import type { FileNode } from "@/jmap/types/files"
-import {
-  filterAndSortFiles,
-  nodeKind,
-} from "@/lib/file-browser"
+import { filterAndSortFiles, nodeKind } from "@/lib/file-browser"
 import type { FileFilterKey, FileSortKey } from "@/lib/file-browser"
 import { loadFileBlob } from "@/services/files/files.service"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { SettingsButton } from "@/components/shell/settings-button"
+import { MobileFabMenu } from "@/components/shell/mobile-fab"
+import { ThemeMenu } from "@/components/theme/theme-menu"
 import {
   AttachmentThumb,
   DocumentViewer,
@@ -147,6 +149,7 @@ export function FilesView() {
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
   const [busy, setBusy] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   const [folderDialog, setFolderDialog] = useState(false)
   const [folderName, setFolderName] = useState("")
@@ -285,10 +288,12 @@ export function FilesView() {
     <div className="flex h-full min-w-0 flex-col">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
         <OpenSidebarTrigger />
-        <h1 className="text-sm font-semibold">Files</h1>
-        <nav className="order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto text-sm sm:order-none sm:ml-4 sm:w-auto sm:flex-1">
+        <nav className="order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto text-sm sm:order-none sm:w-auto sm:flex-1">
           {path.map((p, i) => (
-            <span key={p.id ?? "root"} className="flex min-w-0 items-center gap-1">
+            <span
+              key={p.id ?? "root"}
+              className="flex min-w-0 items-center gap-1"
+            >
               {i > 0 ? (
                 <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/50" />
               ) : null}
@@ -297,7 +302,7 @@ export function FilesView() {
                 className={cn(
                   "flex items-center gap-1 truncate rounded px-1.5 py-0.5 hover:bg-muted",
                   i === path.length - 1
-                    ? "font-medium text-foreground"
+                    ? "font-semibold text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
@@ -308,8 +313,11 @@ export function FilesView() {
           ))}
         </nav>
         <div className="ms-auto flex flex-wrap items-center gap-1.5">
+          <SettingsButton />
+          <ThemeMenu />
+          <Separator orientation="vertical" className="mx-1 h-6 self-center!" />
           <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 start-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Search className="pointer-events-none absolute start-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -321,7 +329,7 @@ export function FilesView() {
               <button
                 onClick={() => setSearch("")}
                 aria-label="Clear search"
-                className="absolute top-1/2 end-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="size-3.5" />
               </button>
@@ -382,7 +390,9 @@ export function FilesView() {
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={view === "grid" ? "Switch to list view" : "Switch to grid view"}
+            aria-label={
+              view === "grid" ? "Switch to list view" : "Switch to grid view"
+            }
             onClick={() => setView((v) => (v === "grid" ? "list" : "grid"))}
           >
             <Icon className="size-4" />
@@ -396,7 +406,11 @@ export function FilesView() {
             <RefreshCw className="size-4" />
           </Button>
 
-          <Button variant="outline" size="sm" onClick={() => setFolderDialog(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFolderDialog(true)}
+          >
             <FolderPlus className="size-4" />
             <span className="hidden sm:inline">New folder</span>
           </Button>
@@ -407,6 +421,7 @@ export function FilesView() {
             <Upload className="size-4" />
             <span className="hidden sm:inline">Upload</span>
             <input
+              ref={uploadInputRef}
               type="file"
               multiple
               className="hidden"
@@ -438,7 +453,11 @@ export function FilesView() {
         ) : query.isError ? (
           <div className="flex h-40 flex-col items-center justify-center gap-3 text-sm">
             <p className="text-destructive">Could not load this folder.</p>
-            <Button variant="outline" size="sm" onClick={() => void query.refetch()}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void query.refetch()}
+            >
               Try again
             </Button>
           </div>
@@ -516,14 +535,18 @@ export function FilesView() {
                     }
                     className="mt-2 min-w-0 text-left"
                   >
-                    <p className="w-full truncate text-sm font-medium">{node.name}</p>
+                    <p className="w-full truncate text-sm font-medium">
+                      {node.name}
+                    </p>
                   </button>
                   <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="min-w-0 flex-1 truncate">
                       {node.isFile ? formatFileSize(node.size) : "Folder"}
                     </span>
                     <span className="shrink-0 tabular-nums">
-                      {node.modifiedAt ? formatDate(node.modifiedAt, "MMM d") : ""}
+                      {node.modifiedAt
+                        ? formatDate(node.modifiedAt, "MMM d")
+                        : ""}
                     </span>
                   </div>
                 </div>
@@ -535,7 +558,9 @@ export function FilesView() {
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="border-b text-left text-xs text-muted-foreground">
                 <th className="px-3 py-2 font-medium">Name</th>
-                <th className="hidden px-3 py-2 font-medium sm:table-cell">Size</th>
+                <th className="hidden px-3 py-2 font-medium sm:table-cell">
+                  Size
+                </th>
                 <th className="hidden px-3 py-2 font-medium sm:table-cell">
                   Modified
                 </th>
@@ -562,7 +587,9 @@ export function FilesView() {
                         <NodeIcon
                           className={cn(
                             "size-4 shrink-0",
-                            node.isFile ? "text-muted-foreground" : "text-primary"
+                            node.isFile
+                              ? "text-muted-foreground"
+                              : "text-primary"
                           )}
                         />
                         <span className="truncate">{node.name}</span>
@@ -572,7 +599,9 @@ export function FilesView() {
                       {node.isFile ? formatFileSize(node.size) : "—"}
                     </td>
                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell">
-                      {node.modifiedAt ? formatDate(node.modifiedAt, "MMM d, yyyy") : "—"}
+                      {node.modifiedAt
+                        ? formatDate(node.modifiedAt, "MMM d, yyyy")
+                        : "—"}
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end">
@@ -599,7 +628,9 @@ export function FilesView() {
         <span className="ms-auto" />
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={<Button variant="ghost" size="sm" aria-label="Rows per page" />}
+            render={
+              <Button variant="ghost" size="sm" aria-label="Rows per page" />
+            }
           >
             {pageSize} / page
           </DropdownMenuTrigger>
@@ -725,6 +756,24 @@ export function FilesView() {
         title="Files"
       />
       {busy ? <span className="sr-only">Downloading…</span> : null}
+      <MobileFabMenu
+        icon={Plus}
+        label="Add"
+        actions={[
+          {
+            key: "upload",
+            label: "Upload files",
+            icon: Upload,
+            onSelect: () => uploadInputRef.current?.click(),
+          },
+          {
+            key: "folder",
+            label: "New folder",
+            icon: FolderPlus,
+            onSelect: () => setFolderDialog(true),
+          },
+        ]}
+      />
     </div>
   )
 }

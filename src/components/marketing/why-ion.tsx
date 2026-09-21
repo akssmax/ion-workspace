@@ -16,30 +16,33 @@ import { Eyebrow, TextLink } from "./site"
 const reasons = [
   {
     icon: PanelsTopLeft,
-    label: "One workspace",
-    title: "Go beyond the inbox.",
+    label: "Value",
+    title: "Everything in one place.",
     detail:
       "Your email, calendar, contacts, and files share one home. Move from a customer conversation to the next task without leaving Ion.",
     href: "/demo",
-    link: "Try the connected workspace",
+    link: "See the connected workspace",
+    featured: false,
   },
   {
     icon: SlidersHorizontal,
-    label: "Your way of working",
-    title: "Make the everyday feel effortless.",
+    label: "Usability",
+    title: "Feels like your workflow.",
     detail:
       "Choose your reading layout, organize conversations with folders and labels, and use keyboard shortcuts for the actions you repeat all day.",
     href: "/product#mail",
     link: "Find your workflow",
+    featured: false,
   },
   {
     icon: Network,
-    label: "An open foundation",
-    title: "Keep your options open.",
+    label: "IT evaluation",
+    title: "Open, JMAP-native foundation.",
     detail:
-      "Ion connects to a compatible mail server through the open JMAP protocol. Give your IT team a clear foundation to evaluate for your business.",
-    href: "/enterprise",
-    link: "Explore the architecture",
+      "Ion runs on the open JMAP standard — a clear architecture for your IT team to evaluate, with security and hosting covered on the record.",
+    href: "/security",
+    link: "Review security & trust",
+    featured: true,
   },
 ]
 
@@ -155,31 +158,16 @@ export function WhyIon() {
             </p>
           </div>
         </Cell>
-        <Cell md={6} className="ion-feature-footnote ion-shortcut-feature">
-          <Keyboard size={22} aria-hidden="true" />
-          <h3>Keep your hands on the keyboard.</h3>
+        <Cell className="ion-shortcut-inline">
+          <Keyboard size={20} aria-hidden="true" />
           <p>
             Compose, archive, and move between apps with familiar shortcuts.
           </p>
           <TextLink href="/product#keyboard">Explore shortcuts</TextLink>
         </Cell>
-        <Cell md={6} className="ion-shortcut-strip">
-          <div>
-            <kbd>⌘ / Ctrl K</kbd>
-            <span>Open the command palette</span>
-          </div>
-          <div>
-            <kbd>C</kbd>
-            <span>Compose a message</span>
-          </div>
-          <div>
-            <kbd>E</kbd>
-            <span>Archive a selected conversation</span>
-          </div>
-        </Cell>
       </LandingRow>
       <LandingRow id="compare" className="ion-editorial">
-        <Cell className="ion-story-heading">
+        <Cell className="ion-story-heading ion-compare-heading">
           <Eyebrow>Why choose Ion</Eyebrow>
           <div className="ion-story-intro">
             <h2>
@@ -194,10 +182,12 @@ export function WhyIon() {
             </p>
           </div>
         </Cell>
-        {reasons.map(({ icon: Icon, ...item }) => (
+        {reasons.map(({ icon: Icon, featured, ...item }) => (
           <Cell
             md={4}
-            className="ion-compare-card ion-reason-card"
+            className={`ion-compare-card ion-reason-card${
+              featured ? " ion-reason-card-featured" : ""
+            }`}
             key={item.label}
           >
             <div className="ion-reason-icon">

@@ -24,9 +24,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Separator } from "@/components/ui/separator"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ThemeMenu } from "@/components/theme/theme-menu"
 import type { Contact } from "@/jmap/types/contacts"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { SettingsButton } from "@/components/shell/settings-button"
+import { MobileFab } from "@/components/shell/mobile-fab"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { ContactEditor } from "./contact-editor"
 
@@ -63,10 +67,18 @@ export function ContactsView() {
           <span className="text-xs text-muted-foreground">
             {contacts?.length ?? 0} contact{contacts?.length === 1 ? "" : "s"}
           </span>
-          <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
-            <UserPlus className="size-4" />
-            Add contact
-          </Button>
+          <div className="ms-auto flex items-center gap-1.5">
+            <SettingsButton />
+            <ThemeMenu />
+            <Separator
+              orientation="vertical"
+              className="mx-1 h-6 self-center!"
+            />
+            <Button size="sm" onClick={() => setAdding(true)}>
+              <UserPlus className="size-4" />
+              Add contact
+            </Button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -124,6 +136,11 @@ export function ContactsView() {
             />
           )}
         </div>
+        <MobileFab
+          icon={UserPlus}
+          label="Add contact"
+          onClick={() => setAdding(true)}
+        />
       </div>
 
       {selected ? (

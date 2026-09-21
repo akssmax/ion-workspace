@@ -8,6 +8,34 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { MAIL_QUICK_FILTERS, MAIL_SORT_OPTIONS, mailSortComparators, type MailQuickFilter, type MailSort } from "@/lib/mail-list"
 import { useMailSortCapabilities } from "@/queries/mail"
 
+export function MailSortMenu({ sort, onSortChange, sent, iconOnly = false }: {
+  sort: MailSort
+  onSortChange: (sort: MailSort) => void
+  sent: boolean
+  iconOnly?: boolean
+}) {
+  const capabilities = useMailSortCapabilities()
+  const available = capabilities.data ?? ["receivedAt"]
+  return <DropdownMenu>
+    <DropdownMenuTrigger render={iconOnly
+      ? <Button variant="ghost" size="icon-sm" aria-label="Sort messages" />
+      : <Button variant="outline" size="sm" className="min-h-9 shrink-0 gap-1.5" aria-label="Sort messages" />}>
+      <ArrowDownUp className="size-3.5" />
+      {iconOnly ? null : <><span className="hidden sm:inline">Sort:</span> {MAIL_SORT_OPTIONS.find(option => option.value === sort)?.label}</>}
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start" className="min-w-52">
+      <DropdownMenuRadioGroup value={sort} onValueChange={value => onSortChange(value as MailSort)}>
+        {MAIL_SORT_OPTIONS.map(option => {
+          const supported = mailSortComparators(option.value, sent, available).every(cmp => available.includes(cmp.property))
+          return <DropdownMenuRadioItem key={option.value} value={option.value} disabled={!supported} aria-label={supported ? option.label : `${option.label}: unsupported by mail server`}>
+            {option.label}{!supported ? <span className="ms-auto text-xs text-muted-foreground">Unavailable</span> : null}
+          </DropdownMenuRadioItem>
+        })}
+      </DropdownMenuRadioGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
+}
+
 export function MailListControls({ sort, onSortChange, quickFilters, onQuickFiltersChange, sent }: {
   sort: MailSort
   onSortChange: (sort: MailSort) => void
@@ -16,28 +44,12 @@ export function MailListControls({ sort, onSortChange, quickFilters, onQuickFilt
   sent: boolean
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
-  const capabilities = useMailSortCapabilities()
-  const available = capabilities.data ?? ["receivedAt"]
   function toggle(value: MailQuickFilter) {
     onQuickFiltersChange(quickFilters.includes(value) ? quickFilters.filter(item => item !== value) : [...quickFilters, value])
   }
 
   return <div className="flex min-h-10 shrink-0 items-center gap-1.5 overflow-x-auto border-b px-2 py-1">
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="min-h-9 shrink-0 gap-1.5" aria-label="Sort messages" />}>
-        <ArrowDownUp className="size-3.5" /><span className="hidden sm:inline">Sort:</span> {MAIL_SORT_OPTIONS.find(option => option.value === sort)?.label}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="min-w-52">
-        <DropdownMenuRadioGroup value={sort} onValueChange={value => onSortChange(value as MailSort)}>
-          {MAIL_SORT_OPTIONS.map(option => {
-            const supported = mailSortComparators(option.value, sent, available).every(cmp => available.includes(cmp.property))
-            return <DropdownMenuRadioItem key={option.value} value={option.value} disabled={!supported} aria-label={supported ? option.label : `${option.label}: unsupported by mail server`}>
-              {option.label}{!supported ? <span className="ms-auto text-xs text-muted-foreground">Unavailable</span> : null}
-            </DropdownMenuRadioItem>
-          })}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <MailSortMenu sort={sort} onSortChange={onSortChange} sent={sent} />
 
     <div className="hidden items-center gap-1 sm:flex">
       {MAIL_QUICK_FILTERS.map(option => <Button key={option.value} size="sm" variant={quickFilters.includes(option.value) ? "secondary" : "ghost"} aria-pressed={quickFilters.includes(option.value)} onClick={() => toggle(option.value)}>{option.label}</Button>)}

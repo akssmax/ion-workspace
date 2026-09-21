@@ -48,12 +48,34 @@ export function LandingPage() {
           <TextLink href="/product">Meet your workspace</TextLink>
         </Cell>
       </LandingRow>
+      <LandingRow id="teams">
+        <Cell md={6} className="ion-router-cell">
+          <strong>Team of 5–50?</strong>
+          <p>Start with the managed pilot and a workspace set up around your week.</p>
+          <TextLink href="/request-access">Try the pilot</TextLink>
+        </Cell>
+        <Cell md={6} className="ion-router-cell">
+          <strong>200+ seats?</strong>
+          <p>Bring your requirements to a proper enterprise evaluation.</p>
+          <TextLink href="/enterprise">Talk to Enterprise</TextLink>
+        </Cell>
+      </LandingRow>
       <LandingRow id="product" tone="ion-soft">
         <Cell>
           <DemoPreview />
         </Cell>
       </LandingRow>
       <WhyIon />
+      <LandingRow id="open">
+        <Cell className="ion-proof">
+          <blockquote>
+            &ldquo;Ion is built in the open. The roadmap is public, the
+            protocol is a standard, and every capability is shaped with the
+            businesses using it.&rdquo;
+          </blockquote>
+          <cite>The Ion team</cite>
+        </Cell>
+      </LandingRow>
       <LandingRow id="how" className="ion-editorial">
         <Cell className="ion-story-heading">
           <Eyebrow>Managed Ion · Private pilot</Eyebrow>

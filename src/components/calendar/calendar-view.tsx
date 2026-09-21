@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,6 +15,7 @@ import {
   startOfWeek,
 } from "date-fns"
 import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Spinner } from "@/components/ui/spinner"
@@ -29,6 +30,10 @@ import {
 } from "@/queries/calendar"
 import { usePreferences } from "@/queries/preferences"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
+import { SettingsButton } from "@/components/shell/settings-button"
+import { MobileFab } from "@/components/shell/mobile-fab"
+import { ThemeMenu } from "@/components/theme/theme-menu"
+import { lazyWithRetry } from "@/lib/lazy-with-retry"
 import { EventEditor, emptyDraft } from "./event-editor"
 import { eventCalendarId, type CalendarDraft } from "@/lib/calendar-event"
 import type { CalendarEvent } from "@/jmap/types/calendar"
@@ -38,7 +43,7 @@ import { CalendarList } from "./calendar-list"
 import { CalendarMiniPicker } from "./calendar-mini-picker"
 import { calendarWeekStart } from "@/lib/calendar-week-start"
 
-const CalendarCanvas = lazy(() => import("./calendar-canvas"))
+const CalendarCanvas = lazyWithRetry(() => import("./calendar-canvas"))
 const VIEW_NAMES: Record<View, string> = {
   month: "Month",
   week: "Week",
@@ -211,6 +216,12 @@ export function CalendarView() {
         <h1 className="min-w-max flex-1 text-sm font-semibold sm:text-base">
           {title}
         </h1>
+        <SettingsButton />
+        <ThemeMenu />
+        <Separator
+          orientation="vertical"
+          className="mx-1 h-6 self-center!"
+        />
         <Tabs
           value={view}
           onValueChange={(next) => {
@@ -377,6 +388,12 @@ export function CalendarView() {
         open={showImport}
         onClose={() => setShowImport(false)}
         calendars={calendars.data ?? []}
+      />
+      <MobileFab
+        icon={CalendarPlus}
+        label="New event"
+        disabled={!writable}
+        onClick={() => openNew()}
       />
     </div>
   )

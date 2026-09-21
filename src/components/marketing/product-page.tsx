@@ -50,7 +50,51 @@ export function ProductPage() {
           </Cell>
         </LandingRow>
       ))}
-      <LandingRow id="keyboard">
+      <LandingRow id="protocol" tone="ion-inverse">
+        <Cell md={6} className="ion-pad">
+          <Eyebrow>An open foundation</Eyebrow>
+          <h2 className="ion-heading">Connected by design.</h2>
+          <p className="ion-body">
+            Ion connects the workspace to its mail server with JMAP — an open
+            internet standard for mail, calendars, and contacts, carried over
+            JSON and HTTPS. The interface brings the essentials together;
+            available capabilities depend on the connected server.
+          </p>
+          <a
+            className="ion-text-link"
+            href="https://jmap.io/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Learn about JMAP ↗
+          </a>
+        </Cell>
+        <Cell md={6} className="ion-pad">
+          <ProtocolDiagram />
+        </Cell>
+      </LandingRow>
+      <LandingRow id="protocol-why">
+        {[
+          [
+            "One open standard.",
+            "JMAP (RFC 8620) is a published protocol for mail, calendars, and contacts — something your IT team can review, not reverse-engineer.",
+          ],
+          [
+            "Sync without polling.",
+            "Where IMAP waits to be asked, JMAP pushes state changes efficiently. Faster mail, gentler on slower connections.",
+          ],
+          [
+            "No proprietary lock-in.",
+            "Your data speaks a standard any compatible client or server can implement. The conversation stays open.",
+          ],
+        ].map(([title, copy]) => (
+          <Cell md={4} key={title} className="ion-compare-card">
+            <h3>{title}</h3>
+            <p>{copy}</p>
+          </Cell>
+        ))}
+      </LandingRow>
+      <LandingRow id="keyboard" tone="ion-soft">
         <Cell md={6} className="ion-pad">
           <Eyebrow>Keep your momentum</Eyebrow>
           <h2 className="ion-heading">
@@ -73,28 +117,6 @@ export function ProductPage() {
               <span>{label}</span>
             </div>
           ))}
-        </Cell>
-      </LandingRow>
-      <LandingRow id="protocol" tone="ion-inverse">
-        <Cell md={6} className="ion-pad">
-          <Eyebrow>An open foundation</Eyebrow>
-          <h2 className="ion-heading">Connected by design.</h2>
-          <p className="ion-body">
-            Ion uses JMAP to connect the workspace to its mail server. The
-            interface brings mail, calendars, contacts, and files together;
-            available capabilities depend on the connected server.
-          </p>
-          <a
-            className="ion-text-link"
-            href="https://jmap.io/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Learn about JMAP ↗
-          </a>
-        </Cell>
-        <Cell md={6} className="ion-pad">
-          <ProtocolDiagram />
         </Cell>
       </LandingRow>
       <FinalCTA />

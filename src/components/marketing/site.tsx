@@ -129,6 +129,7 @@ export function Site({ children }: { children: ReactNode }) {
           </a>
           <nav className="ion-desktop-nav" aria-label="Main navigation">
             <a href="/product">Product</a>
+            <a href="/pricing">Pricing</a>
             <a href="/roadmap">Roadmap</a>
             <a href="/enterprise">Enterprise</a>
           </nav>
@@ -168,6 +169,7 @@ export function Site({ children }: { children: ReactNode }) {
           onClick={() => setMenuOpen(false)}
         >
           <a href="/product">Product</a>
+          <a href="/pricing">Pricing</a>
           <a href="/roadmap">Roadmap</a>
           <a href="/enterprise">Enterprise</a>
           <a href={session ? "/app" : "/login"}>
@@ -178,7 +180,7 @@ export function Site({ children }: { children: ReactNode }) {
       <main id="main">{children}</main>
       <footer className="ion-footer">
         <LandingRow>
-          <Cell md={6} className="ion-pad">
+          <Cell md={4} className="ion-pad">
             <a href="/" aria-label="Ion home" className="ion-footer-logo">
               <IonLogo size={48} animateOnHover />
             </a>
@@ -214,6 +216,16 @@ export function Site({ children }: { children: ReactNode }) {
               ],
             },
             {
+              heading: "Trust & resources",
+              links: [
+                ["Pricing", "/pricing"],
+                ["Migration", "/migration"],
+                ["Security", "/security"],
+                ["Compare", "/compare"],
+                ["Changelog", "/changelog"],
+              ],
+            },
+            {
               heading: "Access",
               links: [
                 ["Try the demo", "/demo"],
@@ -239,6 +251,10 @@ export function Site({ children }: { children: ReactNode }) {
           ))}
           <Cell className="ion-footer-bottom">
             <span>© {new Date().getFullYear()} Ion</span>
+            <div className="ion-footer-legal">
+              <a href="/privacy">Privacy</a>
+              <a href="/terms">Terms</a>
+            </div>
             <div className="ion-footer-theme">
               <span>Appearance</span>
               <ThemeSwitch />
@@ -340,6 +356,40 @@ export function Benefits() {
 }
 
 export function FAQ() {
+  const items: [string, ReactNode][] = [
+    [
+      "Who is Ion for?",
+      "Ion is designed for small and medium businesses that want email, calendars, contacts, and files in a connected workspace. Larger organizations can explore our enterprise evaluation page and share their requirements.",
+    ],
+    [
+      "Can I try it without an account?",
+      "Yes. The demo uses sample data and requires no account. Changes stay in the demo and reset when you refresh. Messages are simulated, not delivered.",
+    ],
+    [
+      "Is the managed service available now?",
+      "Managed Ion is in private pilot. Request access to tell us about your business. Submitting a request does not create an account or guarantee admission.",
+    ],
+    [
+      "How much does Ion cost?",
+      <>
+        Pricing is part of the pilot conversation. We shape the plan with you
+        rather than publishing rates we would have to change. See the honest
+        sketch of our approach on the <a href="/pricing">pricing page</a>.
+      </>,
+    ],
+    [
+      "Can I bring mail from Google Workspace or Zoho?",
+      <>
+        Yes. Mail, contacts, calendars, and files can be imported, with a
+        cutover plan your IT team can review. Read how in the{" "}
+        <a href="/migration">migration guide</a>.
+      </>,
+    ],
+    [
+      "What about support?",
+      "Support levels are agreed as part of pilot evaluation rather than promised in advance. We would rather define what your team can rely on than publish a tier we cannot stand behind yet.",
+    ],
+  ]
   return (
     <LandingRow id="faq">
       <Cell md={4} className="ion-pad">
@@ -351,24 +401,7 @@ export function FAQ() {
         </h2>
       </Cell>
       <Cell md={8} className="ion-faq">
-        {[
-          [
-            "Who is Ion for?",
-            "Ion is designed for small and medium businesses that want email, calendars, contacts, and files in a connected workspace. Larger organizations can explore our enterprise evaluation page and share their requirements.",
-          ],
-          [
-            "Can I try it without an account?",
-            "Yes. The demo uses sample data and requires no account. Changes stay in the demo and reset when you refresh. Messages are simulated, not delivered.",
-          ],
-          [
-            "Is the managed service available now?",
-            "Managed Ion is in private pilot. Request access to tell us about your business. Submitting a request does not create an account or guarantee admission.",
-          ],
-          [
-            "What about pricing, migration, and support?",
-            "These are discussed as part of pilot evaluation. We do not yet publish standard plans or make commitments about migration, support levels, or enterprise requirements.",
-          ],
-        ].map(([q, a]) => (
+        {items.map(([q, a]) => (
           <details key={q}>
             <summary>
               {q}

@@ -6,6 +6,7 @@ import type { CSSProperties } from "react"
 import "@/features/catalog"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { SidebarShell } from "./sidebar"
+import { MobileAppNav } from "./mobile-app-nav"
 import { CommandPalette } from "./command-palette"
 import { KeyboardShortcuts } from "./keyboard-shortcuts"
 import { useJmapPush } from "@/queries/push"
@@ -31,13 +32,14 @@ export function AppShell() {
     >
       <SidebarShell />
       <SidebarInset className="h-svh overflow-hidden">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
           {app === "mail" ? <MailView /> : null}
           {app === "calendar" ? <CalendarView /> : null}
           {app === "contacts" ? <ContactsView /> : null}
           {app === "files" ? <FilesView /> : null}
         </div>
       </SidebarInset>
+      <MobileAppNav />
       <CommandPalette />
       <ComposeDock />
       <SendStatusPill />

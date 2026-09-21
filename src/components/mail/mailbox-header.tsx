@@ -1,6 +1,6 @@
 /** Selection and page controls for the current mailbox query. */
 import { useEffect, useState } from "react"
-import { Archive, ChevronDown, ChevronLeft, ChevronRight, Mail, MailOpen, RefreshCw, RotateCcw, ShieldAlert, Star, StarOff, Trash2, X } from "lucide-react"
+import { Archive, ChevronDown, ChevronLeft, ChevronRight, Filter, Mail, MailOpen, RefreshCw, RotateCcw, ShieldAlert, Star, StarOff, Trash2, X } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,7 +15,7 @@ import { useFeatureFlag } from "@/features/flags"
 import { LabelMenu } from "@/modules/mail/labels"
 import { MoveMenu } from "@/modules/mail/move/move-menu"
 import { PermanentDeleteDialog } from "./permanent-delete-dialog"
-import { MailListControls } from "./mail-list-controls"
+import { MailListControls, MailSortMenu } from "./mail-list-controls"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { Spinner } from "@/components/ui/spinner"
 import { SnoozeDialog } from "./snooze-dialog"
@@ -58,6 +58,7 @@ export function MailboxHeader({ mailboxId, query, page, onPageChange, sort, onSo
   const [emptyTrashOpen, setEmptyTrashOpen] = useState(false)
   const [jumpOpen, setJumpOpen] = useState(false)
   const [jumpPage, setJumpPage] = useState("")
+  const [controlsOpen, setControlsOpen] = useState(false)
 
   // Deleting the final row on a page can leave it empty.
   useEffect(() => {
@@ -97,7 +98,11 @@ export function MailboxHeader({ mailboxId, query, page, onPageChange, sort, onSo
       </DropdownMenu>
       {mailbox?.role === "inbox" ? <SnoozeDialog threadIds={ids} /> : null}
       <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" onClick={clearSelection} aria-label="Clear selection" />}><X className="size-4" /></TooltipTrigger><TooltipContent>Clear selection</TooltipContent></Tooltip>
-    </> : <><Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => void queryClient.invalidateQueries({ queryKey: ["acc", "emails"] })} />}><RefreshCw className="size-4" /></TooltipTrigger><TooltipContent>Refresh</TooltipContent></Tooltip>{isTrash && total != null && total > 0 ? <Button variant="ghost" size="sm" disabled={emptyTrash.isPending} onClick={() => setEmptyTrashOpen(true)}>Empty Trash</Button> : null}</>}
+    </> : <>
+      <MailSortMenu sort={sort} onSortChange={onSortChange} sent={sent} iconOnly />
+      <Tooltip><TooltipTrigger render={<Button variant={controlsOpen || quickFilters.length > 0 ? "secondary" : "ghost"} size="icon-sm" aria-label={`Filters${quickFilters.length ? `, ${quickFilters.length} active` : ""}`} aria-pressed={controlsOpen} onClick={() => setControlsOpen((open) => !open)} />}><Filter className="size-4" />{quickFilters.length > 0 ? <span className="ms-0.5 text-[10px] tabular-nums">{quickFilters.length}</span> : null}</TooltipTrigger><TooltipContent>Filters</TooltipContent></Tooltip>
+      {isTrash && total != null && total > 0 ? <Button variant="ghost" size="sm" disabled={emptyTrash.isPending} onClick={() => setEmptyTrashOpen(true)}>Empty Trash</Button> : null}
+    </>}
     <div className="ms-auto flex shrink-0 items-center gap-0.5">
       <span className="me-1 flex items-center gap-1.5 whitespace-nowrap text-xs text-muted-foreground tabular-nums" aria-live="polite">
         {results.isPending ? <Spinner className="size-3.5" /> : results.isError ? "Couldn't load" : total === 0 ? "0 messages" : `${count ? position + 1 : 0}–${position + count}${total == null ? "" : ` of ${total.toLocaleString()}`}`}
@@ -105,8 +110,9 @@ export function MailboxHeader({ mailboxId, query, page, onPageChange, sort, onSo
       {total != null && total > MAIL_PAGE_SIZE ? <Popover open={jumpOpen} onOpenChange={open => { setJumpOpen(open); if (open) setJumpPage(String(page + 1)) }}><PopoverTrigger render={<Button variant="ghost" size="sm" aria-label="Jump to page" className="hidden sm:inline-flex" />}>Page {page + 1}</PopoverTrigger><PopoverContent align="end" className="w-48"><form className="flex items-center gap-2" onSubmit={event => { event.preventDefault(); const next = Number(jumpPage); if (Number.isInteger(next) && next >= 1 && next <= Math.ceil(total / MAIL_PAGE_SIZE)) { onPageChange(next - 1); setJumpOpen(false) } }}><Input aria-label={`Page number, 1 to ${Math.ceil(total / MAIL_PAGE_SIZE)}`} type="number" min={1} max={Math.ceil(total / MAIL_PAGE_SIZE)} value={jumpPage} onChange={event => setJumpPage(event.target.value)} className="w-20" /><Button size="sm" type="submit">Go</Button></form></PopoverContent></Popover> : null}
       <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Previous page" disabled={page === 0 || results.isPending} onClick={() => onPageChange(page - 1)} />}><ChevronLeft className="size-4 rtl:rotate-180" /></TooltipTrigger><TooltipContent>Previous page</TooltipContent></Tooltip>
       <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Next page" disabled={!hasNext || results.isPending || results.isError} onClick={() => onPageChange(page + 1)} />}><ChevronRight className="size-4 rtl:rotate-180" /></TooltipTrigger><TooltipContent>Next page</TooltipContent></Tooltip>
+      {hasSelection ? null : <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label="Refresh" onClick={() => void queryClient.invalidateQueries({ queryKey: ["acc", "emails"] })} />}><RefreshCw className="size-4" /></TooltipTrigger><TooltipContent>Refresh</TooltipContent></Tooltip>}
     </div>
     {isTrash ? <PermanentDeleteDialog open={permanentDeleteOpen} onOpenChange={setPermanentDeleteOpen} count={ids.length} onConfirm={() => permanentlyDelete.mutate(ids, { onSuccess: clearSelection })} /> : null}
     <AlertDialog open={emptyTrashOpen} onOpenChange={setEmptyTrashOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Empty Trash?</AlertDialogTitle><AlertDialogDescription>All messages in Trash will be permanently deleted. This cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => emptyTrash.mutate()}>Empty Trash</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-  </header><MailListControls sort={sort} onSortChange={onSortChange} quickFilters={quickFilters} onQuickFiltersChange={onQuickFiltersChange} sent={sent} /></div>
+  </header>{controlsOpen || quickFilters.length > 0 ? <MailListControls sort={sort} onSortChange={onSortChange} quickFilters={quickFilters} onQuickFiltersChange={onQuickFiltersChange} sent={sent} /> : null}</div>
 }

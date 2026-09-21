@@ -11,14 +11,24 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppRouteImport } from './routes/app'
+import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as DemoRouteImport } from './routes/demo'
 import { Route as DesignSystemRouteRouteImport } from './routes/design-system/route'
 import { Route as EnterpriseRouteImport } from './routes/enterprise'
+import { Route as IntegrationsRouteImport } from './routes/integrations'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as MigrationRouteImport } from './routes/migration'
+import { Route as PricingRouteImport } from './routes/pricing'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProductRouteImport } from './routes/product'
 import { Route as RequestAccessRouteImport } from './routes/request-access'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as CompareIndexRouteImport } from './routes/compare/index'
+import { Route as CompareGoogleWorkspaceRouteImport } from './routes/compare/google-workspace'
+import { Route as CompareZohoRouteImport } from './routes/compare/zoho'
 import { Route as DesignSystemIndexRouteImport } from './routes/design-system/index'
 import { Route as DesignSystemAccentsRouteImport } from './routes/design-system/accents'
 import { Route as DesignSystemAuthRouteImport } from './routes/design-system/auth'
@@ -42,6 +52,11 @@ const AppRoute = AppRouteImport.update({
   path: '/app',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChangelogRoute = ChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DemoRoute = DemoRouteImport.update({
   id: '/demo',
   path: '/demo',
@@ -57,9 +72,29 @@ const EnterpriseRoute = EnterpriseRouteImport.update({
   path: '/enterprise',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IntegrationsRoute = IntegrationsRouteImport.update({
+  id: '/integrations',
+  path: '/integrations',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MigrationRoute = MigrationRouteImport.update({
+  id: '/migration',
+  path: '/migration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductRoute = ProductRouteImport.update({
@@ -77,9 +112,34 @@ const RoadmapRoute = RoadmapRouteImport.update({
   path: '/roadmap',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareIndexRoute = CompareIndexRouteImport.update({
+  id: '/compare/',
+  path: '/compare/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareGoogleWorkspaceRoute = CompareGoogleWorkspaceRouteImport.update({
+  id: '/compare/google-workspace',
+  path: '/compare/google-workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareZohoRoute = CompareZohoRouteImport.update({
+  id: '/compare/zoho',
+  path: '/compare/zoho',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DesignSystemIndexRoute = DesignSystemIndexRouteImport.update({
@@ -148,13 +208,22 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRouteRouteWithChildren
   '/app': typeof AppRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
   '/enterprise': typeof EnterpriseRoute
+  '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
+  '/migration': typeof MigrationRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
   '/roadmap': typeof RoadmapRoute
+  '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/compare/google-workspace': typeof CompareGoogleWorkspaceRoute
+  '/compare/zoho': typeof CompareZohoRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
   '/design-system/calendar': typeof DesignSystemCalendarRoute
@@ -165,19 +234,29 @@ export interface FileRoutesByFullPath {
   '/design-system/shell': typeof DesignSystemShellRoute
   '/design-system/theme': typeof DesignSystemThemeRoute
   '/design-system/typography': typeof DesignSystemTypographyRoute
+  '/compare/': typeof CompareIndexRoute
   '/design-system/': typeof DesignSystemIndexRoute
   '/design-system/components/$slug': typeof DesignSystemComponentsSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/app': typeof AppRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
   '/enterprise': typeof EnterpriseRoute
+  '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
+  '/migration': typeof MigrationRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
   '/roadmap': typeof RoadmapRoute
+  '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/compare/google-workspace': typeof CompareGoogleWorkspaceRoute
+  '/compare/zoho': typeof CompareZohoRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
   '/design-system/calendar': typeof DesignSystemCalendarRoute
@@ -188,6 +267,7 @@ export interface FileRoutesByTo {
   '/design-system/shell': typeof DesignSystemShellRoute
   '/design-system/theme': typeof DesignSystemThemeRoute
   '/design-system/typography': typeof DesignSystemTypographyRoute
+  '/compare': typeof CompareIndexRoute
   '/design-system': typeof DesignSystemIndexRoute
   '/design-system/components/$slug': typeof DesignSystemComponentsSlugRoute
 }
@@ -196,13 +276,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/design-system': typeof DesignSystemRouteRouteWithChildren
   '/app': typeof AppRoute
+  '/changelog': typeof ChangelogRoute
   '/demo': typeof DemoRoute
   '/enterprise': typeof EnterpriseRoute
+  '/integrations': typeof IntegrationsRoute
   '/login': typeof LoginRoute
+  '/migration': typeof MigrationRoute
+  '/pricing': typeof PricingRoute
+  '/privacy': typeof PrivacyRoute
   '/product': typeof ProductRoute
   '/request-access': typeof RequestAccessRoute
   '/roadmap': typeof RoadmapRoute
+  '/security': typeof SecurityRoute
   '/settings': typeof SettingsRoute
+  '/terms': typeof TermsRoute
+  '/compare/google-workspace': typeof CompareGoogleWorkspaceRoute
+  '/compare/zoho': typeof CompareZohoRoute
   '/design-system/accents': typeof DesignSystemAccentsRoute
   '/design-system/auth': typeof DesignSystemAuthRoute
   '/design-system/calendar': typeof DesignSystemCalendarRoute
@@ -213,6 +302,7 @@ export interface FileRoutesById {
   '/design-system/shell': typeof DesignSystemShellRoute
   '/design-system/theme': typeof DesignSystemThemeRoute
   '/design-system/typography': typeof DesignSystemTypographyRoute
+  '/compare/': typeof CompareIndexRoute
   '/design-system/': typeof DesignSystemIndexRoute
   '/design-system/components/$slug': typeof DesignSystemComponentsSlugRoute
 }
@@ -222,13 +312,22 @@ export interface FileRouteTypes {
     | '/'
     | '/design-system'
     | '/app'
+    | '/changelog'
     | '/demo'
     | '/enterprise'
+    | '/integrations'
     | '/login'
+    | '/migration'
+    | '/pricing'
+    | '/privacy'
     | '/product'
     | '/request-access'
     | '/roadmap'
+    | '/security'
     | '/settings'
+    | '/terms'
+    | '/compare/google-workspace'
+    | '/compare/zoho'
     | '/design-system/accents'
     | '/design-system/auth'
     | '/design-system/calendar'
@@ -239,19 +338,29 @@ export interface FileRouteTypes {
     | '/design-system/shell'
     | '/design-system/theme'
     | '/design-system/typography'
+    | '/compare/'
     | '/design-system/'
     | '/design-system/components/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/app'
+    | '/changelog'
     | '/demo'
     | '/enterprise'
+    | '/integrations'
     | '/login'
+    | '/migration'
+    | '/pricing'
+    | '/privacy'
     | '/product'
     | '/request-access'
     | '/roadmap'
+    | '/security'
     | '/settings'
+    | '/terms'
+    | '/compare/google-workspace'
+    | '/compare/zoho'
     | '/design-system/accents'
     | '/design-system/auth'
     | '/design-system/calendar'
@@ -262,6 +371,7 @@ export interface FileRouteTypes {
     | '/design-system/shell'
     | '/design-system/theme'
     | '/design-system/typography'
+    | '/compare'
     | '/design-system'
     | '/design-system/components/$slug'
   id:
@@ -269,13 +379,22 @@ export interface FileRouteTypes {
     | '/'
     | '/design-system'
     | '/app'
+    | '/changelog'
     | '/demo'
     | '/enterprise'
+    | '/integrations'
     | '/login'
+    | '/migration'
+    | '/pricing'
+    | '/privacy'
     | '/product'
     | '/request-access'
     | '/roadmap'
+    | '/security'
     | '/settings'
+    | '/terms'
+    | '/compare/google-workspace'
+    | '/compare/zoho'
     | '/design-system/accents'
     | '/design-system/auth'
     | '/design-system/calendar'
@@ -286,6 +405,7 @@ export interface FileRouteTypes {
     | '/design-system/shell'
     | '/design-system/theme'
     | '/design-system/typography'
+    | '/compare/'
     | '/design-system/'
     | '/design-system/components/$slug'
   fileRoutesById: FileRoutesById
@@ -294,13 +414,23 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DesignSystemRouteRoute: typeof DesignSystemRouteRouteWithChildren
   AppRoute: typeof AppRoute
+  ChangelogRoute: typeof ChangelogRoute
   DemoRoute: typeof DemoRoute
   EnterpriseRoute: typeof EnterpriseRoute
+  IntegrationsRoute: typeof IntegrationsRoute
   LoginRoute: typeof LoginRoute
+  MigrationRoute: typeof MigrationRoute
+  PricingRoute: typeof PricingRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProductRoute: typeof ProductRoute
   RequestAccessRoute: typeof RequestAccessRoute
   RoadmapRoute: typeof RoadmapRoute
+  SecurityRoute: typeof SecurityRoute
   SettingsRoute: typeof SettingsRoute
+  TermsRoute: typeof TermsRoute
+  CompareGoogleWorkspaceRoute: typeof CompareGoogleWorkspaceRoute
+  CompareZohoRoute: typeof CompareZohoRoute
+  CompareIndexRoute: typeof CompareIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -317,6 +447,13 @@ declare module '@tanstack/react-router' {
       path: '/app'
       fullPath: '/app'
       preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/changelog': {
+      id: '/changelog'
+      path: '/changelog'
+      fullPath: '/changelog'
+      preLoaderRoute: typeof ChangelogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo': {
@@ -340,11 +477,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EnterpriseRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integrations': {
+      id: '/integrations'
+      path: '/integrations'
+      fullPath: '/integrations'
+      preLoaderRoute: typeof IntegrationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/migration': {
+      id: '/migration'
+      path: '/migration'
+      fullPath: '/migration'
+      preLoaderRoute: typeof MigrationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/product': {
@@ -368,11 +533,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RoadmapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/': {
+      id: '/compare/'
+      path: '/compare'
+      fullPath: '/compare/'
+      preLoaderRoute: typeof CompareIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/google-workspace': {
+      id: '/compare/google-workspace'
+      path: '/compare/google-workspace'
+      fullPath: '/compare/google-workspace'
+      preLoaderRoute: typeof CompareGoogleWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare/zoho': {
+      id: '/compare/zoho'
+      path: '/compare/zoho'
+      fullPath: '/compare/zoho'
+      preLoaderRoute: typeof CompareZohoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/design-system/': {
@@ -499,13 +699,23 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DesignSystemRouteRoute: DesignSystemRouteRouteWithChildren,
   AppRoute: AppRoute,
+  ChangelogRoute: ChangelogRoute,
   DemoRoute: DemoRoute,
   EnterpriseRoute: EnterpriseRoute,
+  IntegrationsRoute: IntegrationsRoute,
   LoginRoute: LoginRoute,
+  MigrationRoute: MigrationRoute,
+  PricingRoute: PricingRoute,
+  PrivacyRoute: PrivacyRoute,
   ProductRoute: ProductRoute,
   RequestAccessRoute: RequestAccessRoute,
   RoadmapRoute: RoadmapRoute,
+  SecurityRoute: SecurityRoute,
   SettingsRoute: SettingsRoute,
+  TermsRoute: TermsRoute,
+  CompareGoogleWorkspaceRoute: CompareGoogleWorkspaceRoute,
+  CompareZohoRoute: CompareZohoRoute,
+  CompareIndexRoute: CompareIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

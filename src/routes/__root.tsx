@@ -2,12 +2,13 @@ import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools"
 import { TanStackDevtools } from "@tanstack/react-devtools"
 import { QueryClientProvider } from "@tanstack/react-query"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 import { createWorkspaceQueryClient } from "@/queries/client"
 import { RouteErrorFallback } from "@/components/error-boundary"
 import { ThemeProvider, THEME_BOOTSTRAP_SCRIPT } from "@/theme/provider"
 import { LanguageSync } from "@/lib/language"
+import { reloadForStaleChunk } from "@/lib/lazy-with-retry"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import appCss from "../styles.css?url"
 
@@ -49,6 +50,17 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => createWorkspaceQueryClient())
+
+  useEffect(() => {
+    const onPreloadError = (event: Event) => {
+      event.preventDefault()
+      reloadForStaleChunk()
+    }
+    window.addEventListener("vite:preloadError", onPreloadError)
+    return () =>
+      window.removeEventListener("vite:preloadError", onPreloadError)
+  }, [])
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
