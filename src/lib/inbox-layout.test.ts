@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-  DEFAULT_INBOX_LAYOUT,
-  resolveInboxLayout,
-} from "./inbox-layout"
+import { DEFAULT_INBOX_LAYOUT, resolveInboxLayout } from "./inbox-layout"
 
 describe("resolveInboxLayout", () => {
   it("returns defaults for missing input", () => {
@@ -18,12 +15,14 @@ describe("resolveInboxLayout", () => {
         listDensity: "compact",
         showSnippets: false,
         rowStyle: "outlook",
+        unreadStyle: "fill",
       })
     ).toEqual({
       readingPane: "bottom",
       listDensity: "compact",
       showSnippets: false,
       rowStyle: "outlook",
+      unreadStyle: "fill",
     })
   })
 
@@ -60,9 +59,7 @@ describe("resolveInboxLayout", () => {
     expect(resolveInboxLayout({ showSnippets: "yes" }).showSnippets).toBe(
       DEFAULT_INBOX_LAYOUT.showSnippets
     )
-    expect(
-      resolveInboxLayout({ showSnippets: false }).showSnippets
-    ).toBe(false)
+    expect(resolveInboxLayout({ showSnippets: false }).showSnippets).toBe(false)
   })
 
   it("falls back for unknown row styles", () => {
@@ -70,5 +67,15 @@ describe("resolveInboxLayout", () => {
       DEFAULT_INBOX_LAYOUT.rowStyle
     )
     expect(resolveInboxLayout({ rowStyle: "gmail" }).rowStyle).toBe("gmail")
+  })
+
+  it("falls back for unknown unread styles", () => {
+    expect(resolveInboxLayout({ unreadStyle: "glow" }).unreadStyle).toBe(
+      DEFAULT_INBOX_LAYOUT.unreadStyle
+    )
+    expect(resolveInboxLayout({ unreadStyle: null }).unreadStyle).toBe(
+      DEFAULT_INBOX_LAYOUT.unreadStyle
+    )
+    expect(resolveInboxLayout({ unreadStyle: "fill" }).unreadStyle).toBe("fill")
   })
 })

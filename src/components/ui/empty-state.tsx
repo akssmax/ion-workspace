@@ -13,12 +13,7 @@ import { AuthBackground } from "@/components/effects/AuthBackground"
 
 export type EmptyStateSize = "sm" | "md" | "lg"
 export type EmptyStateTone =
-  | "neutral"
-  | "noResults"
-  | "info"
-  | "success"
-  | "warning"
-  | "danger"
+  "neutral" | "noResults" | "info" | "success" | "warning" | "danger"
 
 export interface EmptyStateProps {
   /** Icon element rendered centered inside the framed container. */
@@ -39,8 +34,9 @@ export interface EmptyStateProps {
    */
   tone?: EmptyStateTone
   /**
-   * Render the sign-in backdrop behind the empty state. The backdrop is always
-   * dark, so text/icon switch to a light palette when enabled. Default `true`.
+   * Render the animated backdrop behind the empty state. It is dark-only and
+   * theme aware: in light theme the empty state falls back to the card surface
+   * tokens. Default `true`.
    */
   background?: boolean
   className?: string
@@ -77,39 +73,39 @@ const TONES: Record<
 > = {
   neutral: {
     glow: "from-primary/40 via-primary/5 to-transparent",
-    icon: "text-white/90",
+    icon: "dark:text-white/90",
     iconLight: "text-primary",
-    border: "border-white/15",
+    border: "dark:border-white/15",
   },
   noResults: {
     glow: "from-violet-400/45 via-violet-400/5 to-transparent",
-    icon: "text-violet-200",
+    icon: "dark:text-violet-200",
     iconLight: "text-violet-600",
-    border: "border-violet-300/25",
+    border: "dark:border-violet-300/25",
   },
   info: {
     glow: "from-sky-400/50 via-sky-400/5 to-transparent",
-    icon: "text-sky-200",
+    icon: "dark:text-sky-200",
     iconLight: "text-sky-600",
-    border: "border-sky-300/25",
+    border: "dark:border-sky-300/25",
   },
   success: {
     glow: "from-emerald-400/50 via-emerald-400/5 to-transparent",
-    icon: "text-emerald-200",
+    icon: "dark:text-emerald-200",
     iconLight: "text-emerald-600",
-    border: "border-emerald-300/25",
+    border: "dark:border-emerald-300/25",
   },
   warning: {
     glow: "from-amber-400/55 via-amber-400/5 to-transparent",
-    icon: "text-amber-200",
+    icon: "dark:text-amber-200",
     iconLight: "text-amber-600",
-    border: "border-amber-300/30",
+    border: "dark:border-amber-300/30",
   },
   danger: {
     glow: "from-red-500/55 via-red-500/5 to-transparent",
-    icon: "text-red-200",
+    icon: "dark:text-red-200",
     iconLight: "text-destructive",
-    border: "border-red-400/30",
+    border: "dark:border-red-400/30",
   },
 }
 
@@ -134,17 +130,20 @@ export function EmptyState({
         "relative isolate flex h-full w-full flex-col items-center justify-center overflow-hidden rounded-2xl border text-center",
         scale.root,
         background
-          ? cn("text-white", palette.border)
+          ? cn(
+              "border-border bg-card text-foreground dark:bg-transparent dark:text-white",
+              palette.border
+            )
           : "border-border bg-card text-foreground",
         className
       )}
     >
       {background ? (
-        <>
+        <div className="absolute inset-0 hidden dark:block">
           <AuthBackground />
           {/* Keep the copy legible over the animated pattern. */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,#151515cc_0%,#151515aa_55%,#15151599_100%)]" />
-        </>
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--background)_80%,transparent)_0%,color-mix(in_oklch,var(--background)_67%,transparent)_55%,color-mix(in_oklch,var(--background)_60%,transparent)_100%)]" />
+        </div>
       ) : null}
 
       <div className="relative z-10 flex flex-col items-center gap-4">
@@ -154,7 +153,10 @@ export function EmptyState({
               "relative grid shrink-0 place-items-center border shadow-lg",
               scale.icon,
               background
-                ? cn("bg-white/[0.06] backdrop-blur-md shadow-black/40", palette.border)
+                ? cn(
+                    "border-border bg-muted dark:bg-white/[0.06] dark:shadow-black/40 dark:backdrop-blur-md",
+                    palette.border
+                  )
                 : "border-border bg-muted",
               iconContainerClassName
             )}
@@ -162,7 +164,7 @@ export function EmptyState({
             {/* Top sheen for a glassy finish. */}
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-white/15 to-transparent"
+              className="pointer-events-none absolute inset-0 rounded-[inherit] bg-gradient-to-b from-transparent to-transparent dark:from-white/15"
             />
             {/* Tone-tinted glow ring. */}
             <span
@@ -176,7 +178,9 @@ export function EmptyState({
               className={cn(
                 "relative grid place-items-center [&>svg]:size-full",
                 scale.iconSize,
-                background ? palette.icon : palette.iconLight
+                background
+                  ? cn(palette.iconLight, palette.icon)
+                  : palette.iconLight
               )}
             >
               {icon}
@@ -193,7 +197,9 @@ export function EmptyState({
           <p
             className={cn(
               "max-w-md text-sm text-balance",
-              background ? "text-white/60" : "text-muted-foreground",
+              background
+                ? "text-muted-foreground dark:text-white/60"
+                : "text-muted-foreground",
               title ? "-mt-1" : ""
             )}
           >

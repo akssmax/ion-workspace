@@ -1,12 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router"
 import { Paperclip, Star } from "lucide-react"
 import { cn } from "cn"
-import { DocsFile, DocsPage, DocsSection } from "@/components/design-system/page"
+import {
+  DocsFile,
+  DocsPage,
+  DocsSection,
+} from "@/components/design-system/page"
 import { Playground } from "@/components/design-system/playground"
 import { LabelChip } from "@/modules/mail/labels"
 import { SendStatusBanner } from "@/components/mail/send-status"
 import { ACCENT_NAMES, type AccentName } from "@/lib/accents"
-import type { ListDensity } from "@/lib/inbox-layout"
+import type { ListDensity, UnreadStyle } from "@/lib/inbox-layout"
 
 export const Route = createFileRoute("/design-system/mail")({
   component: MailPage,
@@ -25,6 +29,7 @@ function MailListRow({
   selected,
   density,
   showSnippets,
+  unreadStyle = "dot",
   labels,
   starred,
   attachment,
@@ -38,6 +43,7 @@ function MailListRow({
   selected: boolean
   density: ListDensity
   showSnippets: boolean
+  unreadStyle?: UnreadStyle
   labels: { name: string; accent: AccentName }[]
   starred: boolean
   attachment: boolean
@@ -56,21 +62,37 @@ function MailListRow({
     </>
   )
 
+  const surface = featured
+    ? "bg-accent"
+    : selected
+      ? "bg-accent/40"
+      : unreadStyle === "fill"
+        ? unread
+          ? "bg-primary/[0.07]"
+          : "bg-muted/40"
+        : "bg-background"
+  const dot =
+    unreadStyle === "dot" ? (
+      <span
+        className={cn(
+          "size-2 shrink-0 rounded-full",
+          unread ? "bg-primary" : "bg-transparent"
+        )}
+      />
+    ) : null
+
   if (density === "compact") {
     return (
       <div
         className={cn(
           "flex w-full items-center gap-2 border-b px-3 py-1.5 text-left text-sm",
-          featured ? "bg-accent" : selected ? "bg-accent/40" : "bg-background"
+          surface
         )}
       >
+        {dot}
         <span
-          className={cn(
-            "size-2 shrink-0 rounded-full",
-            unread ? "bg-primary" : "bg-transparent"
-          )}
-        />
-        <span className={cn("w-32 shrink-0 truncate", unread && "font-semibold")}>
+          className={cn("w-32 shrink-0 truncate", unread && "font-semibold")}
+        >
           {sender}
         </span>
         <span className="min-w-0 flex-1 truncate">
@@ -94,18 +116,16 @@ function MailListRow({
       className={cn(
         "flex w-full flex-col gap-0.5 border-b px-3 text-left",
         density === "cozy" ? "py-1.5" : "py-2.5",
-        featured ? "bg-accent" : selected ? "bg-accent/40" : "bg-background"
+        surface
       )}
     >
       <div className="flex items-center gap-2">
+        {dot}
         <span
           className={cn(
-            "size-2 shrink-0 rounded-full",
-            unread ? "bg-primary" : "bg-transparent"
+            "min-w-0 flex-1 truncate text-sm",
+            unread && "font-semibold"
           )}
-        />
-        <span
-          className={cn("min-w-0 flex-1 truncate text-sm", unread && "font-semibold")}
         >
           {sender}
         </span>
@@ -168,6 +188,12 @@ function MailPage() {
             { type: "boolean", name: "selected", defaultValue: false },
             { type: "boolean", name: "starred", defaultValue: true },
             { type: "boolean", name: "showSnippets", defaultValue: true },
+            {
+              type: "select",
+              name: "unreadStyle",
+              options: ["dot", "fill", "none"],
+              defaultValue: "dot",
+            },
           ]}
           render={(v) => (
             <div className="w-full max-w-xl overflow-hidden rounded-none">
@@ -181,6 +207,7 @@ function MailPage() {
                 selected={Boolean(v.selected)}
                 density={String(v.density) as ListDensity}
                 showSnippets={Boolean(v.showSnippets)}
+                unreadStyle={String(v.unreadStyle) as UnreadStyle}
                 labels={[{ name: "Work", accent: "teal" }]}
                 starred={Boolean(v.starred)}
                 attachment
@@ -205,10 +232,7 @@ function MailPage() {
             { type: "text", name: "name", defaultValue: "Later" },
           ]}
           render={(v) => (
-            <LabelChip
-              name={String(v.name)}
-              accent={v.accent as AccentName}
-            />
+            <LabelChip name={String(v.name)} accent={v.accent as AccentName} />
           )}
           code={(v) =>
             `<LabelChip name="${String(v.name)}" accent="${String(v.accent)}" />`

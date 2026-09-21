@@ -18,7 +18,11 @@ import {
   X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { useSidebar } from "@/components/ui/sidebar"
@@ -47,7 +51,16 @@ import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import type { MailQuickFilter, MailSort } from "@/lib/mail-list"
 import type { TranslationKey } from "@/lib/language"
 
-const mailboxRoleLabels: Record<string, TranslationKey> = { inbox: "Inbox", sent: "Sent", drafts: "Drafts", archive: "Archive", junk: "Junk", trash: "Trash", starred: "Starred", important: "Important" }
+const mailboxRoleLabels: Record<string, TranslationKey> = {
+  inbox: "Inbox",
+  sent: "Sent",
+  drafts: "Drafts",
+  archive: "Archive",
+  junk: "Junk",
+  trash: "Trash",
+  starred: "Starred",
+  important: "Important",
+}
 
 export function MailView() {
   const { t, direction } = useLanguage()
@@ -79,12 +92,19 @@ export function MailView() {
   // Never send an unresolved/stale mailbox id (e.g. a mock id persisted from a
   // previous session) to the server — Stalwart rejects unknown ids with a 400.
   const resolvedMailboxId = mailbox?.id ?? null
-  const sort = preferences?.mailSortByMailbox?.[activeMailboxId ?? "all"] ?? "newest"
+  const sort =
+    preferences?.mailSortByMailbox?.[activeMailboxId ?? "all"] ?? "newest"
   const listScope = { sort, sent: mailbox?.role === "sent", quickFilters }
   function changeSort(value: MailSort) {
-    savePreferences.mutate({ mailSortByMailbox: { ...preferences?.mailSortByMailbox, [activeMailboxId ?? "all"]: value } })
+    savePreferences.mutate({
+      mailSortByMailbox: {
+        ...preferences?.mailSortByMailbox,
+        [activeMailboxId ?? "all"]: value,
+      },
+    })
   }
-  const mailboxLabel = (item: typeof mailbox) => item?.role ? t(mailboxRoleLabels[item.role] ?? item.name) : item?.name
+  const mailboxLabel = (item: typeof mailbox) =>
+    item?.role ? t(mailboxRoleLabels[item.role] ?? item.name) : item?.name
   const setActiveMailbox = useMailStore((s) => s.setActiveMailbox)
   const compact = isMobile || (paneWidth !== null && paneWidth < 620)
   // Search starts compact and grows to full width when focused or filled.
@@ -94,8 +114,12 @@ export function MailView() {
   const showSearchHints = !hasSearch && (compact || searchExpanded)
   const showMailboxMenu = sidebarState === "collapsed" || compact
 
-  useEffect(() => { setMailPage(0) }, [activeMailboxId, searchQuery, sort, quickFilters])
-  useEffect(() => { setQuickFilters([]) }, [activeMailboxId])
+  useEffect(() => {
+    setMailPage(0)
+  }, [activeMailboxId, searchQuery, sort, quickFilters])
+  useEffect(() => {
+    setQuickFilters([])
+  }, [activeMailboxId])
 
   useEffect(() => {
     const element = panesRef.current
@@ -122,10 +146,18 @@ export function MailView() {
       const bounds = panesRef.current?.getBoundingClientRect()
       if (!bounds) return
       const available = axis === "x" ? bounds.width : bounds.height
-      const point = axis === "x" ? direction === "rtl" ? bounds.right - pointer.clientX : pointer.clientX - bounds.left : pointer.clientY - bounds.top
+      const point =
+        axis === "x"
+          ? direction === "rtl"
+            ? bounds.right - pointer.clientX
+            : pointer.clientX - bounds.left
+          : pointer.clientY - bounds.top
       const minimum = axis === "x" ? 220 : 150
       const remaining = axis === "x" ? 280 : 220
-      const size = Math.min(Math.max(point, minimum), Math.max(minimum, available - remaining))
+      const size = Math.min(
+        Math.max(point, minimum),
+        Math.max(minimum, available - remaining)
+      )
       const next = available ? size / available : 0.5
       if (axis === "x") setRightSplit(next)
       else setBottomSplit(next)
@@ -180,7 +212,12 @@ export function MailView() {
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      <header className={cn("relative z-20 flex shrink-0 items-center gap-2 overflow-visible border-b px-3 sm:px-4", compact ? "min-h-14 flex-wrap py-2" : "h-14")}>
+      <header
+        className={cn(
+          "relative z-20 flex shrink-0 items-center gap-2 overflow-visible border-b px-3 sm:px-4",
+          compact ? "min-h-14 flex-wrap py-2" : "h-14"
+        )}
+      >
         <div className="flex min-w-0 items-center gap-2">
           <OpenSidebarTrigger />
           {showMailboxMenu ? (
@@ -197,7 +234,8 @@ export function MailView() {
               >
                 <MailboxIcon role={mailbox?.role} />
                 <span className="max-w-28 truncate">
-                  {mailboxLabel(mailbox) ?? (searchQuery ? t("Search results") : t("Inbox"))}
+                  {mailboxLabel(mailbox) ??
+                    (searchQuery ? t("Search results") : t("Inbox"))}
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
               </DropdownMenuTrigger>
@@ -208,7 +246,9 @@ export function MailView() {
                     onClick={() => pickMailbox(item.id)}
                   >
                     <MailboxIcon role={item.role} />
-                    <span className="min-w-0 flex-1 truncate">{mailboxLabel(item)}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {mailboxLabel(item)}
+                    </span>
                     {(item.unreadEmails ?? 0) > 0 ? (
                       <span className="text-xs text-muted-foreground tabular-nums">
                         {item.unreadEmails}
@@ -225,7 +265,8 @@ export function MailView() {
             <div className="flex min-w-0 items-center gap-2">
               <MailboxIcon role={mailbox?.role} />
               <h1 className="truncate text-sm font-semibold">
-                {mailboxLabel(mailbox) ?? (searchQuery ? t("Search results") : t("Inbox"))}
+                {mailboxLabel(mailbox) ??
+                  (searchQuery ? t("Search results") : t("Inbox"))}
               </h1>
             </div>
           )}
@@ -245,7 +286,7 @@ export function MailView() {
                 )
           )}
         >
-          <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
             aria-label={t("Search mail")}
@@ -283,16 +324,23 @@ export function MailView() {
                 >
                   /
                 </kbd>
-                <Tooltip><TooltipTrigger render={<button
-                  type="button"
-                  aria-label="Open command palette (Command K)"
-                  onClick={() => setPaletteOpen(true)}
-                  className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
-                />}>
-                  <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
-                    ⌘ K
-                  </kbd>
-                </TooltipTrigger><TooltipContent>Open command palette</TooltipContent></Tooltip>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        aria-label="Open command palette (Command K)"
+                        onClick={() => setPaletteOpen(true)}
+                        className="inline-flex h-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-ring"
+                      />
+                    }
+                  >
+                    <kbd className="inline-flex h-6 shrink-0 items-center justify-center rounded border bg-background px-1.5 font-mono text-[10px] leading-none text-muted-foreground shadow-xs">
+                      ⌘ K
+                    </kbd>
+                  </TooltipTrigger>
+                  <TooltipContent>Open command palette</TooltipContent>
+                </Tooltip>
               </>
             ) : null}
           </div>
@@ -312,7 +360,13 @@ export function MailView() {
         </div>
       </header>
 
-      <div ref={panesRef} className={cn("flex min-h-0 min-w-0 flex-1 overflow-hidden", verticalSplit && "flex-col")}>
+      <div
+        ref={panesRef}
+        className={cn(
+          "flex min-h-0 min-w-0 flex-1 overflow-hidden",
+          verticalSplit && "flex-col"
+        )}
+      >
         {showList ? (
           <div
             className={cn(
@@ -325,9 +379,25 @@ export function MailView() {
                     ? "min-w-[220px] shrink-0"
                     : "flex-1"
             )}
-            style={showReading && !hiddenPane ? verticalSplit ? { height: `${bottomSplit * 100}%` } : { width: `${rightSplit * 100}%` } : undefined}
+            style={
+              showReading && !hiddenPane
+                ? verticalSplit
+                  ? { height: `${bottomSplit * 100}%` }
+                  : { width: `${rightSplit * 100}%` }
+                : undefined
+            }
           >
-            <MailboxHeader mailboxId={resolvedMailboxId} query={searchQuery} page={mailPage} onPageChange={setMailPage} sort={sort} onSortChange={changeSort} quickFilters={quickFilters} onQuickFiltersChange={setQuickFilters} sent={listScope.sent} />
+            <MailboxHeader
+              mailboxId={resolvedMailboxId}
+              query={searchQuery}
+              page={mailPage}
+              onPageChange={setMailPage}
+              sort={sort}
+              onSortChange={changeSort}
+              quickFilters={quickFilters}
+              onQuickFiltersChange={setQuickFilters}
+              sent={listScope.sent}
+            />
             <div className="min-h-0 flex-1 overflow-hidden">
               <EmailList
                 mailboxId={resolvedMailboxId}
@@ -340,53 +410,96 @@ export function MailView() {
                 density={layout.listDensity}
                 showSnippets={layout.showSnippets}
                 rowStyle={layout.rowStyle}
-                narrow={showReading && !hiddenPane && !verticalSplit && paneWidth !== null && paneWidth * rightSplit < 440}
+                unreadStyle={layout.unreadStyle}
+                narrow={
+                  showReading &&
+                  !hiddenPane &&
+                  !verticalSplit &&
+                  paneWidth !== null &&
+                  paneWidth * rightSplit < 440
+                }
               />
             </div>
           </div>
         ) : null}
 
         {showList && showReading && !hiddenPane ? (
-          <Tooltip><TooltipTrigger render={<div
-            role="separator"
-            tabIndex={0}
-            aria-label={verticalSplit ? "Resize message list height" : "Resize message list width"}
-            aria-orientation={verticalSplit ? "horizontal" : "vertical"}
-            aria-valuemin={20}
-            aria-valuemax={80}
-            aria-valuenow={Math.round((verticalSplit ? bottomSplit : rightSplit) * 100)}
-            onPointerDown={startResize}
-            onDoubleClick={() => verticalSplit ? setBottomSplit(0.46) : setRightSplit(0.37)}
-            onKeyDown={(event) => {
-              const amount = verticalSplit
-                ? event.key === "ArrowDown" ? 0.04 : event.key === "ArrowUp" ? -0.04 : 0
-                : event.key === "ArrowRight" ? (direction === "rtl" ? -0.04 : 0.04) : event.key === "ArrowLeft" ? (direction === "rtl" ? 0.04 : -0.04) : 0
-              if (!amount) return
-              event.preventDefault()
-              const bounds = panesRef.current?.getBoundingClientRect()
-              const available = verticalSplit ? bounds?.height : bounds?.width
-              const minimum = verticalSplit ? 150 : 220
-              const remaining = verticalSplit ? 220 : 280
-              const lower = available ? minimum / available : 0.2
-              const upper = available ? Math.max(lower, (available - remaining) / available) : 0.8
-              const update = (value: number) => Math.min(upper, Math.max(lower, value + amount))
-              if (verticalSplit) setBottomSplit(update)
-              else setRightSplit(update)
-            }}
-            className={cn(
-              "group/separator relative z-10 shrink-0 touch-none bg-border outline-none before:absolute before:bg-transparent before:content-[''] focus-visible:bg-primary",
-              verticalSplit
-                ? "h-px w-full cursor-row-resize before:-inset-y-2 before:inset-x-0"
-                : "h-full w-px cursor-col-resize before:inset-y-0 before:-inset-x-2"
-            )}
-          />}>
-            <span className={cn(
-              "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100",
-              verticalSplit
-                ? "top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2"
-                : "top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2"
-            )} />
-          </TooltipTrigger><TooltipContent>Drag to resize; double-click to reset</TooltipContent></Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div
+                  role="separator"
+                  tabIndex={0}
+                  aria-label={
+                    verticalSplit
+                      ? "Resize message list height"
+                      : "Resize message list width"
+                  }
+                  aria-orientation={verticalSplit ? "horizontal" : "vertical"}
+                  aria-valuemin={20}
+                  aria-valuemax={80}
+                  aria-valuenow={Math.round(
+                    (verticalSplit ? bottomSplit : rightSplit) * 100
+                  )}
+                  onPointerDown={startResize}
+                  onDoubleClick={() =>
+                    verticalSplit ? setBottomSplit(0.46) : setRightSplit(0.37)
+                  }
+                  onKeyDown={(event) => {
+                    const amount = verticalSplit
+                      ? event.key === "ArrowDown"
+                        ? 0.04
+                        : event.key === "ArrowUp"
+                          ? -0.04
+                          : 0
+                      : event.key === "ArrowRight"
+                        ? direction === "rtl"
+                          ? -0.04
+                          : 0.04
+                        : event.key === "ArrowLeft"
+                          ? direction === "rtl"
+                            ? 0.04
+                            : -0.04
+                          : 0
+                    if (!amount) return
+                    event.preventDefault()
+                    const bounds = panesRef.current?.getBoundingClientRect()
+                    const available = verticalSplit
+                      ? bounds?.height
+                      : bounds?.width
+                    const minimum = verticalSplit ? 150 : 220
+                    const remaining = verticalSplit ? 220 : 280
+                    const lower = available ? minimum / available : 0.2
+                    const upper = available
+                      ? Math.max(lower, (available - remaining) / available)
+                      : 0.8
+                    const update = (value: number) =>
+                      Math.min(upper, Math.max(lower, value + amount))
+                    if (verticalSplit) setBottomSplit(update)
+                    else setRightSplit(update)
+                  }}
+                  className={cn(
+                    "group/separator relative z-10 shrink-0 touch-none bg-border outline-none before:absolute before:bg-transparent before:content-[''] focus-visible:bg-primary",
+                    verticalSplit
+                      ? "h-px w-full cursor-row-resize before:inset-x-0 before:-inset-y-2"
+                      : "h-full w-px cursor-col-resize before:-inset-x-2 before:inset-y-0"
+                  )}
+                />
+              }
+            >
+              <span
+                className={cn(
+                  "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100",
+                  verticalSplit
+                    ? "top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2"
+                    : "top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2"
+                )}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              Drag to resize; double-click to reset
+            </TooltipContent>
+          </Tooltip>
         ) : null}
 
         {showReading ? (

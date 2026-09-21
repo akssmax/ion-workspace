@@ -8,7 +8,7 @@ export function AuthBackground() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 overflow-hidden bg-[#151515]"
+      className="pointer-events-none absolute inset-0 overflow-hidden bg-background"
     >
       <div className="absolute inset-0">
         <ClientOnly>
@@ -33,7 +33,7 @@ export function AuthBackground() {
           />
         </ClientOnly>
       </div>
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_28%,#15151588_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_28%,color-mix(in_oklch,var(--background)_53%,transparent)_100%)]" />
     </div>
   )
 }

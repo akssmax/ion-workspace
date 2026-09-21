@@ -19,7 +19,13 @@ import { ACCOUNT_KEY } from "./client"
 import { getPrimaryAccountId } from "../services/jmap.service"
 import { syncEngine } from "../jmap/sync/sync.engine"
 import { useSession } from "../hooks/use-session"
-import { combineMailFilters, MAIL_QUICK_FILTERS, mailSortComparators, type MailQuickFilter, type MailSort } from "@/lib/mail-list"
+import {
+  combineMailFilters,
+  MAIL_QUICK_FILTERS,
+  mailSortComparators,
+  type MailQuickFilter,
+  type MailSort,
+} from "@/lib/mail-list"
 import { getJmapClient } from "../services/jmap.service"
 import { JMAP_CAPS } from "../jmap/types"
 
@@ -30,7 +36,11 @@ function useMailScopeKey(): string {
 
 function canReadOffline(error: unknown): boolean {
   const code = (error as { code?: string } | null)?.code
-  return (typeof navigator !== "undefined" && !navigator.onLine) || code === "transport" || code === "106"
+  return (
+    (typeof navigator !== "undefined" && !navigator.onLine) ||
+    code === "transport" ||
+    code === "106"
+  )
 }
 
 export function useMailboxes() {
@@ -63,8 +73,7 @@ export function useRenameMailbox() {
   return useMutation({
     mutationFn: ({ id, name }: { id: JmapId; name: string }) =>
       mailService.setMailboxes({ update: { [id]: { name } } }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: qk.mailboxes() }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: qk.mailboxes() }),
   })
 }
 
@@ -72,8 +81,7 @@ export function useRenameMailbox() {
 export function useDeleteMailbox() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: JmapId) =>
-      mailService.setMailboxes({ destroy: [id] }),
+    mutationFn: (id: JmapId) => mailService.setMailboxes({ destroy: [id] }),
     onSuccess: (res) => {
       const err = res.notDestroyed?.[Object.keys(res.notDestroyed ?? {})[0]]
       if (err) throw new Error(err.description ?? "Couldn't delete folder.")
@@ -95,7 +103,9 @@ export function useUpdateIdentity() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const client = await (await import("../services/jmap.service")).getJmapClient()
+      const client = await (
+        await import("../services/jmap.service")
+      ).getJmapClient()
       await client.mail.updateIdentity(id, { name })
     },
     onSuccess: () => void qc.invalidateQueries({ queryKey: qk.identities() }),
@@ -125,9 +135,15 @@ export function useMailSortCapabilities() {
       const client = await getJmapClient()
       const session = await client.session()
       const accountId = session.primaryAccounts[JMAP_CAPS.MAIL]
-      const accountCaps = session.accounts[accountId]?.accountCapabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined
-      const sessionCaps = session.capabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined
-      return accountCaps?.emailQuerySortOptions ?? sessionCaps?.emailQuerySortOptions ?? ["receivedAt"]
+      const accountCaps = session.accounts[accountId]?.accountCapabilities[
+        JMAP_CAPS.MAIL
+      ] as { emailQuerySortOptions?: string[] } | undefined
+      const sessionCaps = session.capabilities[JMAP_CAPS.MAIL] as
+        { emailQuerySortOptions?: string[] } | undefined
+      return (
+        accountCaps?.emailQuerySortOptions ??
+        sessionCaps?.emailQuerySortOptions ?? ["receivedAt"]
+      )
     },
     staleTime: 60_000,
   })
@@ -140,15 +156,34 @@ export function useEmails(scope: EmailListScope, page = 0) {
   const query = scope.query ?? ""
   const pageSize = scope.limit ?? MAIL_PAGE_SIZE
   return useQuery({
-    queryKey: [...qk.emails(mailboxId, query), accountScope, pageSize, page, scope.sort ?? "newest", !!scope.sent, [...(scope.quickFilters ?? [])].sort().join(",")],
-    queryFn: () => fetchEmailsForScope({ ...scope, limit: pageSize }, mailboxId, page * pageSize, session?.accountId),
+    queryKey: [
+      ...qk.emails(mailboxId, query),
+      accountScope,
+      pageSize,
+      page,
+      scope.sort ?? "newest",
+      !!scope.sent,
+      [...(scope.quickFilters ?? [])].sort().join(","),
+    ],
+    queryFn: () =>
+      fetchEmailsForScope(
+        { ...scope, limit: pageSize },
+        mailboxId,
+        page * pageSize,
+        session?.accountId
+      ),
     enabled: scope.mailboxId !== undefined || scope.query !== undefined,
     staleTime: 30_000,
     gcTime: 60_000,
   })
 }
 
-async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string, position: number, cachedAccountId?: string) {
+async function fetchEmailsForScope(
+  scope: EmailListScope,
+  mailboxId: string,
+  position: number,
+  cachedAccountId?: string
+) {
   const parsed = scope.query ? parseSearch(scope.query) : null
   let filter: EmailFilterOperator | undefined = parsed?.filter ?? undefined
 
@@ -171,31 +206,65 @@ async function fetchEmailsForScope(scope: EmailListScope, mailboxId: string, pos
     filter = combineMailFilters({ inMailbox: mailboxId }, filter)
   }
 
-  filter = combineMailFilters(filter, ...MAIL_QUICK_FILTERS.filter(({ value }) => scope.quickFilters?.includes(value)).map(({ clause }) => clause))
+  filter = combineMailFilters(
+    filter,
+    ...MAIL_QUICK_FILTERS.filter(({ value }) =>
+      scope.quickFilters?.includes(value)
+    ).map(({ clause }) => clause)
+  )
 
   let accountId = cachedAccountId
   try {
     accountId ??= (await getPrimaryAccountId()) ?? undefined
     const client = await getJmapClient()
     const jmapSession = await client.session()
-    const sortOptions = (accountId ? jmapSession.accounts[accountId]?.accountCapabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined : undefined)?.emailQuerySortOptions
-      ?? (jmapSession.capabilities[JMAP_CAPS.MAIL] as { emailQuerySortOptions?: string[] } | undefined)?.emailQuerySortOptions
-      ?? ["receivedAt"]
+    const sortOptions = (accountId
+      ? (jmapSession.accounts[accountId]?.accountCapabilities[
+          JMAP_CAPS.MAIL
+        ] as { emailQuerySortOptions?: string[] } | undefined)
+      : undefined
+    )?.emailQuerySortOptions ??
+      (
+        jmapSession.capabilities[JMAP_CAPS.MAIL] as
+          { emailQuerySortOptions?: string[] } | undefined
+      )?.emailQuerySortOptions ?? ["receivedAt"]
     const result = await mailService.getEmails(mailboxId, {
       filter,
-      sort: mailSortComparators(scope.sort ?? "newest", scope.sent, sortOptions),
+      sort: mailSortComparators(
+        scope.sort ?? "newest",
+        scope.sent,
+        sortOptions
+      ),
       limit: scope.limit ?? 60,
       position,
       calculateTotal: true,
     })
-    if (accountId) void syncEngine.storeMailPage(accountId, result.emails).catch(() => {})
+    if (accountId)
+      void syncEngine.storeMailPage(accountId, result.emails).catch(() => {})
     return result
   } catch (error) {
-    if (!accountId || scope.query || scope.sort && scope.sort !== "newest" || scope.quickFilters?.length || !canReadOffline(error)) {
-      if (canReadOffline(error) && (scope.sort && scope.sort !== "newest" || scope.quickFilters?.length)) throw new Error("Reconnect to sort or filter messages; cached mail is shown newest first.")
+    if (
+      !accountId ||
+      scope.query ||
+      (scope.sort && scope.sort !== "newest") ||
+      scope.quickFilters?.length ||
+      !canReadOffline(error)
+    ) {
+      if (
+        canReadOffline(error) &&
+        ((scope.sort && scope.sort !== "newest") || scope.quickFilters?.length)
+      )
+        throw new Error(
+          "Reconnect to sort or filter messages; cached mail is shown newest first."
+        )
       throw error
     }
-    return syncEngine.offlineMailPage(accountId, mailboxId, position, scope.limit ?? 60)
+    return syncEngine.offlineMailPage(
+      accountId,
+      mailboxId,
+      position,
+      scope.limit ?? 60
+    )
   }
 }
 
@@ -229,11 +298,17 @@ export function useThread(threadId: string | null, enabled = true) {
       try {
         accountId ??= (await getPrimaryAccountId()) ?? undefined
         const data = await mailService.getThread(threadId as JmapId)
-        if (accountId) void syncEngine.storeThread(accountId, data.thread, data.emails).catch(() => {})
+        if (accountId)
+          void syncEngine
+            .storeThread(accountId, data.thread, data.emails)
+            .catch(() => {})
         return data
       } catch (error) {
         if (!accountId || !canReadOffline(error)) throw error
-        const cached = await syncEngine.offlineThread(accountId, threadId as JmapId)
+        const cached = await syncEngine.offlineThread(
+          accountId,
+          threadId as JmapId
+        )
         if (!cached) throw error
         return cached
       }
@@ -271,6 +346,92 @@ export function useThread(threadId: string | null, enabled = true) {
 function invalidateMailViews(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: ["acc", "emails"] })
   void queryClient.invalidateQueries({ queryKey: qk.mailboxes() })
+  // Refresh the open reading pane so toolbar state (star, read, junk) stays in sync.
+  void queryClient.invalidateQueries({ queryKey: [ACCOUNT_KEY, "thread"] })
+}
+
+/** Apply/remove keywords on a single email without mutating the source object. */
+function patchKeywords(
+  email: EmailProperties,
+  patch: Record<string, boolean>
+): EmailProperties {
+  const keywords = { ...(email.keywords ?? {}) }
+  for (const [key, value] of Object.entries(patch)) {
+    if (value) keywords[key] = true
+    else delete keywords[key]
+  }
+  return { ...email, keywords }
+}
+
+function isTargetEmail(email: EmailProperties, ids: Set<string>): boolean {
+  return (
+    (!!email.id && ids.has(email.id)) ||
+    (!!email.threadId && ids.has(email.threadId))
+  )
+}
+
+/**
+ * Optimistically apply a keyword patch (star, read, …) to every cached copy of
+ * the affected emails — both mailbox lists and open threads — so the UI updates
+ * instantly, before the server round-trip.
+ */
+function optimisticallyPatchKeywords(
+  queryClient: ReturnType<typeof useQueryClient>,
+  ids: JmapId[],
+  patch: Record<string, boolean>
+): void {
+  const idSet = new Set(ids)
+  queryClient.setQueriesData(
+    { queryKey: [ACCOUNT_KEY, "emails"] },
+    (data: { emails?: EmailProperties[] } | undefined) => {
+      if (!Array.isArray(data?.emails)) return data
+      return {
+        ...data,
+        emails: data.emails.map((email) =>
+          isTargetEmail(email, idSet) ? patchKeywords(email, patch) : email
+        ),
+      }
+    }
+  )
+  queryClient.setQueriesData(
+    { queryKey: [ACCOUNT_KEY, "thread"] },
+    (
+      data: { thread?: { id?: string }; emails?: EmailProperties[] } | undefined
+    ) => {
+      if (!Array.isArray(data?.emails)) return data
+      const matchesThread = !!data.thread?.id && idSet.has(data.thread.id)
+      if (
+        !matchesThread &&
+        !data.emails.some((email) => isTargetEmail(email, idSet))
+      )
+        return data
+      return {
+        ...data,
+        emails: data.emails.map((email) =>
+          matchesThread || isTargetEmail(email, idSet)
+            ? patchKeywords(email, patch)
+            : email
+        ),
+      }
+    }
+  )
+}
+
+/** Snapshot the keyword-bearing caches so an optimistic patch can be rolled back. */
+function snapshotKeywordCaches(
+  queryClient: ReturnType<typeof useQueryClient>
+): [readonly unknown[], unknown][] {
+  return [
+    ...queryClient.getQueriesData({ queryKey: [ACCOUNT_KEY, "emails"] }),
+    ...queryClient.getQueriesData({ queryKey: [ACCOUNT_KEY, "thread"] }),
+  ]
+}
+
+function restoreKeywordCaches(
+  queryClient: ReturnType<typeof useQueryClient>,
+  snapshot: [readonly unknown[], unknown][]
+): void {
+  for (const [key, data] of snapshot) queryClient.setQueryData(key, data)
 }
 
 /** A single email with body values (draft reopen, previews). */
@@ -290,7 +451,12 @@ export function useEmail(id: JmapId | null) {
 export function useThreadEmails(threadIds: JmapId[], enabled = true) {
   const accountScope = useMailScopeKey()
   return useQuery({
-    queryKey: [ACCOUNT_KEY, "thread-emails", accountScope, ...[...threadIds].sort()],
+    queryKey: [
+      ACCOUNT_KEY,
+      "thread-emails",
+      accountScope,
+      ...[...threadIds].sort(),
+    ],
     queryFn: async () => {
       const threads = await mailService.getThreads(threadIds)
       const ids = [...new Set(threads.flatMap((t) => t.emailIds))]
@@ -323,7 +489,17 @@ export function useMarkRead() {
   return useMutation({
     mutationFn: ({ ids, read }: { ids: JmapId[]; read: boolean }) =>
       mailService.markRead(ids, read),
-    onSuccess: () => invalidateMailViews(qc),
+    onMutate: async ({ ids, read }) => {
+      await qc.cancelQueries({ queryKey: [ACCOUNT_KEY, "emails"] })
+      await qc.cancelQueries({ queryKey: [ACCOUNT_KEY, "thread"] })
+      const snapshot = snapshotKeywordCaches(qc)
+      optimisticallyPatchKeywords(qc, ids, { $seen: read })
+      return snapshot
+    },
+    onError: (_error, _variables, snapshot) => {
+      if (snapshot) restoreKeywordCaches(qc, snapshot)
+    },
+    onSettled: () => invalidateMailViews(qc),
   })
 }
 
@@ -332,7 +508,17 @@ export function useMarkStarred() {
   return useMutation({
     mutationFn: ({ ids, starred }: { ids: JmapId[]; starred: boolean }) =>
       mailService.markStarred(ids, starred),
-    onSuccess: () => invalidateMailViews(qc),
+    onMutate: async ({ ids, starred }) => {
+      await qc.cancelQueries({ queryKey: [ACCOUNT_KEY, "emails"] })
+      await qc.cancelQueries({ queryKey: [ACCOUNT_KEY, "thread"] })
+      const snapshot = snapshotKeywordCaches(qc)
+      optimisticallyPatchKeywords(qc, ids, { $flagged: starred })
+      return snapshot
+    },
+    onError: (_error, _variables, snapshot) => {
+      if (snapshot) restoreKeywordCaches(qc, snapshot)
+    },
+    onSettled: () => invalidateMailViews(qc),
   })
 }
 

@@ -16,6 +16,7 @@ import { ContactsView } from "../contacts/contacts-view"
 import { FilesView } from "../files/files-view"
 import { ComposeDock } from "../mail/composer"
 import { SendStatusPill } from "../mail/send-status"
+import { Toaster } from "@/components/ui/sonner"
 
 export function AppShell() {
   const app = useWorkspaceStore((s) => s.app)
@@ -39,6 +40,7 @@ export function AppShell() {
       <CommandPalette />
       <ComposeDock />
       <SendStatusPill />
+      <Toaster position="bottom-left" />
       <KeyboardShortcuts />
     </SidebarProvider>
   )

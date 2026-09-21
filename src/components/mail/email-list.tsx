@@ -11,15 +11,32 @@
  * Bulk selection: every row style has a visible checkbox.
  * Ctrl/Cmd-click toggles; Shift-click selects the visible range from the
  * last-selected row. Clicking the rest of the row opens the conversation.
+ *
+ * Read/unread treatment (Settings → Inbox → Read/unread style):
+ * - `dot`  — a colored dot (and the Outlook accent bar) marks unread rows.
+ * - `fill` — unread rows get a tinted fill and read rows a muted one.
+ * - `none` — only the sender/subject font weight differs.
  */
 
 import { useEffect, useRef, useState } from "react"
-import { Star, Paperclip, MailPlus, Archive, RotateCcw, Trash2, Mail, MailOpen, AlertCircle, SearchX } from "lucide-react"
+import {
+  Star,
+  Paperclip,
+  MailPlus,
+  Archive,
+  RotateCcw,
+  Trash2,
+  Mail,
+  MailOpen,
+  AlertCircle,
+  SearchX,
+} from "lucide-react"
 import { cn } from "cn"
 import type { EmailProperties } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
 import { useComposerStore } from "@/stores/composer.store"
-import { useEmails, useArchiveEmails, useUnarchiveEmails, useMailboxes, useTrashEmails, useMarkRead, useMarkStarred } from "@/queries/mail"
+import { useEmails, useMailboxes } from "@/queries/mail"
+import { useThreadActionRunner } from "@/hooks/use-thread-actions"
 import { usePreferences } from "@/queries/preferences"
 import type { UserPreferences } from "@/server/preferences.rpc"
 import { senderName, emailHasAttachments } from "@/lib/html"
@@ -28,10 +45,19 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { EmptyState } from "@/components/ui/empty-state"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { Alert, AlertTitle, AlertDescription, AlertAction } from "@/components/ui/alert"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import {
+  Alert,
+  AlertTitle,
+  AlertDescription,
+  AlertAction,
+} from "@/components/ui/alert"
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip"
 import { parseSearch } from "@/lib/search"
-import type { ListDensity, RowStyle } from "@/lib/inbox-layout"
+import type { ListDensity, RowStyle, UnreadStyle } from "@/lib/inbox-layout"
 import { useFeatureFlag } from "@/features/flags"
 import { LabelChips } from "@/modules/mail/labels"
 import { useLanguage } from "@/lib/language"
@@ -49,6 +75,7 @@ export function EmailList({
   density = "comfortable",
   showSnippets = true,
   rowStyle = "minimal",
+  unreadStyle = "dot",
   narrow = false,
 }: {
   mailboxId: string | null
@@ -61,6 +88,7 @@ export function EmailList({
   density?: ListDensity
   showSnippets?: boolean
   rowStyle?: RowStyle
+  unreadStyle?: UnreadStyle
   narrow?: boolean
 }) {
   const { language, t } = useLanguage()
@@ -73,7 +101,14 @@ export function EmailList({
   const openCompose = useComposerStore((s) => s.openCompose)
   const { data: preferences } = usePreferences()
   const { data: mailboxes } = useMailboxes()
-  const isArchive = mailboxes?.some((mailbox) => mailbox.id === mailboxId && mailbox.role === "archive") ?? false
+  const isArchive =
+    mailboxes?.some(
+      (mailbox) => mailbox.id === mailboxId && mailbox.role === "archive"
+    ) ?? false
+  const isTrash =
+    mailboxes?.some(
+      (mailbox) => mailbox.id === mailboxId && mailbox.role === "trash"
+    ) ?? false
 
   const parsed = parseSearch(query)
   const scope = {
@@ -198,7 +233,12 @@ export function EmailList({
   return (
     <div className="h-full min-w-0 overflow-x-hidden overflow-y-auto">
       {emails.data?.state === "offline" ? (
-        <p role="status" className="border-b bg-muted px-3 py-1.5 text-xs text-muted-foreground">Offline · showing cached messages</p>
+        <p
+          role="status"
+          className="border-b bg-muted px-3 py-1.5 text-xs text-muted-foreground"
+        >
+          Offline · showing cached messages
+        </p>
       ) : null}
       {rows.map((row) => {
         const threadId = row.threadId
@@ -209,20 +249,30 @@ export function EmailList({
           selected,
           density,
           showSnippets,
+          rowStyle,
+          unreadStyle,
           narrow,
           language,
           onSelect: (e: React.MouseEvent) => onRowClick(row, e),
           onToggleSelect: () => toggleThreadSelection(threadId),
         }
-        return <ActionRow key={threadId} email={row} preferences={preferences} isArchive={isArchive}>
-          {rowStyle === "gmail" ? (
-            <GmailRow {...shared} />
-          ) : rowStyle === "outlook" ? (
-            <OutlookRow {...shared} />
-          ) : (
-            <MinimalRow {...shared} />
-          )}
-        </ActionRow>
+        return (
+          <ActionRow
+            key={threadId}
+            email={row}
+            preferences={preferences}
+            isArchive={isArchive}
+            isTrash={isTrash}
+          >
+            {rowStyle === "gmail" ? (
+              <GmailRow {...shared} />
+            ) : rowStyle === "outlook" ? (
+              <OutlookRow {...shared} />
+            ) : (
+              <MinimalRow {...shared} />
+            )}
+          </ActionRow>
+        )
       })}
     </div>
   )
@@ -230,88 +280,191 @@ export function EmailList({
 
 type SwipeAction = NonNullable<UserPreferences["swipeLeftAction"]>
 
-function ActionRow({ email, preferences, isArchive, children }: { email: EmailProperties; preferences?: UserPreferences; isArchive: boolean; children: React.ReactNode }) {
-  const archive = useArchiveEmails()
-  const unarchive = useUnarchiveEmails()
-  const trash = useTrashEmails()
-  const markRead = useMarkRead()
-  const markStarred = useMarkStarred()
+function ActionRow({
+  email,
+  preferences,
+  isArchive,
+  isTrash,
+  children,
+}: {
+  email: EmailProperties
+  preferences?: UserPreferences
+  isArchive: boolean
+  isTrash: boolean
+  children: React.ReactNode
+}) {
+  const { run: runThreadAction, busy } = useThreadActionRunner(email.threadId)
   const [offset, setOffset] = useState(0)
   const offsetRef = useRef(0)
   const start = useRef<{ x: number; y: number } | null>(null)
   const suppressClick = useRef(false)
-  const busy = archive.isPending || unarchive.isPending || trash.isPending || markRead.isPending || markStarred.isPending
   const isRead = email.keywords?.$seen === true
   const isStarred = email.keywords?.$flagged === true
 
   function run(action: SwipeAction) {
     if (busy || action === "none") return
-    const ids = [email.threadId]
-    if (action === "archive") void (isArchive ? unarchive : archive).mutateAsync(ids)
-    if (action === "trash") void trash.mutateAsync(ids)
-    if (action === "read") void markRead.mutateAsync({ ids, read: !isRead })
-    if (action === "star") void markStarred.mutateAsync({ ids, starred: !isStarred })
+    if (action === "archive")
+      runThreadAction(isArchive ? "unarchive" : "archive")
+    if (action === "trash" && !isTrash) runThreadAction("trash")
+    if (action === "read") runThreadAction(isRead ? "unread" : "read")
+    if (action === "star") runThreadAction(isStarred ? "unstar" : "star")
   }
 
-  function actionDetails(action: SwipeAction) {
+  function actionDetails(action: SwipeAction): {
+    label: string
+    icon: React.ComponentType<{ className?: string }>
+    color: string
+    iconClassName?: string
+  } {
     switch (action) {
-      case "archive": return { label: isArchive ? "Unarchive" : "Archive", icon: isArchive ? RotateCcw : Archive, color: "bg-success text-success-foreground" }
-      case "trash": return { label: "Move to trash", icon: Trash2, color: "bg-destructive text-destructive-foreground" }
-      case "read": return { label: isRead ? "Mark unread" : "Mark read", icon: isRead ? Mail : MailOpen, color: "bg-info text-info-foreground" }
-      case "star": return { label: isStarred ? "Remove star" : "Star", icon: Star, color: "bg-warning text-warning-foreground" }
-      default: return { label: "No action", icon: Mail, color: "bg-muted text-muted-foreground" }
+      case "archive":
+        return {
+          label: isArchive ? "Unarchive" : "Archive",
+          icon: isArchive ? RotateCcw : Archive,
+          color: "bg-success text-success-foreground",
+        }
+      case "trash":
+        return {
+          label: "Move to trash",
+          icon: Trash2,
+          color: "bg-destructive text-destructive-foreground",
+        }
+      case "read":
+        return {
+          label: isRead ? "Mark unread" : "Mark read",
+          icon: isRead ? Mail : MailOpen,
+          color: "bg-info text-info-foreground",
+        }
+      case "star":
+        return {
+          label: isStarred ? "Remove star" : "Star",
+          icon: Star,
+          color: "bg-warning text-warning-foreground",
+          iconClassName: isStarred
+            ? "fill-amber-400 text-amber-400"
+            : undefined,
+        }
+      default:
+        return {
+          label: "No action",
+          icon: Mail,
+          color: "bg-muted text-muted-foreground",
+        }
     }
   }
 
-  const swipeAction = offset > 0 ? preferences?.swipeRightAction ?? "archive" : preferences?.swipeLeftAction ?? "archive"
+  const swipeAction =
+    offset > 0
+      ? (preferences?.swipeRightAction ?? "archive")
+      : (preferences?.swipeLeftAction ?? "archive")
   const swipe = actionDetails(swipeAction)
   const SwipeIcon = swipe.icon
 
-  return <div
-    className="group/action relative min-w-0 overflow-hidden"
-    onClickCapture={event => {
-      if (suppressClick.current) {
-        event.stopPropagation()
-        event.preventDefault()
-        suppressClick.current = false
-      }
-    }}
-    onTouchStart={event => {
-      const touch = event.touches[0]
-      start.current = { x: touch.clientX, y: touch.clientY }
-    }}
-    onTouchMove={event => {
-      if (!start.current) return
-      const touch = event.touches[0]
-      const x = touch.clientX - start.current.x
-      const y = touch.clientY - start.current.y
-      if (Math.abs(x) > 8 && Math.abs(x) > Math.abs(y) * 1.4) {
-        offsetRef.current = Math.max(-100, Math.min(100, x))
-        setOffset(offsetRef.current)
-      }
-    }}
-    onTouchEnd={() => {
-      if (Math.abs(offsetRef.current) >= 70) {
-        suppressClick.current = true
-        run(offsetRef.current > 0 ? preferences?.swipeRightAction ?? "archive" : preferences?.swipeLeftAction ?? "archive")
-        window.setTimeout(() => { suppressClick.current = false }, 400)
-      }
-      start.current = null
-      offsetRef.current = 0
-      setOffset(0)
-    }}
-    onTouchCancel={() => { start.current = null; offsetRef.current = 0; setOffset(0) }}
-  >
-    {offset !== 0 ? <div aria-hidden className={cn("absolute inset-0 flex items-center px-5", offset > 0 ? "justify-start" : "justify-end", swipe.color)}><SwipeIcon className="size-5" /><span className="ms-2 text-xs font-medium">{swipe.label}</span></div> : null}
-    <div className="relative transition-transform duration-150" style={{ transform: `translateX(${offset}px)` }}>{children}</div>
-    <div className="pointer-events-none absolute inset-y-0 end-2 hidden items-center gap-0.5 bg-background/95 ps-2 shadow-[-8px_0_12px_var(--background)] group-hover/action:pointer-events-auto group-hover/action:flex group-has-[:focus-visible]/action:pointer-events-auto group-has-[:focus-visible]/action:flex max-md:!hidden">
-      {(["archive", "trash", "read", "star"] as const).map(action => {
-        const details = actionDetails(action)
-        const Icon = details.icon
-        return <Tooltip key={action}><TooltipTrigger render={<button type="button" aria-label={details.label} disabled={busy} onClick={event => { event.stopPropagation(); run(action) }} className={cn("flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50", action === "trash" ? "hover:bg-destructive/15 hover:text-destructive" : action === "archive" ? "hover:bg-success hover:text-success-foreground" : action === "read" ? "hover:bg-info hover:text-info-foreground" : "hover:bg-warning hover:text-warning-foreground")} />}><Icon className="size-4" /></TooltipTrigger><TooltipContent>{details.label}</TooltipContent></Tooltip>
-      })}
+  return (
+    <div
+      className="group/action relative min-w-0 overflow-hidden"
+      onClickCapture={(event) => {
+        if (suppressClick.current) {
+          event.stopPropagation()
+          event.preventDefault()
+          suppressClick.current = false
+        }
+      }}
+      onTouchStart={(event) => {
+        const touch = event.touches[0]
+        start.current = { x: touch.clientX, y: touch.clientY }
+      }}
+      onTouchMove={(event) => {
+        if (!start.current) return
+        const touch = event.touches[0]
+        const x = touch.clientX - start.current.x
+        const y = touch.clientY - start.current.y
+        if (Math.abs(x) > 8 && Math.abs(x) > Math.abs(y) * 1.4) {
+          offsetRef.current = Math.max(-100, Math.min(100, x))
+          setOffset(offsetRef.current)
+        }
+      }}
+      onTouchEnd={() => {
+        if (Math.abs(offsetRef.current) >= 70) {
+          suppressClick.current = true
+          run(
+            offsetRef.current > 0
+              ? (preferences?.swipeRightAction ?? "archive")
+              : (preferences?.swipeLeftAction ?? "archive")
+          )
+          window.setTimeout(() => {
+            suppressClick.current = false
+          }, 400)
+        }
+        start.current = null
+        offsetRef.current = 0
+        setOffset(0)
+      }}
+      onTouchCancel={() => {
+        start.current = null
+        offsetRef.current = 0
+        setOffset(0)
+      }}
+    >
+      {offset !== 0 ? (
+        <div
+          aria-hidden
+          className={cn(
+            "absolute inset-0 flex items-center px-5",
+            offset > 0 ? "justify-start" : "justify-end",
+            swipe.color
+          )}
+        >
+          <SwipeIcon className="size-5" />
+          <span className="ms-2 text-xs font-medium">{swipe.label}</span>
+        </div>
+      ) : null}
+      <div
+        className="relative transition-transform duration-150"
+        style={{ transform: `translateX(${offset}px)` }}
+      >
+        {children}
+      </div>
+      <div className="pointer-events-none absolute inset-y-0 end-2 hidden items-center gap-0.5 bg-background/95 ps-2 shadow-[-8px_0_12px_var(--background)] group-hover/action:pointer-events-auto group-hover/action:flex group-has-[:focus-visible]/action:pointer-events-auto group-has-[:focus-visible]/action:flex max-md:!hidden">
+        {(["archive", "trash", "read", "star"] as const)
+          .filter((action) => !(action === "trash" && isTrash))
+          .map((action) => {
+            const details = actionDetails(action)
+            const Icon = details.icon
+            return (
+              <Tooltip key={action}>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label={details.label}
+                      disabled={busy}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        run(action)
+                      }}
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-full transition-colors focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50",
+                        action === "trash"
+                          ? "hover:bg-destructive/15 hover:text-destructive"
+                          : action === "archive"
+                            ? "hover:bg-success hover:text-success-foreground"
+                            : action === "read"
+                              ? "hover:bg-info hover:text-info-foreground"
+                              : "hover:bg-warning hover:text-warning-foreground"
+                      )}
+                    />
+                  }
+                >
+                  <Icon className={cn("size-4", details.iconClassName)} />
+                </TooltipTrigger>
+                <TooltipContent>{details.label}</TooltipContent>
+              </Tooltip>
+            )
+          })}
+      </div>
     </div>
-  </div>
+  )
 }
 
 // -- Shared row pieces -------------------------------------------------------
@@ -322,6 +475,8 @@ interface RowProps {
   selected: boolean
   density: ListDensity
   showSnippets: boolean
+  rowStyle: RowStyle
+  unreadStyle: UnreadStyle
   narrow: boolean
   language: Language
   onSelect: (e: React.MouseEvent) => void
@@ -402,7 +557,13 @@ function RowAvatar({
   )
 }
 
-function RowBadges({ email, narrow = false }: { email: EmailProperties; narrow?: boolean }) {
+function RowBadges({
+  email,
+  narrow = false,
+}: {
+  email: EmailProperties
+  narrow?: boolean
+}) {
   const labelsEnabled = useFeatureFlag("mail.labels")
   return (
     <>
@@ -417,18 +578,43 @@ function RowBadges({ email, narrow = false }: { email: EmailProperties; narrow?:
   )
 }
 
+/**
+ * Row surface colors. Featured/selected states win. With the `fill` unread
+ * style, unread rows get a tinted fill and read rows a muted one (Gmail-like);
+ * otherwise rows stay transparent until hovered.
+ */
 function rowBackground({
   featured,
   selected,
+  isUnread,
+  unreadStyle,
 }: {
   featured: boolean
   selected: boolean
+  isUnread: boolean
+  unreadStyle: UnreadStyle
 }) {
-  return featured
-    ? "bg-accent"
-    : selected
-      ? "bg-accent/40"
-      : "hover:bg-muted/60"
+  if (featured) return "bg-accent"
+  if (selected) return "bg-accent/40"
+  if (unreadStyle === "fill") {
+    return isUnread
+      ? "bg-primary/[0.07] hover:bg-primary/[0.11]"
+      : "bg-muted/40 hover:bg-muted/70"
+  }
+  return "hover:bg-muted/60"
+}
+
+/** Colored dot marking an unread conversation (the `dot` unread style). */
+function UnreadDot({ isUnread }: { isUnread: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "size-2 shrink-0 rounded-full",
+        isUnread ? "bg-primary" : "bg-transparent"
+      )}
+    />
+  )
 }
 
 // -- Gmail: single-line rows with avatar -------------------------------------
@@ -446,7 +632,12 @@ function GmailRow(props: RowProps) {
       className={cn(
         "group/row flex w-full min-w-0 items-center gap-2 overflow-hidden border-b px-3 text-sm transition-colors",
         density === "compact" ? "py-1" : density === "cozy" ? "py-1.5" : "py-2",
-        rowBackground(props)
+        rowBackground({
+          featured: props.featured,
+          selected: props.selected,
+          isUnread,
+          unreadStyle: props.unreadStyle,
+        })
       )}
     >
       <RowCheckbox
@@ -484,6 +675,7 @@ function GmailRow(props: RowProps) {
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {time ? formatRelative(time, props.language) : ""}
         </span>
+        {props.unreadStyle === "dot" ? <UnreadDot isUnread={isUnread} /> : null}
       </button>
     </div>
   )
@@ -508,10 +700,15 @@ function OutlookRow(props: RowProps) {
           : density === "cozy"
             ? "py-2"
             : "py-2.5",
-        rowBackground(props)
+        rowBackground({
+          featured: props.featured,
+          selected: props.selected,
+          isUnread,
+          unreadStyle: props.unreadStyle,
+        })
       )}
     >
-      {isUnread ? (
+      {isUnread && props.unreadStyle === "dot" ? (
         <span
           aria-hidden
           className="absolute top-1 bottom-1 left-0 w-0.5 rounded-full bg-primary"
@@ -587,7 +784,12 @@ function MinimalRow(props: RowProps) {
       <div
         className={cn(
           "group/row flex w-full min-w-0 items-center gap-2 overflow-hidden border-b px-3 py-1.5 text-sm transition-colors",
-          rowBackground(props)
+          rowBackground({
+            featured: props.featured,
+            selected: props.selected,
+            isUnread,
+            unreadStyle: props.unreadStyle,
+          })
         )}
       >
         <RowCheckbox
@@ -626,7 +828,9 @@ function MinimalRow(props: RowProps) {
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
-          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", isUnread ? "bg-primary" : "bg-transparent")} />
+          {props.unreadStyle === "dot" ? (
+            <UnreadDot isUnread={isUnread} />
+          ) : null}
         </button>
       </div>
     )
@@ -637,7 +841,12 @@ function MinimalRow(props: RowProps) {
       className={cn(
         "group/row flex w-full min-w-0 items-start gap-2 overflow-hidden border-b px-3 transition-colors",
         density === "cozy" ? "py-1.5" : "py-2.5",
-        rowBackground(props)
+        rowBackground({
+          featured: props.featured,
+          selected: props.selected,
+          isUnread,
+          unreadStyle: props.unreadStyle,
+        })
       )}
     >
       <RowCheckbox
@@ -664,7 +873,9 @@ function MinimalRow(props: RowProps) {
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
-          <span aria-hidden className={cn("size-2 shrink-0 rounded-full", isUnread ? "bg-primary" : "bg-transparent")} />
+          {props.unreadStyle === "dot" ? (
+            <UnreadDot isUnread={isUnread} />
+          ) : null}
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <span

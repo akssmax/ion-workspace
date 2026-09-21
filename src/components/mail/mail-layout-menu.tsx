@@ -21,14 +21,12 @@ import {
   TooltipContent,
 } from "@/components/ui/tooltip"
 import { cn } from "cn"
-import {
-  useInboxLayout,
-  useSaveInboxLayout,
-} from "@/queries/preferences"
+import { useInboxLayout, useSaveInboxLayout } from "@/queries/preferences"
 import type {
   ListDensity,
   ReadingPanePosition,
   RowStyle,
+  UnreadStyle,
 } from "@/lib/inbox-layout"
 
 const READING_PANE_OPTIONS: {
@@ -111,6 +109,16 @@ const ROW_STYLE_OPTIONS: {
       </span>
     ),
   },
+]
+
+const UNREAD_STYLE_OPTIONS: {
+  value: UnreadStyle
+  title: string
+  hint: string
+}[] = [
+  { value: "dot", title: "Dot", hint: "Colored dot marks unread" },
+  { value: "fill", title: "Fill", hint: "Tint read and unread rows" },
+  { value: "none", title: "None", hint: "Bold text only" },
 ]
 
 export function MailLayoutControls({ compact = false }: { compact?: boolean }) {
@@ -220,6 +228,34 @@ export function MailLayoutControls({ compact = false }: { compact?: boolean }) {
         </div>
       </section>
 
+      <section className={section}>
+        <Label>Read/unread style</Label>
+        <div className={cn("grid", grid)}>
+          {UNREAD_STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              aria-pressed={layout.unreadStyle === opt.value}
+              onClick={() => void save.mutateAsync({ unreadStyle: opt.value })}
+              className={cn(
+                "flex flex-col items-center border text-center transition-colors",
+                card,
+                layout.unreadStyle === opt.value
+                  ? "border-primary/60 bg-accent"
+                  : "hover:bg-muted/60"
+              )}
+            >
+              <span className={title}>{opt.title}</span>
+              {compact ? null : (
+                <span className="text-[11px] leading-tight text-muted-foreground">
+                  {opt.hint}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section
         className={cn(
           "flex items-center justify-between gap-4",
@@ -254,7 +290,11 @@ export function MailLayoutMenu() {
           render={
             <PopoverTrigger
               render={
-                <Button variant="ghost" size="icon-sm" aria-label="Mail layout" />
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Mail layout"
+                />
               }
             />
           }

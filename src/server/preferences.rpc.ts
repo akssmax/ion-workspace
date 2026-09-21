@@ -31,6 +31,7 @@ export interface UserPreferences {
   listDensity?: InboxLayoutPrefs["listDensity"]
   showSnippets?: boolean
   rowStyle?: InboxLayoutPrefs["rowStyle"]
+  unreadStyle?: InboxLayoutPrefs["unreadStyle"]
   mailSortByMailbox?: Record<string, MailSort>
   /** Feature-flag overrides: feature id -> enabled. Absent = registry default. */
   features?: Record<string, boolean>
@@ -48,15 +49,23 @@ export interface UserPreferences {
   tagAppearance?: Record<string, { color?: string; icon?: string }>
 }
 
-function scope(session: { userId: string; accountId?: string }): [string, string] {
+function scope(session: {
+  userId: string
+  accountId?: string
+}): [string, string] {
   return [session.userId, session.accountId ?? "primary"]
 }
 
-async function readStoredPreferences(session: { userId: string; accountId?: string; prefs?: unknown }): Promise<UserPreferences> {
+async function readStoredPreferences(session: {
+  userId: string
+  accountId?: string
+  prefs?: unknown
+}): Promise<UserPreferences> {
   const database = mailMetadataPool()
   if (!database) return session.prefs ?? {}
   const result = await database.query<{ data: UserPreferences }>(
-    "SELECT data FROM user_preferences WHERE user_id = $1 AND account_id = $2", scope(session)
+    "SELECT data FROM user_preferences WHERE user_id = $1 AND account_id = $2",
+    scope(session)
   )
   if (result.rows[0]) return result.rows[0].data
   const previous = (session.prefs as UserPreferences | undefined) ?? {}
@@ -82,7 +91,8 @@ export const savePreferences = createServerFn({ method: "POST" })
   .handler(async ({ data }: { data?: UserPreferences }) => {
     const session = await requireSession()
     const preferences = data ?? {}
-    if (JSON.stringify(preferences).length > 32000) throw new Error("Preferences are too large.")
+    if (JSON.stringify(preferences).length > 32000)
+      throw new Error("Preferences are too large.")
     const database = mailMetadataPool()
     if (database) {
       await database.query(
