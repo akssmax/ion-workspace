@@ -7,8 +7,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { getPreferences, savePreferences } from "../server/preferences.rpc"
 import type { UserPreferences } from "../server/preferences.rpc"
-import { resolveInboxLayout  } from "../lib/inbox-layout"
-import type {InboxLayoutPrefs} from "../lib/inbox-layout";
+import { resolveInboxLayout } from "../lib/inbox-layout"
+import type { InboxLayoutPrefs } from "../lib/inbox-layout"
+import { resolveNotificationPrefs } from "../lib/notifications"
+import type { NotificationPreferences } from "../lib/notifications"
 import { isDemoRuntime } from "@/lib/demo/runtime"
 
 import { qk } from "./keys"
@@ -36,6 +38,12 @@ export function useInboxLayout(): InboxLayoutPrefs {
   return resolveInboxLayout(data)
 }
 
+/** Resolved notification preferences (server prefs merged over defaults). */
+export function useNotificationPrefs(): NotificationPreferences {
+  const { data } = usePreferences()
+  return resolveNotificationPrefs(data?.notifications)
+}
+
 /**
  * Persist an arbitrary partial preferences patch (feature flags, language,
  * …). Merges over the cached prefs so unrelated settings are preserved.
@@ -44,11 +52,12 @@ export function useInboxLayout(): InboxLayoutPrefs {
 export function useSavePreferences() {
   const queryClient = useQueryClient()
   const { data: session } = useSession()
-  const key = qk.preferences(`${session?.userId ?? "signed-out"}:${session?.accountId ?? "primary"}`)
+  const key = qk.preferences(
+    `${session?.userId ?? "signed-out"}:${session?.accountId ?? "primary"}`
+  )
   return useMutation({
     mutationFn: async (patch: Partial<UserPreferences>) => {
-      const current =
-        queryClient.getQueryData<UserPreferences>(key) ?? {}
+      const current = queryClient.getQueryData<UserPreferences>(key) ?? {}
       const merged: UserPreferences = {
         ...current,
         ...patch,
@@ -63,9 +72,7 @@ export function useSavePreferences() {
     },
     onMutate: async (patch) => {
       await queryClient.cancelQueries({ queryKey: key })
-      const previous = queryClient.getQueryData<UserPreferences>(
-        key
-      )
+      const previous = queryClient.getQueryData<UserPreferences>(key)
       const merged: UserPreferences = {
         ...previous,
         ...patch,
@@ -92,11 +99,12 @@ export function useSavePreferences() {
 export function useSaveInboxLayout() {
   const queryClient = useQueryClient()
   const { data: session } = useSession()
-  const key = qk.preferences(`${session?.userId ?? "signed-out"}:${session?.accountId ?? "primary"}`)
+  const key = qk.preferences(
+    `${session?.userId ?? "signed-out"}:${session?.accountId ?? "primary"}`
+  )
   return useMutation({
     mutationFn: async (patch: Partial<InboxLayoutPrefs>) => {
-      const current =
-        queryClient.getQueryData<UserPreferences>(key) ?? {}
+      const current = queryClient.getQueryData<UserPreferences>(key) ?? {}
       const merged: UserPreferences = {
         ...current,
         ...resolveInboxLayout(current),
@@ -111,9 +119,7 @@ export function useSaveInboxLayout() {
     },
     onMutate: async (patch) => {
       await queryClient.cancelQueries({ queryKey: key })
-      const previous = queryClient.getQueryData<UserPreferences>(
-        key
-      )
+      const previous = queryClient.getQueryData<UserPreferences>(key)
       const merged: UserPreferences = {
         ...previous,
         ...resolveInboxLayout(previous),

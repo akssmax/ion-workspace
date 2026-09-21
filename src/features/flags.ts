@@ -5,6 +5,7 @@
  * default. Writes are optimistic via `useSavePreferences`.
  */
 
+import { useMemo } from "react"
 import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { getFeature, listFeatures } from "./registry"
 
@@ -19,11 +20,14 @@ export function useFeatureFlag(id: string): boolean {
 /** All registered features with their resolved enabled state. */
 export function useFeatureFlags(): Record<string, boolean> {
   const { data } = usePreferences()
-  const out: Record<string, boolean> = {}
-  for (const def of listFeatures()) {
-    out[def.id] = data?.features?.[def.id] ?? def.defaultEnabled
-  }
-  return out
+  const features = data?.features
+  return useMemo(() => {
+    const out: Record<string, boolean> = {}
+    for (const def of listFeatures()) {
+      out[def.id] = features?.[def.id] ?? def.defaultEnabled
+    }
+    return out
+  }, [features])
 }
 
 /** Toggle a feature flag (optimistic, persisted via preferences RPC). */

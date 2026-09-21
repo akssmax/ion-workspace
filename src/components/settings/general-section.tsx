@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { usePreferences, useSavePreferences } from "@/queries/preferences"
 import { useWorkspaceStore } from "@/stores/workspace.store"
 import type { WorkspaceApp } from "@/stores/workspace.store"
-import { SaveState, SettingRow } from "./settings-page"
+import { SaveState, SettingRow } from "./setting-row"
 import { SettingsGroup } from "./settings-group"
 import { LANGUAGES, useLanguage } from "@/lib/language"
 

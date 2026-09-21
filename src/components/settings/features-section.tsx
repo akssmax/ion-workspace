@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { listFeatures } from "@/features/registry"
 import { useFeatureFlags, useSetFeatureFlag } from "@/features/flags"
 import { settingsSections, useContributions } from "@/features/contributions"
-import { SaveState } from "./settings-page"
+import { SaveState } from "./setting-row"
 
 export function FeaturesSection() {
   const flags = useFeatureFlags()

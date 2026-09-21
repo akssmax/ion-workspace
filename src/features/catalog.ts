@@ -7,6 +7,7 @@
  */
 
 import { defineFeature } from "./registry"
+import "@/modules/system/notifications"
 
 export const MAILBOXES_FEATURE = defineFeature({
   id: "mail.mailboxes",
@@ -41,4 +42,13 @@ export const UPCOMING_ISLAND_FEATURE = defineFeature({
     "A Dynamic Island–style pill in the mail header for live and upcoming meetings.",
   defaultEnabled: true,
   apps: ["mail", "calendar"],
+})
+
+export const NOTIFICATIONS_FEATURE = defineFeature({
+  id: "system.notifications",
+  title: "Notifications",
+  description:
+    "Desktop and in-app alerts for new mail and upcoming calendar events.",
+  defaultEnabled: true,
+  apps: ["system", "mail", "calendar"],
 })

@@ -1,5 +1,6 @@
 /**
- * JMAP Contacts namespace API (RFC 9739).
+ * JMAP Contacts namespace API (RFC 9610). Contacts are JSContact Cards
+ * ("ContactCard") on the wire and are mapped to the app's flatter shape.
  */
 
 import type { JmapClient } from "./JmapClient"
@@ -14,6 +15,12 @@ import type {
   ContactSetResponse,
   ContactSortComparator,
   JmapId,
+  JsContactCard,
+} from "../types/contacts"
+import {
+  contactFromJsContact,
+  contactToJsContactCreate,
+  contactToJsContactPatch,
 } from "../types/contacts"
 
 export interface ContactQueryOptions {
@@ -64,11 +71,11 @@ export class ContactsApi {
     accountId?: string
   ): Promise<{ queryState: string; ids: JmapId[]; total?: number }> {
     const res = await this.client.call<ContactQueryResponse>(
-      "Contact/query",
+      "ContactCard/query",
       {
         accountId: this.acct(accountId),
         filter,
-        sort: options.sort ?? [{ property: "fn", isAscending: true }],
+        ...(options.sort ? { sort: options.sort } : {}),
         position: options.position,
         limit: options.limit ?? null,
         calculateTotal: options.calculateTotal,
@@ -94,26 +101,25 @@ export class ContactsApi {
       [
         {
           id: qid,
-          method: "Contact/query",
+          method: "ContactCard/query",
           args: {
             accountId: acc,
             filter: { text },
-            sort: [{ property: "fn", isAscending: true }],
             limit: options.limit ?? 25,
             calculateTotal: true,
           },
         },
         {
           id: gid,
-          method: "Contact/get",
+          method: "ContactCard/get",
           args: { accountId: acc, ids: [`#${qid}`] },
-          resultOf: { callId: qid, name: "Contact/query", path: "/ids/*" },
+          resultOf: { callId: qid, name: "ContactCard/query", path: "/ids/*" },
         },
       ],
       { accountId: acc }
     )
     const get = res.get<ContactGetResponse>(gid)
-    return get.list
+    return visibleContacts(get.list)
   }
 
   async getContactsByIds(
@@ -121,11 +127,11 @@ export class ContactsApi {
     accountId?: string
   ): Promise<Contact[]> {
     const res = await this.client.call<ContactGetResponse>(
-      "Contact/get",
+      "ContactCard/get",
       { accountId: this.acct(accountId), ids },
       "cg0"
     )
-    return res.list
+    return visibleContacts(res.list)
   }
 
   async getAllContacts(
@@ -140,24 +146,24 @@ export class ContactsApi {
       [
         {
           id: qid,
-          method: "Contact/query",
+          method: "ContactCard/query",
           args: {
             accountId: acc,
-            sort: options.sort ?? [{ property: "fn", isAscending: true }],
+            ...(options.sort ? { sort: options.sort } : {}),
             limit: options.limit,
           },
         },
         {
           id: gid,
-          method: "Contact/get",
+          method: "ContactCard/get",
           args: { accountId: acc, ids: [`#${qid}`] },
-          resultOf: { callId: qid, name: "Contact/query", path: "/ids/*" },
+          resultOf: { callId: qid, name: "ContactCard/query", path: "/ids/*" },
         },
       ],
       { accountId: acc }
     )
     const get = res.get<ContactGetResponse>(gid)
-    return get.list
+    return visibleContacts(get.list)
   }
 
   async createContact(
@@ -165,13 +171,23 @@ export class ContactsApi {
     accountId?: string
   ): Promise<string> {
     const acc = this.acct(accountId)
-    const args: ContactSetArgs = { accountId: acc, create: { c0: contact } }
+    const args: ContactSetArgs = {
+      accountId: acc,
+      create: { c0: contactToJsContactCreate(contact) },
+    }
     const res = await this.client.call<ContactSetResponse>(
-      "Contact/set",
+      "ContactCard/set",
       args,
       "csnew"
     )
-    return Object.values(res.created ?? {})[0]?.id ?? ""
+    if (res.notCreated?.c0)
+      throw new Error(res.notCreated.c0.description ?? res.notCreated.c0.type)
+    const id = res.created?.c0.id
+    if (!id)
+      throw new Error(
+        "The contact server did not confirm the contact was created."
+      )
+    return id
   }
 
   async updateContact(
@@ -180,14 +196,31 @@ export class ContactsApi {
     accountId?: string
   ): Promise<void> {
     const acc = this.acct(accountId)
-    const args: ContactSetArgs = { accountId: acc, update: { [id]: patch } }
-    await this.client.call<ContactSetResponse>("Contact/set", args, "csupd")
+    const args: ContactSetArgs = {
+      accountId: acc,
+      update: { [id]: contactToJsContactPatch(patch) },
+    }
+    const res = await this.client.call<ContactSetResponse>(
+      "ContactCard/set",
+      args,
+      "csupd"
+    )
+    if (res.notUpdated?.[id])
+      throw new Error(res.notUpdated[id].description ?? res.notUpdated[id].type)
   }
 
   async destroyContact(id: JmapId, accountId?: string): Promise<void> {
     const acc = this.acct(accountId)
     const args: ContactSetArgs = { accountId: acc, destroy: [id] }
-    await this.client.call<ContactSetResponse>("Contact/set", args, "csdel")
+    const res = await this.client.call<ContactSetResponse>(
+      "ContactCard/set",
+      args,
+      "csdel"
+    )
+    if (res.notDestroyed?.[id])
+      throw new Error(
+        res.notDestroyed[id].description ?? res.notDestroyed[id].type
+      )
   }
 
   async getGroups(accountId?: string): Promise<ContactGroup[]> {
@@ -198,6 +231,21 @@ export class ContactsApi {
     )
     return res.list
   }
+}
+
+/**
+ * Map wire ContactCards to the app's contact shape, dropping group cards
+ * (which this UI does not surface) and sorting by display name.
+ */
+function visibleContacts(cards: JsContactCard[]): Contact[] {
+  return cards
+    .filter((card) => card.kind !== "group")
+    .map(contactFromJsContact)
+    .sort((a, b) =>
+      (a.fn ?? "").localeCompare(b.fn ?? "", undefined, {
+        sensitivity: "base",
+      })
+    )
 }
 
 export type {

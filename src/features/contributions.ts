@@ -7,7 +7,8 @@
  * out contributions from disabled features.
  */
 
-import type { ComponentType } from "react"
+import { useMemo } from "react"
+import type { ComponentType, ReactNode } from "react"
 import { useFeatureFlags } from "./flags"
 
 export interface Contribution<T> {
@@ -19,6 +20,20 @@ export class ContributionPoint<T> {
   private readonly entries: Contribution<T>[] = []
 
   register(featureId: string, value: T): void {
+    // Idempotent for values carrying an `id`: HMR re-runs module registration
+    // against this long-lived singleton, so replace instead of duplicating.
+    const id = (value as { id?: string } | null)?.id
+    if (id) {
+      const index = this.entries.findIndex(
+        (entry) =>
+          entry.featureId === featureId &&
+          (entry.value as { id?: string } | null)?.id === id
+      )
+      if (index !== -1) {
+        this.entries[index] = { featureId, value }
+        return
+      }
+    }
     this.entries.push({ featureId, value })
   }
 
@@ -51,11 +66,22 @@ export interface ShortcutContribution {
   run: () => void
 }
 
+/** A deep-linkable settings section contributed by a feature. */
+export interface SettingsNavContribution {
+  /** URL-safe id, used as `?section=<id>`. Must be unique. */
+  id: string
+  title: string
+  description: string
+  /** Nav group label; unknown groups sort after known ones. */
+  group: string
+  icon: ReactNode
+  component: ComponentContribution
+}
+
 // -- Points -----------------------------------------------------------------
 
 /** Extra actions in the mail toolbar (next to archive/trash/…). */
-export const mailToolbarActions =
-  new ContributionPoint<ComponentContribution>()
+export const mailToolbarActions = new ContributionPoint<ComponentContribution>()
 
 /** Extra actions in the thread reading-pane header. */
 export const threadActions = new ContributionPoint<ComponentContribution>()
@@ -65,6 +91,10 @@ export const sidebarSections = new ContributionPoint<ComponentContribution>()
 
 /** Extra sections in the settings dialog. */
 export const settingsSections = new ContributionPoint<ComponentContribution>()
+
+/** Extra deep-linkable sections in the settings nav. */
+export const settingsNavSections =
+  new ContributionPoint<SettingsNavContribution>()
 
 /** Extra command-palette actions. */
 export const paletteItems = new ContributionPoint<PaletteContribution>()
@@ -77,8 +107,12 @@ export const featureShortcuts = new ContributionPoint<ShortcutContribution>()
 /** Contributions from enabled features only. */
 export function useContributions<T>(point: ContributionPoint<T>): T[] {
   const flags = useFeatureFlags()
-  return point
-    .all()
-    .filter((c) => flags[c.featureId] ?? false)
-    .map((c) => c.value)
+  return useMemo(
+    () =>
+      point
+        .all()
+        .filter((c) => flags[c.featureId] ?? false)
+        .map((c) => c.value),
+    [point, flags]
+  )
 }

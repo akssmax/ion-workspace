@@ -7,6 +7,7 @@
  */
 
 import type {
+  EmailChangesResponse,
   EmailProperties,
   Identity,
   JmapId,
@@ -140,6 +141,25 @@ export async function getEmailsByIds(
     if (!accountId) return []
     client.mail.bindAccount(accountId)
     return client.mail.getEmailByIds(ids, { properties }, accountId)
+  } catch (error) {
+    throw toAppError(error)
+  }
+}
+
+/**
+ * Fetch changes for the Email type since a state. Used by live updates and
+ * notifications to discover newly created messages.
+ */
+export async function emailChanges(
+  sinceState?: string
+): Promise<EmailChangesResponse> {
+  try {
+    const client = await getJmapClient()
+    const accountId = await getPrimaryAccountId()
+    if (!accountId)
+      throw new AppError("accountNotFound", "No primary mail account found.")
+    client.mail.bindAccount(accountId)
+    return client.mail.changes(sinceState, accountId)
   } catch (error) {
     throw toAppError(error)
   }
@@ -280,10 +300,15 @@ export async function emptyTrash(): Promise<number> {
   let removed = 0
   const seen = new Set<string>()
   for (;;) {
-    const page = await client.mail.queryEmails(trash.id, { filter: { inMailbox: trash.id }, collapseThreads: false, limit: 100 }, accountId)
+    const page = await client.mail.queryEmails(
+      trash.id,
+      { filter: { inMailbox: trash.id }, collapseThreads: false, limit: 100 },
+      accountId
+    )
     if (!page.ids.length) return removed
-    if (page.ids.some(id => seen.has(id))) throw new Error("Trash changed during deletion. Refresh and try again.")
-    page.ids.forEach(id => seen.add(id))
+    if (page.ids.some((id) => seen.has(id)))
+      throw new Error("Trash changed during deletion. Refresh and try again.")
+    page.ids.forEach((id) => seen.add(id))
     await client.mail.destroyEmails(page.ids, accountId)
     removed += page.ids.length
   }

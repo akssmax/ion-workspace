@@ -52,7 +52,7 @@ import {
   useMarkNotJunk,
   useDownloadAttachment,
 } from "@/queries/mail"
-import { useThreadActionRunner } from "@/hooks/use-thread-actions"
+import { useThreadActionRunner } from "@/components/mail/thread-actions"
 import { downloadAttachment } from "@/services/mail/mail.service"
 import { threadActions, useContributions } from "@/features/contributions"
 import {
@@ -644,7 +644,7 @@ function EmailCard({
   const downloadOriginal = useDownloadAttachment()
   const subject = email.subject || "(no subject)"
   const time = email.receivedAt ?? email.sentAt
-  const attachments = attachmentsOf(email)
+  const attachments = useMemo(() => attachmentsOf(email), [email])
   const sender = email.from?.[0]?.email.toLowerCase() ?? ""
   const imagesAllowed =
     loadImages ||
@@ -680,9 +680,10 @@ function EmailCard({
 
   const [cidUrls, setCidUrls] = useState<Record<string, string>>({})
   useEffect(() => {
+    if (!expanded) return
     const entries = Object.entries(cidSources)
     if (!entries.length) {
-      setCidUrls({})
+      setCidUrls((prev) => (Object.keys(prev).length ? {} : prev))
       return
     }
     const cancelled = { current: false }
@@ -703,7 +704,7 @@ function EmailCard({
       cancelled.current = true
       for (const url of created) URL.revokeObjectURL(url)
     }
-  }, [cidSources])
+  }, [cidSources, expanded])
 
   const safeBody = useMemo(() => {
     const raw = renderEmailBody(email)
@@ -711,7 +712,11 @@ function EmailCard({
       ? rewriteCidImages(raw, (cid) => cidUrls[cid.replace(/[<>]/g, "")])
       : raw
   }, [email, cidUrls])
-  const blocked = blockRemoteImages(safeBody)
+  const blocked = useMemo(() => blockRemoteImages(safeBody), [safeBody])
+  const renderedBody = useMemo(
+    () => collapseQuotedSections(imagesAllowed ? safeBody : blocked.html),
+    [imagesAllowed, safeBody, blocked.html]
+  )
 
   function printMessage() {
     const printable = window.open("", "_blank")
@@ -856,11 +861,7 @@ function EmailCard({
             ) : null}
             <div
               className="email-body min-w-0 px-4 py-3"
-              dangerouslySetInnerHTML={{
-                __html: collapseQuotedSections(
-                  imagesAllowed ? safeBody : blocked.html
-                ),
-              }}
+              dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
 
             {attachments.length ? (

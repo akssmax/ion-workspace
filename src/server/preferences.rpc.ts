@@ -15,6 +15,7 @@ import { createServerFn } from "@tanstack/react-start"
 import { getSession, requireSession, updateSession } from "./session.server"
 import { mailMetadataPool } from "./mail-metadata.server"
 import type { InboxLayoutPrefs } from "../lib/inbox-layout"
+import type { NotificationPreferences } from "../lib/notifications"
 import type { MailSort } from "../lib/mail-list"
 
 export interface UserPreferences {
@@ -32,6 +33,7 @@ export interface UserPreferences {
   showSnippets?: boolean
   rowStyle?: InboxLayoutPrefs["rowStyle"]
   unreadStyle?: InboxLayoutPrefs["unreadStyle"]
+  notifications?: NotificationPreferences
   mailSortByMailbox?: Record<string, MailSort>
   /** Feature-flag overrides: feature id -> enabled. Absent = registry default. */
   features?: Record<string, boolean>

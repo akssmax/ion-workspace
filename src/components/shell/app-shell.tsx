@@ -17,6 +17,7 @@ import { FilesView } from "../files/files-view"
 import { ComposeDock } from "../mail/composer"
 import { SendStatusPill } from "../mail/send-status"
 import { Toaster } from "@/components/ui/sonner"
+import { NotificationsBridge } from "@/modules/system/notifications"
 
 export function AppShell() {
   const app = useWorkspaceStore((s) => s.app)
@@ -41,6 +42,7 @@ export function AppShell() {
       <ComposeDock />
       <SendStatusPill />
       <Toaster position="bottom-left" />
+      <NotificationsBridge />
       <KeyboardShortcuts />
     </SidebarProvider>
   )

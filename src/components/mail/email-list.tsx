@@ -18,7 +18,7 @@
  * - `none` — only the sender/subject font weight differs.
  */
 
-import { useEffect, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   Star,
   Paperclip,
@@ -32,11 +32,17 @@ import {
   SearchX,
 } from "lucide-react"
 import { cn } from "cn"
-import type { EmailProperties } from "@/jmap/types/mail"
+import type { EmailProperties, Mailbox } from "@/jmap/types/mail"
 import { useMailStore } from "@/stores/mail.store"
 import { useComposerStore } from "@/stores/composer.store"
-import { useEmails, useMailboxes } from "@/queries/mail"
-import { useThreadActionRunner } from "@/hooks/use-thread-actions"
+import {
+  MAIL_PAGE_SIZE,
+  useEmails,
+  useMailboxes,
+  usePrefetchEmails,
+  usePrefetchThread,
+} from "@/queries/mail"
+import { useThreadActionRunner } from "@/components/mail/thread-actions"
 import { usePreferences } from "@/queries/preferences"
 import type { UserPreferences } from "@/server/preferences.rpc"
 import { senderName, emailHasAttachments } from "@/lib/html"
@@ -59,7 +65,7 @@ import {
 import { parseSearch } from "@/lib/search"
 import type { ListDensity, RowStyle, UnreadStyle } from "@/lib/inbox-layout"
 import { useFeatureFlag } from "@/features/flags"
-import { LabelChips } from "@/modules/mail/labels"
+import { LabelChips, labelsOf } from "@/modules/mail/labels"
 import { useLanguage } from "@/lib/language"
 import type { Language } from "@/lib/language"
 import type { MailQuickFilter, MailSort } from "@/lib/mail-list"
@@ -109,6 +115,41 @@ export function EmailList({
     mailboxes?.some(
       (mailbox) => mailbox.id === mailboxId && mailbox.role === "trash"
     ) ?? false
+  const labelsEnabled = useFeatureFlag("mail.labels")
+  const tagAppearance = preferences?.tagAppearance
+  const labelMailboxes = useMemo(() => labelsOf(mailboxes ?? []), [mailboxes])
+  const selectedSet = useMemo(
+    () => new Set(selectedThreadIds),
+    [selectedThreadIds]
+  )
+
+  // Read the latest selection from a ref so the row callback stays stable and
+  // memoized rows don't re-render when unrelated selection changes.
+  const rowStateRef = useRef({ selectedThreadIds, featuredThreadId })
+  rowStateRef.current = { selectedThreadIds, featuredThreadId }
+  const onRowClick = useCallback(
+    (row: EmailProperties, e: React.MouseEvent) => {
+      const threadId = row.threadId
+      const { selectedThreadIds: selected, featuredThreadId: featured } =
+        rowStateRef.current
+      if (e.shiftKey) {
+        const anchor = selected.at(-1) ?? featured ?? threadId
+        selectRange(anchor, threadId)
+        return
+      }
+      if (e.ctrlKey || e.metaKey) {
+        toggleThreadSelection(threadId)
+        return
+      }
+      // Drafts reopen in the composer instead of the reading pane.
+      if (row.keywords?.$draft) {
+        openCompose({ mode: "draft", draftEmailId: row.id })
+        return
+      }
+      setFocusedThread(threadId)
+    },
+    [selectRange, toggleThreadSelection, openCompose, setFocusedThread]
+  )
 
   const parsed = parseSearch(query)
   const scope = {
@@ -121,6 +162,16 @@ export function EmailList({
     quickFilters,
   }
   const emails = useEmails(scope, page)
+  const prefetchThread = usePrefetchThread()
+  const prefetchEmails = usePrefetchEmails(scope)
+
+  // Warm the next page once the current one has rendered (search sets are
+  // transient, so only prefetch for the normal mailbox listing).
+  useEffect(() => {
+    if (query) return
+    const total = emails.data?.total ?? 0
+    if (total > (page + 1) * MAIL_PAGE_SIZE) prefetchEmails(page + 1)
+  }, [emails.data?.total, page, prefetchEmails, query])
 
   // Switching mailbox or editing the query drops stale selection.
   useEffect(() => {
@@ -211,25 +262,6 @@ export function EmailList({
     )
   }
 
-  function onRowClick(row: EmailProperties, e: React.MouseEvent) {
-    const threadId = row.threadId
-    if (e.shiftKey) {
-      const anchor = selectedThreadIds.at(-1) ?? featuredThreadId ?? threadId
-      selectRange(anchor, threadId)
-      return
-    }
-    if (e.ctrlKey || e.metaKey) {
-      toggleThreadSelection(threadId)
-      return
-    }
-    // Drafts reopen in the composer instead of the reading pane.
-    if (row.keywords?.$draft) {
-      openCompose({ mode: "draft", draftEmailId: row.id })
-      return
-    }
-    setFocusedThread(threadId)
-  }
-
   return (
     <div className="h-full min-w-0 overflow-x-hidden overflow-y-auto">
       {emails.data?.state === "offline" ? (
@@ -242,19 +274,21 @@ export function EmailList({
       ) : null}
       {rows.map((row) => {
         const threadId = row.threadId
-        const selected = selectedThreadIds.includes(threadId)
         const shared = {
           email: row,
           featured: !!featuredThreadId && featuredThreadId === threadId,
-          selected,
+          selected: selectedSet.has(threadId),
           density,
           showSnippets,
           rowStyle,
           unreadStyle,
           narrow,
           language,
-          onSelect: (e: React.MouseEvent) => onRowClick(row, e),
-          onToggleSelect: () => toggleThreadSelection(threadId),
+          labels: labelMailboxes,
+          labelsEnabled,
+          tagAppearance,
+          onSelect: onRowClick,
+          onToggleSelect: toggleThreadSelection,
         }
         return (
           <ActionRow
@@ -263,13 +297,14 @@ export function EmailList({
             preferences={preferences}
             isArchive={isArchive}
             isTrash={isTrash}
+            onPrefetch={() => prefetchThread(threadId)}
           >
             {rowStyle === "gmail" ? (
-              <GmailRow {...shared} />
+              <GmailRowMemo {...shared} />
             ) : rowStyle === "outlook" ? (
-              <OutlookRow {...shared} />
+              <OutlookRowMemo {...shared} />
             ) : (
-              <MinimalRow {...shared} />
+              <MinimalRowMemo {...shared} />
             )}
           </ActionRow>
         )
@@ -285,12 +320,14 @@ function ActionRow({
   preferences,
   isArchive,
   isTrash,
+  onPrefetch,
   children,
 }: {
   email: EmailProperties
   preferences?: UserPreferences
   isArchive: boolean
   isTrash: boolean
+  onPrefetch?: () => void
   children: React.ReactNode
 }) {
   const { run: runThreadAction, busy } = useThreadActionRunner(email.threadId)
@@ -363,6 +400,8 @@ function ActionRow({
   return (
     <div
       className="group/action relative min-w-0 overflow-hidden"
+      onPointerEnter={onPrefetch}
+      onFocus={onPrefetch}
       onClickCapture={(event) => {
         if (suppressClick.current) {
           event.stopPropagation()
@@ -479,8 +518,11 @@ interface RowProps {
   unreadStyle: UnreadStyle
   narrow: boolean
   language: Language
-  onSelect: (e: React.MouseEvent) => void
-  onToggleSelect: () => void
+  labels: Mailbox[]
+  labelsEnabled: boolean
+  tagAppearance?: UserPreferences["tagAppearance"]
+  onSelect: (email: EmailProperties, e: React.MouseEvent) => void
+  onToggleSelect: (threadId: string) => void
 }
 
 const AVATAR_COLORS = [
@@ -560,19 +602,38 @@ function RowAvatar({
 function RowBadges({
   email,
   narrow = false,
+  labels,
+  labelsEnabled,
+  tagAppearance,
 }: {
   email: EmailProperties
   narrow?: boolean
+  labels: Mailbox[]
+  labelsEnabled: boolean
+  tagAppearance?: UserPreferences["tagAppearance"]
 }) {
-  const labelsEnabled = useFeatureFlag("mail.labels")
   return (
     <>
-      {labelsEnabled && !narrow ? <LabelChips email={email} /> : null}
+      {labelsEnabled && !narrow ? (
+        <LabelChips
+          email={email}
+          labels={labels}
+          tagAppearance={tagAppearance}
+        />
+      ) : null}
       {emailHasAttachments(email) ? (
         <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
       ) : null}
       {email.keywords?.$flagged ? (
         <Star className="size-3.5 shrink-0 fill-amber-400 text-amber-400" />
+      ) : null}
+      {email.threadEmailCount && email.threadEmailCount > 1 ? (
+        <span
+          className="shrink-0 rounded-full bg-muted px-1.5 text-[10px] leading-4 font-medium text-muted-foreground tabular-nums"
+          title={`${email.threadEmailCount} messages`}
+        >
+          {email.threadEmailCount}
+        </span>
       ) : null}
     </>
   )
@@ -643,12 +704,12 @@ function GmailRow(props: RowProps) {
       <RowCheckbox
         selected={props.selected}
         name={sender}
-        onToggleSelect={props.onToggleSelect}
+        onToggleSelect={() => props.onToggleSelect(email.threadId)}
       />
       <button
         type="button"
         dir="auto"
-        onClick={onSelect}
+        onClick={(e) => onSelect(email, e)}
         className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden text-left"
       >
         <RowAvatar email={email} size="size-7" />
@@ -671,7 +732,13 @@ function GmailRow(props: RowProps) {
             </span>
           ) : null}
         </span>
-        <RowBadges email={email} narrow={props.narrow} />
+        <RowBadges
+          email={email}
+          narrow={props.narrow}
+          labels={props.labels}
+          labelsEnabled={props.labelsEnabled}
+          tagAppearance={props.tagAppearance}
+        />
         <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
           {time ? formatRelative(time, props.language) : ""}
         </span>
@@ -717,12 +784,12 @@ function OutlookRow(props: RowProps) {
       <RowCheckbox
         selected={props.selected}
         name={sender}
-        onToggleSelect={props.onToggleSelect}
+        onToggleSelect={() => props.onToggleSelect(email.threadId)}
       />
       <button
         type="button"
         dir="auto"
-        onClick={onSelect}
+        onClick={(e) => onSelect(email, e)}
         className="flex min-w-0 flex-1 items-start gap-3 overflow-hidden text-left"
       >
         <RowAvatar
@@ -739,7 +806,13 @@ function OutlookRow(props: RowProps) {
             >
               {sender}
             </span>
-            <RowBadges email={email} narrow={props.narrow} />
+            <RowBadges
+              email={email}
+              narrow={props.narrow}
+              labels={props.labels}
+              labelsEnabled={props.labelsEnabled}
+              tagAppearance={props.tagAppearance}
+            />
             <span
               className={cn(
                 "shrink-0 text-xs tabular-nums",
@@ -795,12 +868,12 @@ function MinimalRow(props: RowProps) {
         <RowCheckbox
           selected={props.selected}
           name={sender}
-          onToggleSelect={props.onToggleSelect}
+          onToggleSelect={() => props.onToggleSelect(email.threadId)}
         />
         <button
           type="button"
           dir="auto"
-          onClick={onSelect}
+          onClick={(e) => onSelect(email, e)}
           className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-left"
         >
           <span
@@ -824,7 +897,13 @@ function MinimalRow(props: RowProps) {
               </span>
             ) : null}
           </span>
-          <RowBadges email={email} narrow={props.narrow} />
+          <RowBadges
+            email={email}
+            narrow={props.narrow}
+            labels={props.labels}
+            labelsEnabled={props.labelsEnabled}
+            tagAppearance={props.tagAppearance}
+          />
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
@@ -852,12 +931,12 @@ function MinimalRow(props: RowProps) {
       <RowCheckbox
         selected={props.selected}
         name={sender}
-        onToggleSelect={props.onToggleSelect}
+        onToggleSelect={() => props.onToggleSelect(email.threadId)}
       />
       <button
         type="button"
         dir="auto"
-        onClick={onSelect}
+        onClick={(e) => onSelect(email, e)}
         className="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden text-left"
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -869,7 +948,13 @@ function MinimalRow(props: RowProps) {
           >
             {sender}
           </span>
-          <RowBadges email={email} narrow={props.narrow} />
+          <RowBadges
+            email={email}
+            narrow={props.narrow}
+            labels={props.labels}
+            labelsEnabled={props.labelsEnabled}
+            tagAppearance={props.tagAppearance}
+          />
           <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
             {time ? formatRelative(time, props.language) : ""}
           </span>
@@ -896,3 +981,7 @@ function MinimalRow(props: RowProps) {
     </div>
   )
 }
+
+const GmailRowMemo = memo(GmailRow)
+const OutlookRowMemo = memo(OutlookRow)
+const MinimalRowMemo = memo(MinimalRow)

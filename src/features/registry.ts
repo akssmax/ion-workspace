@@ -27,11 +27,16 @@ export interface FeatureDefinition {
 
 const registry = new Map<string, FeatureDefinition>()
 
-/** Register a feature. Called by feature modules at import time. */
+/**
+ * Register a feature. Called by feature modules at import time.
+ *
+ * Idempotent: the registry is a module singleton that outlives Vite HMR
+ * re-evaluations, so re-registering the same id returns the existing entry
+ * instead of throwing during development.
+ */
 export function defineFeature(def: FeatureDefinition): FeatureDefinition {
-  if (registry.has(def.id)) {
-    throw new Error(`Duplicate feature id "${def.id}".`)
-  }
+  const existing = registry.get(def.id)
+  if (existing) return existing
   registry.set(def.id, def)
   return def
 }

@@ -34,9 +34,9 @@ export interface EmptyStateProps {
    */
   tone?: EmptyStateTone
   /**
-   * Render the animated backdrop behind the empty state. It is dark-only and
-   * theme aware: in light theme the empty state falls back to the card surface
-   * tokens. Default `true`.
+   * Render the animated backdrop behind the empty state. It is theme aware:
+   * dark theme shows the dark wash, light theme a lighter ink-on-paper variant.
+   * Default `true`.
    */
   background?: boolean
   className?: string
@@ -139,10 +139,10 @@ export function EmptyState({
       )}
     >
       {background ? (
-        <div className="absolute inset-0 hidden dark:block">
+        <div className="absolute inset-0">
           <AuthBackground />
           {/* Keep the copy legible over the animated pattern. */}
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--background)_80%,transparent)_0%,color-mix(in_oklch,var(--background)_67%,transparent)_55%,color-mix(in_oklch,var(--background)_60%,transparent)_100%)]" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--background)_55%,transparent)_0%,color-mix(in_oklch,var(--background)_45%,transparent)_55%,color-mix(in_oklch,var(--background)_40%,transparent)_100%)] dark:bg-[radial-gradient(ellipse_at_center,color-mix(in_oklch,var(--background)_80%,transparent)_0%,color-mix(in_oklch,var(--background)_67%,transparent)_55%,color-mix(in_oklch,var(--background)_60%,transparent)_100%)]" />
         </div>
       ) : null}
 

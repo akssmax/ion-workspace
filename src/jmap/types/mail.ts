@@ -72,6 +72,8 @@ export interface EmailProperties {
   messageId?: string | null
   preview?: string | null
   hasAttachment?: boolean
+  /** Number of messages in the thread (page query only; not a JMAP property). */
+  threadEmailCount?: number
   htmlBody?: EmailBodyPart[]
   textBody?: EmailBodyPart[]
   bodyValues?: Record<
@@ -228,6 +230,16 @@ export interface EmailQueryResponse {
   limit?: number | null
   filter?: EmailFilterOperator
   sort?: EmailSortComparator[]
+}
+
+export interface EmailChangesResponse {
+  accountId: JmapId
+  oldState: string
+  newState: string
+  created: JmapId[]
+  updated: JmapId[]
+  destroyed: JmapId[]
+  hasMoreChanges: boolean
 }
 
 export interface EmailSetArgs {

@@ -34,8 +34,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "cn"
 import { useMailStore } from "@/stores/mail.store"
-import { useMailboxes, sortMailboxes } from "@/queries/mail"
+import { useMailboxes } from "@/queries/mail"
 import { EmailList } from "./email-list"
+import { ThreadActionsProvider } from "./thread-actions"
 import { MailboxHeader } from "./mailbox-header"
 import { ThreadViewPane } from "./thread-view"
 import { useInboxLayout } from "@/queries/preferences"
@@ -63,10 +64,28 @@ const mailboxRoleLabels: Record<string, TranslationKey> = {
 }
 
 export function MailView() {
+  return (
+    <ThreadActionsProvider>
+      <MailViewInner />
+    </ThreadActionsProvider>
+  )
+}
+
+function MailViewInner() {
   const { t, direction } = useLanguage()
   const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const searchQuery = useMailStore((s) => s.searchQuery)
   const setSearchQuery = useMailStore((s) => s.setSearchQuery)
+  // Debounce the search passed to the data layer: fuzzy search scans a window
+  // per keystroke, so we don't want a request for every character.
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery)
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedSearchQuery(searchQuery),
+      250
+    )
+    return () => window.clearTimeout(timer)
+  }, [searchQuery])
   const paneView = useMailStore((s) => s.paneView)
   const focusedThreadId = useMailStore((s) => s.focusedThreadId)
   const setFocusedThread = useMailStore((s) => s.setFocusedThread)
@@ -87,7 +106,7 @@ export function MailView() {
   const layout = useInboxLayout()
 
   const { data: rawMailboxes } = useMailboxes()
-  const mailboxes = sortMailboxes(rawMailboxes ?? [])
+  const mailboxes = rawMailboxes ?? []
   const mailbox = mailboxes.find((m) => m.id === activeMailboxId)
   // Never send an unresolved/stale mailbox id (e.g. a mock id persisted from a
   // previous session) to the server — Stalwart rejects unknown ids with a 400.
@@ -389,7 +408,7 @@ export function MailView() {
           >
             <MailboxHeader
               mailboxId={resolvedMailboxId}
-              query={searchQuery}
+              query={debouncedSearchQuery}
               page={mailPage}
               onPageChange={setMailPage}
               sort={sort}
@@ -401,7 +420,7 @@ export function MailView() {
             <div className="min-h-0 flex-1 overflow-hidden">
               <EmailList
                 mailboxId={resolvedMailboxId}
-                query={searchQuery}
+                query={debouncedSearchQuery}
                 page={mailPage}
                 sort={sort}
                 sent={listScope.sent}
@@ -489,7 +508,7 @@ export function MailView() {
             >
               <span
                 className={cn(
-                  "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100",
+                  "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity group-hover/separator:opacity-100 group-focus-visible/separator:opacity-100 max-lg:opacity-100",
                   verticalSplit
                     ? "top-1/2 left-1/2 h-1 w-10 -translate-x-1/2 -translate-y-1/2"
                     : "top-1/2 left-1/2 h-10 w-1 -translate-x-1/2 -translate-y-1/2"
@@ -502,30 +521,29 @@ export function MailView() {
           </Tooltip>
         ) : null}
 
-        {showReading ? (
-          <div
-            className={cn(
-              "flex min-w-0 flex-1 flex-col",
-              verticalSplit && "min-h-[220px]"
-            )}
-          >
-            {hiddenPane ? (
-              <div className="flex h-12 shrink-0 items-center gap-2 border-b px-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setFocusedThread(null)}
-                >
-                  <ArrowLeft className="size-4 rtl:rotate-180" />
-                  {t("Back")}
-                </Button>
-              </div>
-            ) : null}
-            <div className="min-h-0 flex-1">
-              <ThreadViewPane threadId={focusedThreadId} />
+        <div
+          className={cn(
+            "min-w-0 flex-1 flex-col",
+            showReading ? "flex" : "hidden",
+            verticalSplit && "min-h-[220px]"
+          )}
+        >
+          {hiddenPane ? (
+            <div className="flex h-12 shrink-0 items-center gap-2 border-b px-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFocusedThread(null)}
+              >
+                <ArrowLeft className="size-4 rtl:rotate-180" />
+                {t("Back")}
+              </Button>
             </div>
+          ) : null}
+          <div className="min-h-0 flex-1">
+            <ThreadViewPane threadId={focusedThreadId} />
           </div>
-        ) : null}
+        </div>
       </div>
     </div>
   )

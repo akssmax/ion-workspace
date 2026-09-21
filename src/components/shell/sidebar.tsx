@@ -46,7 +46,7 @@ import type {WorkspaceApp} from "@/stores/workspace.store";
 import { useMailStore } from "@/stores/mail.store"
 import { useFilesStore } from "@/stores/files.store"
 import { useComposerStore } from "@/stores/composer.store"
-import { useMailboxes, sortMailboxes } from "@/queries/mail"
+import { useMailboxes } from "@/queries/mail"
 import { usePreferences } from "@/queries/preferences"
 import { accentClasses } from "@/lib/accents"
 import { resolveTagAppearance } from "@/lib/tag-appearance"
@@ -249,7 +249,7 @@ function MailboxPanel() {
   const setSearchQuery = useMailStore((s) => s.setSearchQuery)
   const { data: rawMailboxes } = useMailboxes()
   const { data: prefs } = usePreferences()
-  const mailboxes = sortMailboxes(rawMailboxes ?? [])
+  const mailboxes = rawMailboxes ?? []
   const folderManagement = useFeatureFlag("mail.mailboxes")
 
   function pickMailbox(id: string) {

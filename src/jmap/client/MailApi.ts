@@ -3,9 +3,10 @@
  * client so domain services never construct raw invocations themselves.
  */
 
-import type { JmapClient } from "./JmapClient"
+import type { JmapClient, JmapBatchResponse } from "./JmapClient"
 import type {
   DraftCreationInput,
+  EmailChangesResponse,
   EmailFilterOperator,
   EmailGetResponse,
   EmailProperties,
@@ -255,6 +256,7 @@ export class MailApi {
     const acc = this.acct(accountId)
     const qid = "eq1"
     const gid = "eg1"
+    const tid = "etg1"
 
     const res = await this.client.invoke(
       [
@@ -297,6 +299,17 @@ export class MailApi {
           },
           resultOf: { callId: qid, name: "Email/query", path: "/ids/*" },
         },
+        {
+          // Thread sizes for the visible page, so rows can show a message count.
+          id: tid,
+          method: "Thread/get",
+          args: { accountId: acc, ids: [`#${gid}`] },
+          resultOf: {
+            callId: gid,
+            name: "Email/get",
+            path: "/list/*/threadId",
+          },
+        },
       ],
       { accountId: acc }
     )
@@ -304,17 +317,58 @@ export class MailApi {
     const query = res.get<EmailQueryResponse>(qid)
     const get = res.get<EmailGetResponse>(gid)
     // Email/get does not promise query order; render in Email/query order.
-    const byId = new Map(get.list.map(email => [email.id, email]))
+    const byId = new Map(get.list.map((email) => [email.id, email]))
+    const emails = query.ids
+      .map((id) => byId.get(id))
+      .filter((email): email is EmailProperties => !!email)
     return {
       mailboxes: [],
       queryState: query.queryState,
       position: query.position,
       ids: query.ids,
       total: query.total,
-      emails: query.ids.map(id => byId.get(id)).filter((email): email is EmailProperties => !!email),
+      emails: this.withThreadCounts(emails, res, tid),
       notFound: get.notFound,
       state: get.state,
     }
+  }
+
+  /** Attach each email's thread size using a batched Thread/get result. */
+  private withThreadCounts(
+    emails: EmailProperties[],
+    res: JmapBatchResponse,
+    callId: string
+  ): EmailProperties[] {
+    try {
+      const threads = res.get<{ list: (Thread | null)[] }>(callId).list
+      const counts = new Map(
+        threads
+          .filter((thread): thread is Thread => !!thread)
+          .map((thread) => [thread.id, thread.emailIds.length])
+      )
+      return emails.map((email) => ({
+        ...email,
+        threadEmailCount: counts.get(email.threadId),
+      }))
+    } catch {
+      // Thread counts are decorative — never fail the page load over them.
+      return emails
+    }
+  }
+
+  /**
+   * Fetch changes for a JMAP data type since a state (RFC 8620 §5.2).
+   * `sinceState` may be omitted to obtain only the current state.
+   */
+  async changes(
+    sinceState?: string,
+    accountId?: string
+  ): Promise<EmailChangesResponse> {
+    return this.client.call<EmailChangesResponse>(
+      "Email/changes",
+      { accountId: this.acct(accountId), sinceState },
+      "ech0"
+    )
   }
 
   /**
@@ -796,9 +850,22 @@ export class MailApi {
     return res.list
   }
 
-  async updateIdentity(id: string, patch: Partial<Pick<Identity, "name" | "replyTo" | "bcc" | "textSignature" | "htmlSignature">>, accountId?: string): Promise<void> {
-    const result = await this.client.call<{ notUpdated?: Record<string, { description?: string; type: string }> }>(
-      "Identity/set", { accountId: this.acct(accountId), update: { [id]: patch } }, "id1"
+  async updateIdentity(
+    id: string,
+    patch: Partial<
+      Pick<
+        Identity,
+        "name" | "replyTo" | "bcc" | "textSignature" | "htmlSignature"
+      >
+    >,
+    accountId?: string
+  ): Promise<void> {
+    const result = await this.client.call<{
+      notUpdated?: Record<string, { description?: string; type: string }>
+    }>(
+      "Identity/set",
+      { accountId: this.acct(accountId), update: { [id]: patch } },
+      "id1"
     )
     const failure = result.notUpdated?.[id]
     if (failure) throw new Error(failure.description ?? failure.type)

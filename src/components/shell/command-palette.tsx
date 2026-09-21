@@ -34,7 +34,7 @@ import type { WorkspaceApp } from "@/stores/workspace.store"
 import { useMailStore } from "@/stores/mail.store"
 import { useComposerStore } from "@/stores/composer.store"
 import { useCalendarStore } from "@/stores/calendar.store"
-import { useMailboxes, sortMailboxes } from "@/queries/mail"
+import { useMailboxes } from "@/queries/mail"
 
 export function CommandPalette() {
   const open = useWorkspaceStore((s) => s.paletteOpen)
@@ -47,7 +47,7 @@ export function CommandPalette() {
   const navigate = useNavigate()
   const [query, setQuery] = useState("")
   const { data: rawMailboxes } = useMailboxes()
-  const mailboxes = sortMailboxes(rawMailboxes ?? [])
+  const mailboxes = rawMailboxes ?? []
 
   useEffect(() => {
     if (!open) setQuery("")

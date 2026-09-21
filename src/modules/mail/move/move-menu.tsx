@@ -9,7 +9,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useMailboxes, useMoveEmails, sortMailboxes } from "@/queries/mail"
+import { useMailboxes, useMoveEmails } from "@/queries/mail"
 import { useMailStore } from "@/stores/mail.store"
 
 const ROLE_LABELS: Record<string, string> = {
@@ -34,7 +34,7 @@ export function MoveMenu({
   const activeMailboxId = useMailStore((s) => s.activeMailboxId)
   const move = useMoveEmails()
 
-  const targets = sortMailboxes(rawMailboxes ?? []).filter(
+  const targets = (rawMailboxes ?? []).filter(
     (mb) =>
       mb.id !== activeMailboxId &&
       mb.role !== "flagged" &&

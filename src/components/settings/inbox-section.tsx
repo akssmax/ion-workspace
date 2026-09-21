@@ -18,7 +18,7 @@ import {
   useSavePreferences,
 } from "@/queries/preferences"
 import { MailLayoutControls } from "@/components/mail/mail-layout-menu"
-import { SaveState } from "./settings-page"
+import { SaveState } from "./setting-row"
 import { SettingsGroup } from "./settings-group"
 
 const SWIPE_OPTIONS = [

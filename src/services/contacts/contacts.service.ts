@@ -42,7 +42,42 @@ export async function createContact(
   const accountId = await getPrimaryAccountId("urn:ietf:params:jmap:contacts")
   if (!accountId) throw new Error("No contacts account available.")
   client.contacts.bindAccount(accountId)
-  return client.contacts.createContact(contact, accountId)
+
+  const addressBookIds =
+    contact.addressBookIds && Object.keys(contact.addressBookIds).length > 0
+      ? contact.addressBookIds
+      : await resolveDefaultAddressBookIds(accountId)
+
+  return client.contacts.createContact(
+    { ...contact, addressBookIds },
+    accountId
+  )
+}
+
+/**
+ * A contact must belong to at least one address book, so pick a sensible
+ * default when the caller did not supply one.
+ */
+async function resolveDefaultAddressBookIds(
+  accountId: string
+): Promise<Record<string, boolean>> {
+  const client = await getJmapClient()
+  const books = await client.contacts.getAddressBooks(accountId)
+  const writable = books.filter(
+    (book) =>
+      !book.isReadOnly &&
+      book.myRights?.mayWrite !== false &&
+      book.myRights?.mayAddItems !== false
+  )
+  const preferred =
+    writable.find((book) => book.isDefault) ??
+    writable.find((book) => book.isSubscribed !== false) ??
+    writable.at(0) ??
+    books.find((book) => book.isDefault) ??
+    books.at(0)
+  if (!preferred)
+    throw new Error("No address book is available to save this contact to.")
+  return { [preferred.id]: true }
 }
 
 export async function updateContact(

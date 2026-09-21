@@ -20,20 +20,51 @@ type PushListener = () => void
 class SyncEngine {
   private listeners = new Set<PushListener>()
   private syncing = new Set<string>()
+  /** Signature of the last payload written per email, to skip no-op writes. */
+  private written = new Map<string, string>()
 
-  async storeMailPage(accountId: string, emails: EmailProperties[]): Promise<void> {
+  async storeMailPage(
+    accountId: string,
+    emails: EmailProperties[]
+  ): Promise<void> {
     if (isDemoRuntime) return
-    await db.mailCache.bulkPut(emails.map((email) => ({
-      ...email,
-      accountId,
-      cacheKey: `${accountId}:${email.id}`,
-      mailboxIdsList: Object.keys(email.mailboxIds),
-    })))
+    const changed = emails.filter((email) => {
+      const key = `${accountId}:${email.id}`
+      const signature = JSON.stringify([
+        email.receivedAt,
+        email.threadId,
+        email.mailboxIds,
+        email.keywords,
+        email.threadEmailCount,
+      ])
+      if (this.written.get(key) === signature) return false
+      this.written.set(key, signature)
+      return true
+    })
+    if (changed.length === 0) return
+    if (this.written.size > 5000) this.written.clear()
+    await db.mailCache.bulkPut(
+      changed.map((email) => ({
+        ...email,
+        accountId,
+        cacheKey: `${accountId}:${email.id}`,
+        mailboxIdsList: Object.keys(email.mailboxIds),
+      }))
+    )
   }
 
-  async offlineMailPage(accountId: string, mailboxId: string, position: number, limit: number) {
-    if (isDemoRuntime) throw new Error("Demo data is unavailable. Reset the demo to try again.")
-    const accountEmails = await db.mailCache.where("accountId").equals(accountId).toArray()
+  async offlineMailPage(
+    accountId: string,
+    mailboxId: string,
+    position: number,
+    limit: number
+  ) {
+    if (isDemoRuntime)
+      throw new Error("Demo data is unavailable. Reset the demo to try again.")
+    const accountEmails = await db.mailCache
+      .where("accountId")
+      .equals(accountId)
+      .toArray()
     const matches = accountEmails
       .filter((email) => mailboxId === "all" || email.mailboxIds[mailboxId])
       .sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? ""))
@@ -50,9 +81,17 @@ class SyncEngine {
     }
   }
 
-  async storeThread(accountId: string, thread: Thread, emails: EmailProperties[]) {
+  async storeThread(
+    accountId: string,
+    thread: Thread,
+    emails: EmailProperties[]
+  ) {
     if (isDemoRuntime) return
-    await db.threadCache.put({ ...thread, accountId, cacheKey: `${accountId}:${thread.id}` })
+    await db.threadCache.put({
+      ...thread,
+      accountId,
+      cacheKey: `${accountId}:${thread.id}`,
+    })
     await this.storeMailPage(accountId, emails)
   }
 
@@ -60,8 +99,15 @@ class SyncEngine {
     if (isDemoRuntime) return null
     const thread = await db.threadCache.get(`${accountId}:${threadId}`)
     if (!thread) return null
-    const emails = await Promise.all(thread.emailIds.map((id) => db.mailCache.get(`${accountId}:${id}`)))
-    return { thread, emails: emails.filter((email): email is NonNullable<typeof email> => !!email) }
+    const emails = await Promise.all(
+      thread.emailIds.map((id) => db.mailCache.get(`${accountId}:${id}`))
+    )
+    return {
+      thread,
+      emails: emails.filter(
+        (email): email is NonNullable<typeof email> => !!email
+      ),
+    }
   }
 
   /**
@@ -98,7 +144,9 @@ class SyncEngine {
       }))
       if (emails.length) {
         await db.emails.bulkPut(emails)
-        const threadIds = [...new Set(emails.map((e) => e.threadId))].filter(Boolean)
+        const threadIds = [...new Set(emails.map((e) => e.threadId))].filter(
+          Boolean
+        )
         if (threadIds.length) {
           const threads = await mailService.getThreads(threadIds)
           await db.threads.bulkPut(threads)

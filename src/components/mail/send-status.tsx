@@ -18,12 +18,23 @@ export function SendStatusPill() {
   const sendState = useComposerStore((s) => s.sendState)
   const sendError = useComposerStore((s) => s.sendError)
   const setSendState = useComposerStore((s) => s.setSendState)
-  const jobs = useMailJobs()
+  const jobs = useMailJobs({
+    // Poll only while a send is being tracked; idle sessions shouldn't poll.
+    enabled: sendState !== "idle",
+    refetchInterval: sendState !== "idle" ? 30_000 : false,
+  })
   const cancel = useCancelMailJob()
-  const latest = jobs.data?.find(job => job.kind === "send" && job.status === "queued")
+  const latest = jobs.data?.find(
+    (job) => job.kind === "send" && job.status === "queued"
+  )
 
   useEffect(() => {
-    if (sendState !== "sent" && sendState !== "queued" && sendState !== "failed") return
+    if (
+      sendState !== "sent" &&
+      sendState !== "queued" &&
+      sendState !== "failed"
+    )
+      return
     const timer = setTimeout(
       () => setSendState("idle"),
       sendState === "failed" ? ERROR_HIDE_MS : AUTO_HIDE_MS
@@ -40,7 +51,19 @@ export function SendStatusPill() {
         error={sendError}
         onDismiss={() => setSendState("idle")}
       />
-      {sendState === "queued" && latest ? <Button className="mt-2" variant="outline" size="sm" disabled={cancel.isPending} onClick={() => cancel.mutate(latest.id, { onSuccess: () => setSendState("idle") })}>Undo send</Button> : null}
+      {sendState === "queued" && latest ? (
+        <Button
+          className="mt-2"
+          variant="outline"
+          size="sm"
+          disabled={cancel.isPending}
+          onClick={() =>
+            cancel.mutate(latest.id, { onSuccess: () => setSendState("idle") })
+          }
+        >
+          Undo send
+        </Button>
+      ) : null}
     </div>
   )
 }
@@ -63,7 +86,8 @@ export function SendStatusBanner({
         "flex items-center gap-2 rounded-full border px-3.5 py-2 text-sm shadow-lg",
         (state === "sent" || state === "queued") &&
           "border-transparent bg-success text-success-foreground",
-        state === "failed" && "items-start rounded-2xl border-destructive/20 bg-popover",
+        state === "failed" &&
+          "items-start rounded-2xl border-destructive/20 bg-popover",
         state === "sending" && "bg-popover",
         className
       )}
@@ -76,7 +100,9 @@ export function SendStatusBanner({
       ) : state === "sent" || state === "queued" ? (
         <>
           <CheckCircle2 className="size-4" />
-          {state === "queued" ? "Message queued · Undo in Outbox" : "Message sent"}
+          {state === "queued"
+            ? "Message queued · Undo in Outbox"
+            : "Message sent"}
         </>
       ) : (
         <>

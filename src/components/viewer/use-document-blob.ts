@@ -10,16 +10,26 @@ import { useCallback, useEffect, useState } from "react"
 import type { DocumentSource } from "./types"
 
 const blobCache = new Map<string, Promise<Blob>>()
+const MAX_CACHED_BLOBS = 24
 
 /** Start (or reuse) a blob fetch for a source. */
 export function primeDocumentBlob(source: DocumentSource): Promise<Blob> {
   const existing = blobCache.get(source.id)
-  if (existing) return existing
+  if (existing) {
+    // Refresh recency so in-use entries survive eviction.
+    blobCache.delete(source.id)
+    blobCache.set(source.id, existing)
+    return existing
+  }
   const promise = source.loadBlob().catch((error) => {
     blobCache.delete(source.id)
     throw error
   })
   blobCache.set(source.id, promise)
+  if (blobCache.size > MAX_CACHED_BLOBS) {
+    const oldest = blobCache.keys().next().value
+    if (oldest !== undefined) blobCache.delete(oldest)
+  }
   return promise
 }
 

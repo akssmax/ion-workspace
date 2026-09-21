@@ -2,17 +2,15 @@ import { useEffect } from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import {
   SettingsPage,
-  SETTINGS_SECTION_IDS,
+  isSettingsSectionId,
 } from "@/components/settings/settings-page"
-import type { SettingsSectionId } from "@/components/settings/settings-page"
 import { Spinner } from "@/components/ui/spinner"
 import { useSession } from "@/hooks/use-session"
 
 export const Route = createFileRoute("/settings")({
-  validateSearch: (search: Record<string, unknown>): { section: SettingsSectionId } => {
-    const section = search.section as SettingsSectionId
+  validateSearch: (search: Record<string, unknown>): { section: string } => {
     return {
-      section: SETTINGS_SECTION_IDS.includes(section) ? section : "general",
+      section: isSettingsSectionId(search.section) ? search.section : "general",
     }
   },
   component: SettingsRoute,

@@ -16,7 +16,6 @@ import {
 import { cn } from "cn"
 import {
   useContacts,
-  useCreateContact,
   useUpdateContact,
   useDestroyContact,
 } from "@/queries/contacts"
@@ -29,12 +28,12 @@ import { EmptyState } from "@/components/ui/empty-state"
 import type { Contact } from "@/jmap/types/contacts"
 import { OpenSidebarTrigger } from "@/components/shell/open-sidebar-trigger"
 import { useIsMobile } from "@/hooks/use-mobile"
+import { ContactEditor } from "./contact-editor"
 
 export function ContactsView() {
   const isMobile = useIsMobile()
   const { data: contacts, isLoading } = useContacts()
   const session = useSession()
-  const createContact = useCreateContact()
   const updateContact = useUpdateContact()
   const destroyContact = useDestroyContact()
 
@@ -44,32 +43,6 @@ export function ContactsView() {
 
   const selected = contacts?.find((c) => c.id === selectedId) ?? null
 
-  async function handleCreate(fields: {
-    fn: string
-    email: string
-    phone: string
-    organization: string
-  }) {
-    if (!fields.fn.trim()) return
-    await createContact.mutateAsync({
-      fn: fields.fn.trim(),
-      organization: fields.organization.trim() || undefined,
-      emails: fields.email.trim()
-        ? [
-            {
-              type: "work" as const,
-              value: fields.email.trim(),
-              isDefault: true,
-            },
-          ]
-        : undefined,
-      phones: fields.phone.trim()
-        ? [{ type: "work" as const, value: fields.phone.trim() }]
-        : undefined,
-    })
-    setAdding(false)
-  }
-
   async function handleUpdate(patch: Partial<Contact>) {
     if (!selected) return
     await updateContact.mutateAsync({ id: selected.id, patch })
@@ -78,32 +51,23 @@ export function ContactsView() {
 
   return (
     <div className="flex h-full min-w-0">
-      <div className={cn("flex min-w-0 flex-1 flex-col", isMobile && selected && "hidden")}>
+      <div
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          isMobile && selected && "hidden"
+        )}
+      >
         <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-2 border-b px-3 py-2 sm:px-4">
           <OpenSidebarTrigger />
           <h1 className="text-sm font-semibold">Contacts</h1>
           <span className="text-xs text-muted-foreground">
             {contacts?.length ?? 0} contact{contacts?.length === 1 ? "" : "s"}
           </span>
-          {!adding && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setAdding(true)}
-            >
-              <UserPlus className="size-4" />
-              Add contact
-            </Button>
-          )}
+          <Button size="sm" className="ml-auto" onClick={() => setAdding(true)}>
+            <UserPlus className="size-4" />
+            Add contact
+          </Button>
         </header>
-
-        {adding ? (
-          <CreateContactForm
-            onCancel={() => setAdding(false)}
-            onCreate={(f) => void handleCreate(f)}
-          />
-        ) : null}
 
         <div className="min-h-0 flex-1 overflow-y-auto">
           {isLoading ? (
@@ -151,7 +115,11 @@ export function ContactsView() {
                   ? `Using account ${session.data.email}.`
                   : "Add your first contact to get started."
               }
-              action={<Button size="sm">New contact</Button>}
+              action={
+                <Button size="sm" onClick={() => setAdding(true)}>
+                  New contact
+                </Button>
+              }
               className="h-full rounded-none border-0"
             />
           )}
@@ -159,9 +127,17 @@ export function ContactsView() {
       </div>
 
       {selected ? (
-        <aside className="min-w-0 w-full shrink-0 overflow-y-auto border-l bg-card md:w-96">
+        <aside className="w-full min-w-0 shrink-0 overflow-y-auto border-l bg-card md:w-96">
           {isMobile ? (
-            <Button variant="ghost" size="sm" className="m-3" onClick={() => { setSelectedId(null); setEditing(false) }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="m-3"
+              onClick={() => {
+                setSelectedId(null)
+                setEditing(false)
+              }}
+            >
               <ArrowLeft className="size-4" /> Back to contacts
             </Button>
           ) : null}
@@ -183,79 +159,9 @@ export function ContactsView() {
           )}
         </aside>
       ) : null}
+
+      <ContactEditor open={adding} onClose={() => setAdding(false)} />
     </div>
-  )
-}
-
-function CreateContactForm({
-  onCancel,
-  onCreate,
-}: {
-  onCancel: () => void
-  onCreate: (fields: {
-    fn: string
-    email: string
-    phone: string
-    organization: string
-  }) => void
-}) {
-  const [fn, setFn] = useState("")
-  const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
-  const [organization, setOrganization] = useState("")
-
-  return (
-    <form
-      className="grid grid-cols-1 gap-3 border-b p-4 sm:grid-cols-2"
-      onSubmit={(e) => {
-        e.preventDefault()
-        onCreate({ fn, email, phone, organization })
-      }}
-    >
-      <div className="space-y-1">
-        <Label htmlFor="cfn">Name</Label>
-        <Input
-          id="cfn"
-          value={fn}
-          onChange={(e) => setFn(e.target.value)}
-          placeholder="Jane Doe"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="corg">Organization</Label>
-        <Input
-          id="corg"
-          value={organization}
-          onChange={(e) => setOrganization(e.target.value)}
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="cemail">Email</Label>
-        <Input
-          id="cemail"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="jane@example.com"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label htmlFor="cphone">Phone</Label>
-        <Input
-          id="cphone"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
-        />
-      </div>
-      <div className="flex items-center gap-2 sm:col-span-2">
-        <Button type="submit" disabled={!fn.trim()}>
-          <UserPlus className="size-4" />
-          Add contact
-        </Button>
-        <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </form>
   )
 }
 

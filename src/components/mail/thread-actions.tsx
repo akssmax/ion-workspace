@@ -1,10 +1,12 @@
 /**
  * Shared runner for the per-thread actions shown in both the mail list and the
- * reading-pane toolbar. Every surface uses this hook so the mutation, toast and
- * undo behaviour is identical everywhere.
+ * reading-pane toolbar. The mutations are created once by the provider so rows
+ * don't each mount six React Query observers; every surface gets identical
+ * mutation, toast and undo behaviour.
  */
 
-import { useCallback } from "react"
+import { createContext, useCallback, useContext, useMemo } from "react"
+import type { ReactNode } from "react"
 import { runWithUndo } from "@/lib/undo-toast"
 import {
   useArchiveEmails,
@@ -25,7 +27,14 @@ export type ThreadActionIntent =
   | "star"
   | "unstar"
 
-export function useThreadActionRunner(threadId: string) {
+interface ThreadActionsValue {
+  run: (intent: ThreadActionIntent, threadId: string) => void
+  busy: boolean
+}
+
+const ThreadActionsContext = createContext<ThreadActionsValue | null>(null)
+
+export function ThreadActionsProvider({ children }: { children: ReactNode }) {
   const archive = useArchiveEmails()
   const unarchive = useUnarchiveEmails()
   const trash = useTrashEmails()
@@ -41,7 +50,7 @@ export function useThreadActionRunner(threadId: string) {
     starred.isPending
 
   const run = useCallback(
-    (intent: ThreadActionIntent) => {
+    (intent: ThreadActionIntent, threadId: string) => {
       if (busy) return
       const ids = [threadId]
       switch (intent) {
@@ -115,8 +124,29 @@ export function useThreadActionRunner(threadId: string) {
           break
       }
     },
-    [busy, threadId, archive, unarchive, trash, restore, read, starred]
+    [busy, archive, unarchive, trash, restore, read, starred]
   )
 
-  return { run, busy }
+  const value = useMemo(() => ({ run, busy }), [run, busy])
+  return (
+    <ThreadActionsContext.Provider value={value}>
+      {children}
+    </ThreadActionsContext.Provider>
+  )
+}
+
+/** Bind the shared runner to a single thread. */
+export function useThreadActionRunner(threadId: string) {
+  const context = useContext(ThreadActionsContext)
+  if (!context) {
+    throw new Error(
+      "useThreadActionRunner must be used within a ThreadActionsProvider."
+    )
+  }
+  const { run, busy } = context
+  const runForThread = useCallback(
+    (intent: ThreadActionIntent) => run(intent, threadId),
+    [run, threadId]
+  )
+  return { run: runForThread, busy }
 }

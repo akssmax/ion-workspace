@@ -15,7 +15,11 @@ import type {
   Mailbox,
 } from "../../types/mail"
 import type { CalendarEvent } from "../../types/calendar"
-import type { Contact } from "../../types/contacts"
+import type { Contact, JsContactCard } from "../../types/contacts"
+import {
+  contactFromJsContact,
+  contactToJsContactCreate,
+} from "../../types/contacts"
 import type { FileNode } from "../../types/files"
 import { JMAP_CAPS } from "../../types"
 import {
@@ -518,12 +522,12 @@ export class MockServer {
           return H(["CalendarEvent/set", this.calendarEventSet(args), callId])
         case "AddressBook/get":
           return H(["AddressBook/get", this.addressBookGet(args), callId])
-        case "Contact/query":
-          return H(["Contact/query", this.contactQuery(args), callId])
-        case "Contact/get":
-          return H(["Contact/get", this.contactGet(args), callId])
-        case "Contact/set":
-          return H(["Contact/set", this.contactSet(args), callId])
+        case "ContactCard/query":
+          return H(["ContactCard/query", this.contactQuery(args), callId])
+        case "ContactCard/get":
+          return H(["ContactCard/get", this.contactGet(args), callId])
+        case "ContactCard/set":
+          return H(["ContactCard/set", this.contactSet(args), callId])
         case "ContactGroup/get":
           return H(["ContactGroup/get", this.contactGroupGet(args), callId])
         case "FileNode/get":
@@ -1471,7 +1475,7 @@ export class MockServer {
     return {
       accountId: String(args.accountId),
       state: this.state("Contact"),
-      list,
+      list: list.map((contact) => this.toContactCard(contact)),
       notFound,
     }
   }
@@ -1484,8 +1488,14 @@ export class MockServer {
       (args.create as Record<string, Partial<Contact>> | undefined) ?? {}
     )) {
       const id = this.newId("ct")
-      const contact = { id, ...patch }
-      this.contacts.set(id, contact as Contact)
+      const contact = contactFromJsContact({
+        ...(patch as unknown as JsContactCard),
+        id,
+        addressBookIds: (patch as unknown as JsContactCard).addressBookIds ?? {
+          ab_main: true,
+        },
+      })
+      this.contacts.set(id, contact)
       created[cid] = contact
     }
     for (const [id, patch] of Object.entries(
@@ -1493,8 +1503,14 @@ export class MockServer {
     )) {
       const c = this.contacts.get(id)
       if (!c) continue
-      Object.assign(c, patch)
-      updated[id] = c
+      const merged = contactFromJsContact({
+        ...(this.toContactCard(c) as unknown as Record<string, unknown>),
+        ...patch,
+        id,
+        addressBookIds: c.addressBookIds,
+      } as JsContactCard)
+      this.contacts.set(id, merged)
+      updated[id] = merged
     }
     for (const id of (args.destroy as JmapId[] | undefined) ?? []) {
       if (this.contacts.delete(id)) destroyed.push(id)
@@ -1509,6 +1525,14 @@ export class MockServer {
       ...(Object.keys(created).length ? { created } : {}),
       ...(Object.keys(updated).length ? { updated } : {}),
       ...(destroyed.length ? { destroyed } : {}),
+    }
+  }
+
+  private toContactCard(contact: Contact): JsContactCard {
+    return {
+      ...(contactToJsContactCreate(contact) as unknown as JsContactCard),
+      id: contact.id,
+      addressBookIds: contact.addressBookIds ?? {},
     }
   }
 

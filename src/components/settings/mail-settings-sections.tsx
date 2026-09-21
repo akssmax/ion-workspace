@@ -15,7 +15,7 @@ import { filenameDefaults, formatMailFilename, type FilenameKind } from "@/lib/m
 import { resolveTagAppearance } from "@/lib/tag-appearance"
 import type { TagAppearance } from "@/lib/tag-appearance"
 import { TagAppearanceBadge, TagAppearanceControl, TagAppearanceDraftControl } from "@/modules/mail/labels"
-import { SaveState } from "./settings-page"
+import { SaveState } from "./setting-row"
 import { SettingsGroup } from "./settings-group"
 import { useSaveVacationResponse, useVacationResponse, type VacationResponse } from "@/queries/mail-vacation"
 import { useMailFilters, useSaveMailFilters } from "@/queries/mail-filters"
