@@ -403,7 +403,7 @@ function MailViewInner() {
                 : hiddenPane
                   ? "flex-1"
                   : paneView === "list+reading"
-                    ? "min-w-[220px] shrink-0"
+                    ? "min-w-[320px] shrink-0"
                     : "flex-1"
             )}
             style={
@@ -494,7 +494,7 @@ function MailViewInner() {
                     const available = verticalSplit
                       ? bounds?.height
                       : bounds?.width
-                    const minimum = verticalSplit ? 150 : 220
+                    const minimum = verticalSplit ? 150 : 320
                     const remaining = verticalSplit ? 220 : 280
                     const lower = available ? minimum / available : 0.2
                     const upper = available
